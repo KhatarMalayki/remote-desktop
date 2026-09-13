@@ -1,0 +1,37 @@
+name: Release Agent Binaries
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.4'
+
+      - name: Build Agent Binaries
+        run: |
+          mkdir -p dist
+          VERSION=${GITHUB_REF_NAME#v}
+          echo "Building version: $VERSION"
+          CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags="-s -w -X main.version=$VERSION" -o dist/rd-agent-windows-amd64.exe ./cmd/agent
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w -X main.version=$VERSION" -o dist/rd-agent-linux-amd64 ./cmd/agent
+          CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w -X main.version=$VERSION" -o dist/rd-agent-darwin-amd64 ./cmd/agent
+          CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w -X main.version=$VERSION" -o dist/rd-agent-darwin-arm64 ./cmd/agent
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true
