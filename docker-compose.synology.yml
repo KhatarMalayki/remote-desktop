@@ -1,0 +1,31 @@
+version: '3.8'
+
+# RemoteDesk - Auto-updating deployment for Synology NAS
+# Menggunakan Watchtower untuk auto-pull container terbaru dari GitHub Container Registry
+
+services:
+  remotedesk:
+    image: ghcr.io/khatarmalayki/remote-desktop:latest
+    container_name: remotedesk-server
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./data:/data
+    environment:
+      - RD_ADMIN_USER=admin
+      - RD_ADMIN_PASS=admin123
+      - RD_API_KEY=kunci-rahasia-anda
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
+  updater:
+    image: containrrr/watchtower:latest
+    container_name: remotedesk-updater
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - WATCHTOWER_CLEANUP=true
+      - WATCHTOWER_POLL_INTERVAL=300
+      - WATCHTOWER_LABEL_ENABLE=true

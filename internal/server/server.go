@@ -1,0 +1,992 @@
+package server
+
+import (
+	"context"
+	"crypto/rand"
+	"crypto/sha256"
+	"embed"
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
+	"io/fs"
+	"log"
+	"net/http"
+	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/gorilla/websocket"
+	"github.com/user/remote-desktop/internal/models"
+)
+
+type Config struct {
+	Addr      string
+	DBPath    string
+	APIKey    string
+	AdminUser string
+	AdminPass string
+	JWTSecret string
+	Version   string
+	AgentsDir string
+}
+
+type UserClaims struct {
+	Username string `json:"username"`
+	Role     string `json:"role"`
+	Branch   string `json:"branch"`
+}
+
+type contextKey string
+
+const userClaimsKey contextKey = "userClaims"
+
+type Server struct {
+	cfg      Config
+	db       *DB
+	hub      *Hub
+	upgrader websocket.Upgrader
+	webFS    fs.FS
+}
+
+func New(cfg Config, webFS embed.FS) (*Server, error) {
+	db, err := NewDB(cfg.DBPath)
+	if err != nil {
+		return nil, fmt.Errorf("db init: %w", err)
+	}
+
+	if cfg.APIKey == "" {
+		b := make([]byte, 16)
+		rand.Read(b)
+		cfg.APIKey = hex.EncodeToString(b)
+		log.Printf("[server] generated API key: %s", cfg.APIKey)
+	}
+
+	if cfg.JWTSecret == "" {
+		b := make([]byte, 32)
+		rand.Read(b)
+		cfg.JWTSecret = hex.EncodeToString(b)
+	}
+
+	passHash := hashPassword(cfg.AdminPass)
+	db.EnsureAdmin(cfg.AdminUser, passHash)
+
+	sub, err := fs.Sub(webFS, "web")
+	if err != nil {
+		return nil, err
+	}
+
+	s := &Server{
+		cfg:   cfg,
+		db:    db,
+		hub:   NewHub(db),
+		webFS: sub,
+		upgrader: websocket.Upgrader{
+			ReadBufferSize:  4096,
+			WriteBufferSize: 4096,
+			CheckOrigin:     func(r *http.Request) bool { return true },
+		},
+	}
+	return s, nil
+}
+
+func (s *Server) ListenAndServe() error {
+	mux := http.NewServeMux()
+
+	mux.HandleFunc("/api/auth/login", s.handleLogin)
+	mux.HandleFunc("/api/auth/me", s.authMiddleware(s.handleMe))
+	mux.HandleFunc("/api/devices", s.authMiddleware(s.handleDevices))
+	mux.HandleFunc("/api/devices/", s.authMiddleware(s.handleDevice))
+	mux.HandleFunc("/api/stats", s.authMiddleware(s.handleStats))
+	mux.HandleFunc("/api/groups", s.authMiddleware(s.handleGroups))
+	mux.HandleFunc("/api/branches", s.authMiddleware(s.handleBranches))
+	mux.HandleFunc("/api/branches/stats", s.authMiddleware(s.handleBranchStats))
+	mux.HandleFunc("/api/assets/manual", s.authMiddleware(s.handleManualAssets))
+	mux.HandleFunc("/api/assets/manual/", s.authMiddleware(s.handleManualAsset))
+	mux.HandleFunc("/api/assets/verify", s.authMiddleware(s.handleVerifyAsset))
+	mux.HandleFunc("/api/assets/verifications", s.authMiddleware(s.handleAssetVerifications))
+	mux.HandleFunc("/api/agent/version", s.handleAgentVersion)
+	mux.HandleFunc("/api/agent/download", s.handleAgentDownload)
+	mux.HandleFunc("/api/agent/broadcast-update", s.authMiddleware(s.handleBroadcastAgentUpdate))
+	mux.HandleFunc("/api/agent/reconfigure", s.authMiddleware(s.handleReconfigureAgents))
+	mux.HandleFunc("/api/users", s.authMiddleware(s.handleUsers))
+	mux.HandleFunc("/api/users/", s.authMiddleware(s.handleUserDelete))
+	mux.HandleFunc("/api/logs/", s.authMiddleware(s.handleLogs))
+
+	mux.HandleFunc("/ws/agent", s.handleAgentWS)
+	mux.HandleFunc("/ws/viewer", s.authMiddleware(s.handleViewerWS))
+	mux.HandleFunc("/ws/relay/", s.handleRelayWS)
+
+	mux.Handle("/", http.FileServer(http.FS(s.webFS)))
+
+	log.Printf("[server] listening on %s", s.cfg.Addr)
+	return http.ListenAndServe(s.cfg.Addr, mux)
+}
+
+func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", 405)
+		return
+	}
+	var req struct {
+		Username string `json:"username"`
+		Password string `json:"password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonError(w, "invalid body", 400)
+		return
+	}
+	_, storedHash, role, branch, err := s.db.GetUser(req.Username)
+	if err != nil || storedHash != hashPassword(req.Password) {
+		jsonError(w, "invalid credentials", 401)
+		return
+	}
+	token := generateToken(req.Username, role, branch, s.cfg.JWTSecret)
+	jsonResp(w, map[string]string{
+		"token":    token,
+		"username": req.Username,
+		"role":     role,
+		"branch":   branch,
+	}, 200)
+}
+
+func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
+	claims := getClaims(r)
+	jsonResp(w, claims, 200)
+}
+
+func (s *Server) handleDevices(w http.ResponseWriter, r *http.Request) {
+	claims := getClaims(r)
+	switch r.Method {
+	case http.MethodGet:
+		group := r.URL.Query().Get("group")
+		if claims.Role == "kacab" && claims.Branch != "" {
+			group = claims.Branch
+		}
+		search := r.URL.Query().Get("search")
+		limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+		offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
+		if limit <= 0 || limit > 100 {
+			limit = 50
+		}
+
+		devices, total, err := s.db.ListDevices(group, search, limit, offset)
+		if err != nil {
+			jsonError(w, err.Error(), 500)
+			return
+		}
+
+		onlineIDs := s.hub.OnlineIDs()
+		onlineSet := map[string]bool{}
+		for _, id := range onlineIDs {
+			onlineSet[id] = true
+		}
+		for _, d := range devices {
+			d.Online = onlineSet[d.ID]
+		}
+
+		jsonResp(w, map[string]interface{}{
+			"devices": devices,
+			"total":   total,
+			"limit":   limit,
+			"offset":  offset,
+		}, 200)
+	default:
+		http.Error(w, "method not allowed", 405)
+	}
+}
+
+func (s *Server) handleDevice(w http.ResponseWriter, r *http.Request) {
+	id := strings.TrimPrefix(r.URL.Path, "/api/devices/")
+	if id == "" {
+		jsonError(w, "missing device id", 400)
+		return
+	}
+
+	switch r.Method {
+	case http.MethodGet:
+		dev, err := s.db.GetDevice(id)
+		if err != nil {
+			jsonError(w, "not found", 404)
+			return
+		}
+		dev.Online = s.hub.IsOnline(id)
+		jsonResp(w, dev, 200)
+
+	case http.MethodPut:
+		var req struct {
+			Tags  string `json:"tags"`
+			Group string `json:"group"`
+			Note  string `json:"note"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			jsonError(w, "invalid body", 400)
+			return
+		}
+		if err := s.db.UpdateDeviceMeta(id, req.Tags, req.Group, req.Note); err != nil {
+			jsonError(w, err.Error(), 500)
+			return
+		}
+		s.db.AddLog(id, "update_meta", fmt.Sprintf("tags=%s group=%s", req.Tags, req.Group))
+		jsonResp(w, map[string]string{"status": "ok"}, 200)
+
+	case http.MethodDelete:
+		claims := getClaims(r)
+		if claims.Role == "viewer" {
+			jsonError(w, "forbidden", 403)
+			return
+		}
+		if err := s.db.DeleteDevice(id); err != nil {
+			jsonError(w, err.Error(), 500)
+			return
+		}
+		jsonResp(w, map[string]string{"status": "deleted"}, 200)
+
+	default:
+		http.Error(w, "method not allowed", 405)
+	}
+}
+
+func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) {
+	stats, err := s.db.Stats()
+	if err != nil {
+		jsonError(w, err.Error(), 500)
+		return
+	}
+	stats["online_devices"] = s.hub.OnlineCount()
+	jsonResp(w, stats, 200)
+}
+
+func (s *Server) handleGroups(w http.ResponseWriter, r *http.Request) {
+	groups, err := s.db.GetGroups()
+	if err != nil {
+		jsonError(w, err.Error(), 500)
+		return
+	}
+	jsonResp(w, groups, 200)
+}
+
+func (s *Server) handleBranches(w http.ResponseWriter, r *http.Request) {
+	branches, err := s.db.GetBranches()
+	if err != nil {
+		jsonError(w, err.Error(), 500)
+		return
+	}
+	jsonResp(w, branches, 200)
+}
+
+func (s *Server) handleBranchStats(w http.ResponseWriter, r *http.Request) {
+	claims := getClaims(r)
+	branch := r.URL.Query().Get("branch")
+	if claims.Role == "kacab" && claims.Branch != "" {
+		branch = claims.Branch
+	}
+	stats, err := s.db.GetBranchStats(branch)
+	if err != nil {
+		jsonError(w, err.Error(), 500)
+		return
+	}
+	jsonResp(w, stats, 200)
+}
+
+// ---------------- MANUAL ASSETS ----------------
+
+func (s *Server) handleManualAssets(w http.ResponseWriter, r *http.Request) {
+	claims := getClaims(r)
+	switch r.Method {
+	case http.MethodGet:
+		branch := r.URL.Query().Get("branch")
+		if claims.Role == "kacab" && claims.Branch != "" {
+			branch = claims.Branch
+		}
+		category := r.URL.Query().Get("category")
+		verificationStatus := r.URL.Query().Get("verification_status")
+		search := r.URL.Query().Get("search")
+
+		assets, err := s.db.ListManualAssets(branch, category, verificationStatus, search)
+		if err != nil {
+			jsonError(w, err.Error(), 500)
+			return
+		}
+		jsonResp(w, assets, 200)
+
+	case http.MethodPost:
+		if claims.Role == "viewer" {
+			jsonError(w, "forbidden", 403)
+			return
+		}
+		var asset models.ManualAsset
+		if err := json.NewDecoder(r.Body).Decode(&asset); err != nil {
+			jsonError(w, "invalid request body", 400)
+			return
+		}
+		if asset.Name == "" || asset.AssetTag == "" {
+			jsonError(w, "asset name and tag are required", 400)
+			return
+		}
+		if claims.Role == "kacab" && claims.Branch != "" {
+			asset.Branch = claims.Branch
+		}
+		if asset.Branch == "" {
+			asset.Branch = "Pusat"
+		}
+		asset.CreatedBy = claims.Username
+
+		if err := s.db.CreateManualAsset(&asset); err != nil {
+			jsonError(w, fmt.Sprintf("failed to save asset: %v", err), 500)
+			return
+		}
+		jsonResp(w, asset, 201)
+
+	default:
+		http.Error(w, "method not allowed", 405)
+	}
+}
+
+func (s *Server) handleManualAsset(w http.ResponseWriter, r *http.Request) {
+	id := strings.TrimPrefix(r.URL.Path, "/api/assets/manual/")
+	if id == "" {
+		jsonError(w, "missing asset id", 400)
+		return
+	}
+	claims := getClaims(r)
+
+	existing, err := s.db.GetManualAsset(id)
+	if err != nil {
+		jsonError(w, "asset not found", 404)
+		return
+	}
+	if claims.Role == "kacab" && claims.Branch != "" && existing.Branch != claims.Branch {
+		jsonError(w, "forbidden: asset belongs to different branch", 403)
+		return
+	}
+
+	switch r.Method {
+	case http.MethodGet:
+		jsonResp(w, existing, 200)
+
+	case http.MethodPut:
+		if claims.Role == "viewer" {
+			jsonError(w, "forbidden", 403)
+			return
+		}
+		var upd models.ManualAsset
+		if err := json.NewDecoder(r.Body).Decode(&upd); err != nil {
+			jsonError(w, "invalid request body", 400)
+			return
+		}
+		upd.ID = id
+		if claims.Role == "kacab" && claims.Branch != "" {
+			upd.Branch = claims.Branch
+		} else if upd.Branch == "" {
+			upd.Branch = existing.Branch
+		}
+		if upd.AssetTag == "" {
+			upd.AssetTag = existing.AssetTag
+		}
+		if upd.Name == "" {
+			upd.Name = existing.Name
+		}
+		if err := s.db.UpdateManualAsset(&upd); err != nil {
+			jsonError(w, err.Error(), 500)
+			return
+		}
+		jsonResp(w, map[string]string{"status": "updated"}, 200)
+
+	case http.MethodDelete:
+		if claims.Role == "viewer" {
+			jsonError(w, "forbidden", 403)
+			return
+		}
+		if err := s.db.DeleteManualAsset(id); err != nil {
+			jsonError(w, err.Error(), 500)
+			return
+		}
+		jsonResp(w, map[string]string{"status": "deleted"}, 200)
+
+	default:
+		http.Error(w, "method not allowed", 405)
+	}
+}
+
+// ---------------- VERIFICATION ----------------
+
+func (s *Server) handleVerifyAsset(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", 405)
+		return
+	}
+	claims := getClaims(r)
+	if claims.Role == "viewer" {
+		jsonError(w, "forbidden", 403)
+		return
+	}
+
+	var req struct {
+		AssetID   string `json:"asset_id"`
+		AssetType string `json:"asset_type"` // manual, device
+		Status    string `json:"status"`     // verified, discrepancy
+		Condition string `json:"condition"`  // good, fair, damaged
+		Notes     string `json:"notes"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonError(w, "invalid request body", 400)
+		return
+	}
+	if req.AssetID == "" {
+		jsonError(w, "asset_id is required", 400)
+		return
+	}
+	if req.Status != "verified" && req.Status != "discrepancy" && req.Status != "unverified" {
+		req.Status = "verified"
+	}
+
+	verifier := claims.Username
+	if claims.Branch != "" {
+		verifier = fmt.Sprintf("%s (%s)", claims.Username, claims.Branch)
+	}
+
+	var err error
+	if req.AssetType == "device" {
+		err = s.db.VerifyDevice(req.AssetID, req.Status, req.Condition, verifier, req.Notes)
+		s.db.AddLog(req.AssetID, "verified", fmt.Sprintf("status=%s by=%s note=%s", req.Status, verifier, req.Notes))
+	} else {
+		err = s.db.VerifyManualAsset(req.AssetID, req.Status, req.Condition, verifier, req.Notes)
+	}
+
+	if err != nil {
+		jsonError(w, fmt.Sprintf("failed to verify asset: %v", err), 500)
+		return
+	}
+
+	jsonResp(w, map[string]interface{}{
+		"status":      "success",
+		"asset_id":    req.AssetID,
+		"verified_by": verifier,
+	}, 200)
+}
+
+func (s *Server) handleAssetVerifications(w http.ResponseWriter, r *http.Request) {
+	claims := getClaims(r)
+	assetID := r.URL.Query().Get("asset_id")
+	branch := r.URL.Query().Get("branch")
+	if claims.Role == "kacab" && claims.Branch != "" {
+		branch = claims.Branch
+	}
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	logs, err := s.db.GetAssetVerifications(assetID, branch, limit)
+	if err != nil {
+		jsonError(w, err.Error(), 500)
+		return
+	}
+	jsonResp(w, logs, 200)
+}
+
+// ---------------- USER MANAGEMENT ----------------
+
+func (s *Server) handleUsers(w http.ResponseWriter, r *http.Request) {
+	claims := getClaims(r)
+	if claims.Role != "admin" {
+		jsonError(w, "only admin can manage users", 403)
+		return
+	}
+
+	switch r.Method {
+	case http.MethodGet:
+		users, err := s.db.ListUsers()
+		if err != nil {
+			jsonError(w, err.Error(), 500)
+			return
+		}
+		jsonResp(w, users, 200)
+
+	case http.MethodPost:
+		var req struct {
+			Username string `json:"username"`
+			Password string `json:"password"`
+			Role     string `json:"role"`   // admin, kacab, viewer
+			Branch   string `json:"branch"` // Cabang Surabaya, dll
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			jsonError(w, "invalid request body", 400)
+			return
+		}
+		if req.Username == "" || req.Password == "" {
+			jsonError(w, "username and password are required", 400)
+			return
+		}
+		if req.Role == "" {
+			req.Role = "kacab"
+		}
+		if err := s.db.CreateUser(req.Username, hashPassword(req.Password), req.Role, req.Branch); err != nil {
+			jsonError(w, fmt.Sprintf("failed to create user: %v", err), 500)
+			return
+		}
+		jsonResp(w, map[string]string{"status": "created"}, 201)
+
+	default:
+		http.Error(w, "method not allowed", 405)
+	}
+}
+
+func (s *Server) handleUserDelete(w http.ResponseWriter, r *http.Request) {
+	claims := getClaims(r)
+	if claims.Role != "admin" {
+		jsonError(w, "only admin can delete users", 403)
+		return
+	}
+	if r.Method != http.MethodDelete {
+		http.Error(w, "method not allowed", 405)
+		return
+	}
+	idStr := strings.TrimPrefix(r.URL.Path, "/api/users/")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		jsonError(w, "invalid user id", 400)
+		return
+	}
+	if err := s.db.DeleteUser(id); err != nil {
+		jsonError(w, err.Error(), 500)
+		return
+	}
+	jsonResp(w, map[string]string{"status": "deleted"}, 200)
+}
+
+func (s *Server) handleLogs(w http.ResponseWriter, r *http.Request) {
+	deviceID := strings.TrimPrefix(r.URL.Path, "/api/logs/")
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	if limit <= 0 {
+		limit = 50
+	}
+	logs, err := s.db.GetLogs(deviceID, limit)
+	if err != nil {
+		jsonError(w, err.Error(), 500)
+		return
+	}
+	jsonResp(w, logs, 200)
+}
+
+func (s *Server) handleAgentWS(w http.ResponseWriter, r *http.Request) {
+	apiKey := r.URL.Query().Get("key")
+	if apiKey != s.cfg.APIKey {
+		http.Error(w, "unauthorized", 401)
+		return
+	}
+	deviceID := r.URL.Query().Get("id")
+	if deviceID == "" {
+		http.Error(w, "missing device id", 400)
+		return
+	}
+
+	conn, err := s.upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		log.Printf("[ws] upgrade error: %v", err)
+		return
+	}
+
+	client := &Client{
+		DeviceID: deviceID,
+		Conn:     conn,
+		Send:     make(chan []byte, 64),
+		Hub:      s.hub,
+		IsAgent:  true,
+	}
+
+	s.hub.RegisterAgent(client)
+	go client.WritePump()
+	client.ReadPump(s.handleAgentMessage)
+}
+
+func (s *Server) handleViewerWS(w http.ResponseWriter, r *http.Request) {
+	viewerID := r.URL.Query().Get("viewer_id")
+	if viewerID == "" {
+		viewerID = "viewer-" + strconv.FormatInt(time.Now().UnixNano(), 36)
+	}
+
+	conn, err := s.upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		log.Printf("[ws] upgrade error: %v", err)
+		return
+	}
+
+	client := &Client{
+		DeviceID: viewerID,
+		Conn:     conn,
+		Send:     make(chan []byte, 64),
+		Hub:      s.hub,
+		IsAgent:  false,
+	}
+
+	s.hub.RegisterViewer(client)
+	go client.WritePump()
+	client.ReadPump(s.handleViewerMessage)
+}
+
+func (s *Server) handleRelayWS(w http.ResponseWriter, r *http.Request) {
+	parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/ws/relay/"), "/")
+	if len(parts) < 2 {
+		http.Error(w, "bad relay path, use /ws/relay/{session}/{role}", 400)
+		return
+	}
+	sessionID := parts[0]
+	role := parts[1]
+
+	conn, err := s.upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		return
+	}
+
+	s.hub.HandleRelay(sessionID, role, conn)
+}
+
+func (s *Server) handleAgentMessage(c *Client, raw []byte) {
+	var msg models.WSMessage
+	if err := json.Unmarshal(raw, &msg); err != nil {
+		return
+	}
+
+	switch msg.Action {
+	case "register":
+		var dev models.Device
+		if err := json.Unmarshal(msg.Data, &dev); err != nil {
+			return
+		}
+		dev.ID = c.DeviceID
+		dev.LastSeen = time.Now()
+		if dev.RegisteredAt.IsZero() {
+			dev.RegisteredAt = time.Now()
+		}
+		if dev.Status == "" {
+			dev.Status = "active"
+		}
+		if dev.GroupName == "" {
+			dev.GroupName = "default"
+		}
+		s.db.UpsertDevice(&dev)
+		s.db.AddLog(dev.ID, "register", fmt.Sprintf("%s %s v%s", dev.Hostname, dev.OS, dev.Version))
+
+		if s.cfg.Version != "" && dev.Version != "" && dev.Version != s.cfg.Version {
+			log.Printf("[server] agent %s is on version %s, server is %s. Triggering upgrade.", dev.ID, dev.Version, s.cfg.Version)
+			upMsg := map[string]interface{}{
+				"action": "upgrade",
+				"data": map[string]string{
+					"version":      s.cfg.Version,
+					"download_url": fmt.Sprintf("/api/agent/download?os=%s&arch=%s&key=%s", dev.OS, dev.Arch, s.cfg.APIKey),
+				},
+			}
+			if upRaw, err := json.Marshal(upMsg); err == nil {
+				select {
+				case c.Send <- upRaw:
+				default:
+				}
+			}
+		}
+
+	case "heartbeat":
+		var hb models.DeviceHeartbeat
+		if err := json.Unmarshal(msg.Data, &hb); err != nil {
+			return
+		}
+		hb.ID = c.DeviceID
+		s.db.UpdateHeartbeat(&hb)
+
+	case "signal":
+		var sig models.SignalMessage
+		if err := json.Unmarshal(msg.Data, &sig); err != nil {
+			return
+		}
+		sig.From = c.DeviceID
+		s.hub.ForwardSignal(&sig)
+	}
+}
+
+func (s *Server) handleViewerMessage(c *Client, raw []byte) {
+	var msg models.WSMessage
+	if err := json.Unmarshal(raw, &msg); err != nil {
+		return
+	}
+
+	switch msg.Action {
+	case "signal":
+		var sig models.SignalMessage
+		if err := json.Unmarshal(msg.Data, &sig); err != nil {
+			return
+		}
+		sig.From = c.DeviceID
+		s.hub.ForwardSignal(&sig)
+	}
+}
+
+func (s *Server) authMiddleware(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Upgrade") == "websocket" {
+			token := r.URL.Query().Get("token")
+			if token == "" {
+				token = r.URL.Query().Get("key")
+			}
+			if token != "" {
+				if token == s.cfg.APIKey {
+					ctx := context.WithValue(r.Context(), userClaimsKey, &UserClaims{
+						Username: "api_key",
+						Role:     "admin",
+					})
+					next(w, r.WithContext(ctx))
+					return
+				}
+				if claims, ok := parseToken(token, s.cfg.JWTSecret); ok {
+					ctx := context.WithValue(r.Context(), userClaimsKey, claims)
+					next(w, r.WithContext(ctx))
+					return
+				}
+			}
+			http.Error(w, "unauthorized", 401)
+			return
+		}
+
+		auth := r.Header.Get("Authorization")
+		if auth == "" {
+			auth = r.URL.Query().Get("token")
+		} else {
+			auth = strings.TrimPrefix(auth, "Bearer ")
+		}
+
+		if auth == s.cfg.APIKey {
+			ctx := context.WithValue(r.Context(), userClaimsKey, &UserClaims{
+				Username: "api_key",
+				Role:     "admin",
+			})
+			next(w, r.WithContext(ctx))
+			return
+		}
+
+		if claims, ok := parseToken(auth, s.cfg.JWTSecret); ok {
+			ctx := context.WithValue(r.Context(), userClaimsKey, claims)
+			next(w, r.WithContext(ctx))
+			return
+		}
+
+		jsonError(w, "unauthorized", 401)
+	}
+}
+
+func getClaims(r *http.Request) *UserClaims {
+	if c, ok := r.Context().Value(userClaimsKey).(*UserClaims); ok && c != nil {
+		return c
+	}
+	return &UserClaims{Username: "anonymous", Role: "viewer"}
+}
+
+func jsonResp(w http.ResponseWriter, data interface{}, status int) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	json.NewEncoder(w).Encode(data)
+}
+
+func jsonError(w http.ResponseWriter, msg string, status int) {
+	jsonResp(w, map[string]string{"error": msg}, status)
+}
+
+func hashPassword(pass string) string {
+	h := sha256.Sum256([]byte(pass))
+	return hex.EncodeToString(h[:])
+}
+
+func generateToken(username, role, branch, secret string) string {
+	payload := fmt.Sprintf("%s|%s|%s|%d", username, role, branch, time.Now().Add(24*time.Hour).Unix())
+	h := sha256.Sum256([]byte(payload + secret))
+	sig := hex.EncodeToString(h[:8])
+	return hex.EncodeToString([]byte(payload)) + "." + sig
+}
+
+func parseToken(token, secret string) (*UserClaims, bool) {
+	parts := strings.SplitN(token, ".", 2)
+	if len(parts) != 2 {
+		return nil, false
+	}
+	payloadBytes, err := hex.DecodeString(parts[0])
+	if err != nil {
+		return nil, false
+	}
+	payload := string(payloadBytes)
+
+	h := sha256.Sum256([]byte(payload + secret))
+	expectedSig := hex.EncodeToString(h[:8])
+	if parts[1] != expectedSig {
+		return nil, false
+	}
+
+	fields := strings.Split(payload, "|")
+	if len(fields) == 4 {
+		exp, err := strconv.ParseInt(fields[3], 10, 64)
+		if err != nil || time.Now().Unix() >= exp {
+			return nil, false
+		}
+		return &UserClaims{
+			Username: fields[0],
+			Role:     fields[1],
+			Branch:   fields[2],
+		}, true
+	} else if len(fields) == 3 {
+		exp, err := strconv.ParseInt(fields[2], 10, 64)
+		if err != nil || time.Now().Unix() >= exp {
+			return nil, false
+		}
+		return &UserClaims{
+			Username: fields[0],
+			Role:     fields[1],
+			Branch:   "",
+		}, true
+	}
+	return nil, false
+}
+
+
+func (s *Server) handleAgentVersion(w http.ResponseWriter, r *http.Request) {
+	jsonResp(w, map[string]interface{}{
+		"version":      s.cfg.Version,
+		"download_url": "/api/agent/download",
+	}, 200)
+}
+
+func (s *Server) handleAgentDownload(w http.ResponseWriter, r *http.Request) {
+	key := r.URL.Query().Get("key")
+	if key != s.cfg.APIKey {
+		auth := r.Header.Get("Authorization")
+		token := strings.TrimPrefix(auth, "Bearer ")
+		if token == "" {
+			token = r.URL.Query().Get("token")
+		}
+		if token != s.cfg.APIKey && func() bool { _, ok := parseToken(token, s.cfg.JWTSecret); return !ok }() {
+			http.Error(w, "unauthorized", 401)
+			return
+		}
+	}
+
+	targetOS := strings.ToLower(r.URL.Query().Get("os"))
+	targetArch := strings.ToLower(r.URL.Query().Get("arch"))
+	if targetOS == "" {
+		targetOS = "windows"
+	}
+	if targetArch == "" {
+		targetArch = "amd64"
+	}
+
+	candidates := []string{}
+	if s.cfg.AgentsDir != "" {
+		candidates = append(candidates,
+			filepath.Join(s.cfg.AgentsDir, fmt.Sprintf("rd-agent-%s-%s.exe", targetOS, targetArch)),
+			filepath.Join(s.cfg.AgentsDir, fmt.Sprintf("rd-agent-%s-%s", targetOS, targetArch)),
+			filepath.Join(s.cfg.AgentsDir, "rd-agent.exe"),
+			filepath.Join(s.cfg.AgentsDir, "rd-agent"),
+		)
+	}
+	candidates = append(candidates,
+		filepath.Join("bin", "agents", fmt.Sprintf("rd-agent-%s-%s.exe", targetOS, targetArch)),
+		filepath.Join("bin", "agents", fmt.Sprintf("rd-agent-%s-%s", targetOS, targetArch)),
+		filepath.Join("bin", "rd-agent.exe"),
+		filepath.Join("bin", "rd-agent"),
+		"rd-agent.exe",
+		"rd-agent",
+	)
+
+	var foundPath string
+	for _, p := range candidates {
+		if fi, err := os.Stat(p); err == nil && !fi.IsDir() && fi.Size() > 0 {
+			foundPath = p
+			break
+		}
+	}
+
+	if foundPath == "" {
+		http.Error(w, "agent binary not found on server", 404)
+		return
+	}
+
+	fileName := filepath.Base(foundPath)
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", fileName))
+	w.Header().Set("Content-Type", "application/octet-stream")
+	http.ServeFile(w, r, foundPath)
+}
+
+func (s *Server) handleBroadcastAgentUpdate(w http.ResponseWriter, r *http.Request) {
+	claims := getClaims(r)
+	if claims.Role != "admin" {
+		jsonError(w, "forbidden", 403)
+		return
+	}
+	s.hub.mu.RLock()
+	count := len(s.hub.agents)
+	for _, client := range s.hub.agents {
+		upMsg := map[string]interface{}{
+			"action": "upgrade",
+			"data": map[string]string{
+				"version":      s.cfg.Version,
+				"download_url": fmt.Sprintf("/api/agent/download?key=%s", s.cfg.APIKey),
+			},
+		}
+		if upRaw, err := json.Marshal(upMsg); err == nil {
+			select {
+			case client.Send <- upRaw:
+			default:
+			}
+		}
+	}
+	s.hub.mu.RUnlock()
+	jsonResp(w, map[string]interface{}{
+		"status":          "broadcast_sent",
+		"agents_notified": count,
+		"version":         s.cfg.Version,
+	}, 200)
+}
+
+func (s *Server) handleReconfigureAgents(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", 405)
+		return
+	}
+	claims := getClaims(r)
+	if claims.Role != "admin" {
+		jsonError(w, "forbidden", 403)
+		return
+	}
+
+	var req struct {
+		ServerURL string `json:"server_url"`
+		APIKey    string `json:"api_key"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonError(w, "invalid request body", 400)
+		return
+	}
+	if req.ServerURL == "" {
+		jsonError(w, "server_url is required", 400)
+		return
+	}
+
+	s.hub.mu.RLock()
+	count := len(s.hub.agents)
+	for _, client := range s.hub.agents {
+		msg := map[string]interface{}{
+			"action": "reconfigure",
+			"data": map[string]string{
+				"server_url": req.ServerURL,
+				"api_key":    req.APIKey,
+			},
+		}
+		if raw, err := json.Marshal(msg); err == nil {
+			select {
+			case client.Send <- raw:
+			default:
+			}
+		}
+	}
+	s.hub.mu.RUnlock()
+
+	log.Printf("[server] reconfigure broadcast sent to %d agents: new endpoint=%s", count, req.ServerURL)
+	jsonResp(w, map[string]interface{}{
+		"status":          "reconfigure_sent",
+		"agents_notified": count,
+		"new_server_url":  req.ServerURL,
+	}, 200)
+}

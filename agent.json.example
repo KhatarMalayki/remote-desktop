@@ -1,0 +1,7 @@
+{
+  "server_url": "https://jatiasih.synology.me:8443",
+  "api_key": "your-secret-api-key-here",
+  "device_id": "",
+  "heartbeat_seconds": 60,
+  "update_url": "https://github.com/KhatarMalayki/remote-desktop/releases/latest"
+}

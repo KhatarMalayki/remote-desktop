@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  server:
+    build: .
+    container_name: remotedesk
+    ports:
+      - "8080:8080"
+    volumes:
+      - rd-data:/data
+    environment:
+      - RD_ADMIN_USER=admin
+      - RD_ADMIN_PASS=changeme
+      - RD_API_KEY=your-secret-api-key-here
+    restart: unless-stopped
+    mem_limit: 128m
+    cpus: 0.5
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: '0.5'
+
+volumes:
+  rd-data:

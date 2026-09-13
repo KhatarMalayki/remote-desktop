@@ -1,0 +1,29 @@
+name: Auto Deploy to VPS
+
+on:
+  push:
+    branches:
+      - main
+      - master
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to VPS via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: 22
+          script: |
+            set -e
+            echo "==> Pulling latest code..."
+            cd ~/remote-desktop
+            git pull
+            echo "==> Building rd-server..."
+            CGO_ENABLED=1 go build -ldflags="-s -w" -o /usr/local/bin/rd-server ./cmd/server
+            echo "==> Restarting remotedesk service..."
+            sudo systemctl restart remotedesk
+            echo "==> Deploy Success! Status: $(sudo systemctl is-active remotedesk)"
