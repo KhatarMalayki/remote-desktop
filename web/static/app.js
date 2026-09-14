@@ -576,10 +576,21 @@ async function loadUsers() {
   var users = await api('/api/users');
   var container = document.getElementById('usersTableContainer');
   if (!container) return;
-  if (!users || users.length === 0) { container.innerHTML = '<p style="color:var(--fg2);font-size:12px">Belum ada user tambahan.</p>'; return; }
+  if (!users || users.length === 0) { container.innerHTML = '<p style="color:var(--fg2);font-size:12px">Belum ada user terdaftar.</p>'; return; }
   container.innerHTML = '<table class="device-table"><thead><tr><th>Username</th><th>Role</th><th>Cabang</th><th>Aksi</th></tr></thead><tbody>' +
     users.map(function(u) {
-      return '<tr><td><strong>'+esc(u.username)+'</strong>'+(u.mfa_enabled?' <span class="badge-status verified" style="font-size:10px;padding:1px 6px">2FA ON</span>':'')+'</td><td><span class="user-badge '+u.role+'">'+esc(u.role)+'</span></td><td>'+esc(u.branch||'-')+'</td><td>'+(u.role!=='admin'?'<button class="btn btn-danger btn-sm" onclick="deleteUser('+u.id+')">Hapus</button> <button class="btn btn-ghost btn-sm" onclick="resetUserPassword('+u.id+', \''+esc(u.username)+'\')">Reset Pass</button>'+(u.mfa_enabled?' <button class="btn btn-ghost btn-sm" onclick="resetUserMFA('+u.id+', \''+esc(u.username)+'\')">Reset 2FA</button>':''):'<small style="color:var(--fg2)">Root</small>')+'</td></tr>';
+      var isSelf = (currentUser && u.username === currentUser.username);
+      var actions = [];
+      if (isSelf) {
+        actions.push('<button class="btn btn-ghost btn-sm" onclick="openChangeUsernameModal()">Ganti Nama</button>');
+      } else {
+        actions.push('<button class="btn btn-danger btn-sm" onclick="deleteUser('+u.id+', \''+esc(u.username)+'\')">Hapus</button>');
+        actions.push('<button class="btn btn-ghost btn-sm" onclick="resetUserPassword('+u.id+', \''+esc(u.username)+'\')">Reset Pass</button>');
+        if (u.mfa_enabled) {
+          actions.push('<button class="btn btn-ghost btn-sm" onclick="resetUserMFA('+u.id+', \''+esc(u.username)+'\')">Reset 2FA</button>');
+        }
+      }
+      return '<tr><td><strong>'+esc(u.username)+'</strong>'+(isSelf?' <small style="color:var(--accent)">(Anda)</small>':'')+(u.mfa_enabled?' <span class="badge-status verified" style="font-size:10px;padding:1px 6px">2FA ON</span>':'')+'</td><td><span class="user-badge '+u.role+'">'+esc(u.role)+'</span></td><td>'+esc(u.branch||'-')+'</td><td><div style="display:flex;gap:4px;flex-wrap:wrap">'+actions.join(' ')+'</div></td></tr>';
     }).join('') + '</tbody></table>';
 }
 
@@ -604,11 +615,16 @@ async function createUser() {
   }
 }
 
-async function deleteUser(id) {
-  if (!confirm('Hapus akun ini?')) return;
-  await api('/api/users/' + id, { method: 'DELETE' });
-  showToast('Akun dihapus');
-  loadUsers();
+async function deleteUser(id, username) {
+  var nameStr = username ? 'user ' + username : 'akun ini';
+  if (!confirm('Hapus ' + nameStr + '?')) return;
+  var res = await api('/api/users/' + id, { method: 'DELETE' });
+  if (res && res.status === 'deleted') {
+    showToast('Akun berhasil dihapus');
+    loadUsers();
+  } else {
+    alert('Gagal menghapus: ' + ((res && res.error) || 'Terjadi kesalahan'));
+  }
 }
 
 // ==================== AUDIT HISTORY ====================
@@ -1106,5 +1122,70 @@ async function resetUserMFA(id, username) {
     loadUsers();
   } else {
     alert('Gagal reset 2FA: ' + ((res && res.error) || 'Terjadi kesalahan'));
+  }
+}
+
+// ==================== CHANGE USERNAME ====================
+
+function openChangeUsernameModal() {
+  var unEl = document.getElementById('cuNewUsername');
+  var pwEl = document.getElementById('cuPassword');
+  var errEl = document.getElementById('cuError');
+  if (unEl) unEl.value = (currentUser && currentUser.username) || '';
+  if (pwEl) pwEl.value = '';
+  if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
+  var modal = document.getElementById('changeUsernameModal');
+  if (modal) modal.style.display = 'flex';
+}
+
+function closeChangeUsernameModal() {
+  var modal = document.getElementById('changeUsernameModal');
+  if (modal) modal.style.display = 'none';
+}
+
+async function submitChangeUsername() {
+  var newUn = ((document.getElementById('cuNewUsername') || {}).value || '').trim();
+  var pw = ((document.getElementById('cuPassword') || {}).value || '');
+  var errEl = document.getElementById('cuError');
+
+  function showErr(msg) {
+    if (errEl) {
+      errEl.textContent = msg;
+      errEl.style.display = 'block';
+    } else {
+      alert(msg);
+    }
+  }
+
+  if (!newUn || newUn.length < 3) {
+    showErr('Username minimal 3 karakter');
+    return;
+  }
+  if (!pw) {
+    showErr('Masukkan password saat ini sebagai konfirmasi');
+    return;
+  }
+
+  var res = await api('/api/auth/change-username', {
+    method: 'POST',
+    body: JSON.stringify({ new_username: newUn, password: pw })
+  });
+
+  if (res && res.status === 'success') {
+    closeChangeUsernameModal();
+    if (res.token) {
+      token = res.token;
+      localStorage.setItem('rd_token', token);
+    }
+    if (currentUser) {
+      currentUser.username = res.username;
+      updateUserUI();
+    }
+    showToast('Username berhasil diubah menjadi: ' + res.username);
+    if (document.getElementById('usersModal') && document.getElementById('usersModal').style.display !== 'none') {
+      loadUsers();
+    }
+  } else {
+    showErr((res && res.error) || 'Gagal mengubah username');
   }
 }

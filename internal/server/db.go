@@ -360,7 +360,29 @@ func (d *DB) CreateUser(username, passwordHash, role, branch string) error {
 }
 
 func (d *DB) DeleteUser(id int64) error {
-	_, err := d.db.Exec(`DELETE FROM users WHERE id=? AND role != 'admin'`, id)
+	var role string
+	err := d.db.QueryRow(`SELECT role FROM users WHERE id=?`, id).Scan(&role)
+	if err != nil {
+		return err
+	}
+	if role == "admin" {
+		var adminCount int
+		_ = d.db.QueryRow(`SELECT COUNT(*) FROM users WHERE role='admin'`).Scan(&adminCount)
+		if adminCount <= 1 {
+			return fmt.Errorf("tidak dapat menghapus administrator terakhir")
+		}
+	}
+	_, err = d.db.Exec(`DELETE FROM users WHERE id=?`, id)
+	return err
+}
+
+func (d *DB) UpdateUsername(oldUsername, newUsername string) error {
+	var count int
+	_ = d.db.QueryRow(`SELECT COUNT(*) FROM users WHERE username=?`, newUsername).Scan(&count)
+	if count > 0 {
+		return fmt.Errorf("username '%s' sudah digunakan", newUsername)
+	}
+	_, err := d.db.Exec(`UPDATE users SET username=? WHERE username=?`, newUsername, oldUsername)
 	return err
 }
 

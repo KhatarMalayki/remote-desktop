@@ -304,3 +304,55 @@ func TestMFAWorkflow(t *testing.T) {
 		t.Fatalf("expected MFA disabled")
 	}
 }
+
+func TestChangeUsername(t *testing.T) {
+	tempDir := t.TempDir()
+	dbPath := filepath.Join(tempDir, "test.db")
+	db, err := NewDB(dbPath)
+	if err != nil {
+		t.Fatalf("failed db: %v", err)
+	}
+	defer db.Close()
+
+	if err := db.EnsureAdmin("admin", hashPassword("admin123")); err != nil {
+		t.Fatalf("ensure admin: %v", err)
+	}
+
+	s := &Server{
+		cfg: Config{
+			Addr:      ":0",
+			DBPath:    dbPath,
+			JWTSecret: "test-secret-un",
+		},
+		db: db,
+	}
+
+	// 1. Change username with wrong password -> fail
+	bodyWrong := strings.NewReader(`{"new_username":"khatar_ops","password":"wrongpassword"}`)
+	reqWrong := httptest.NewRequest("POST", "/api/auth/change-username", bodyWrong)
+	ctx := context.WithValue(reqWrong.Context(), userClaimsKey, &UserClaims{Username: "admin", Role: "admin"})
+	wWrong := httptest.NewRecorder()
+	s.handleChangeUsername(wWrong, reqWrong.WithContext(ctx))
+	if wWrong.Code != 400 {
+		t.Fatalf("expected 400, got %d", wWrong.Code)
+	}
+
+	// 2. Change username with correct password -> success
+	bodyOK := strings.NewReader(`{"new_username":"khatar_ops","password":"admin123"}`)
+	reqOK := httptest.NewRequest("POST", "/api/auth/change-username", bodyOK)
+	wOK := httptest.NewRecorder()
+	s.handleChangeUsername(wOK, reqOK.WithContext(ctx))
+	if wOK.Code != 200 {
+		t.Fatalf("expected 200, got %d body=%s", wOK.Code, wOK.Body.String())
+	}
+
+	// Verify old user doesn't exist and new user exists
+	_, _, _, _, errOld := db.GetUser("admin")
+	if errOld == nil {
+		t.Fatalf("expected old username 'admin' to not exist")
+	}
+	_, _, role, _, errNew := db.GetUser("khatar_ops")
+	if errNew != nil || role != "admin" {
+		t.Fatalf("expected new username 'khatar_ops' to exist as admin, err=%v", errNew)
+	}
+}

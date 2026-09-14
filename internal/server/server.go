@@ -142,6 +142,7 @@ func (s *Server) ListenAndServe() error {
 	mux.HandleFunc("/api/auth/login/mfa", s.handleLoginMFA)
 	mux.HandleFunc("/api/auth/me", s.authMiddleware(s.handleMe))
 	mux.HandleFunc("/api/auth/change-password", s.authMiddleware(s.handleChangePassword))
+	mux.HandleFunc("/api/auth/change-username", s.authMiddleware(s.handleChangeUsername))
 	mux.HandleFunc("/api/auth/mfa/status", s.authMiddleware(s.handleMFAStatus))
 	mux.HandleFunc("/api/auth/mfa/setup", s.authMiddleware(s.handleMFASetup))
 	mux.HandleFunc("/api/auth/mfa/enable", s.authMiddleware(s.handleMFAEnable))
@@ -1341,4 +1342,57 @@ func (s *Server) handleResetUserMFA(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("[mfa] admin %s reset MFA for user ID %d", claims.Username, id)
 	jsonResp(w, map[string]string{"status": "success", "message": "2FA / MFA user berhasil direset"}, 200)
+}
+
+func (s *Server) handleChangeUsername(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", 405)
+		return
+	}
+	claims := getClaims(r)
+	if claims == nil || claims.Username == "" || claims.Username == "anonymous" {
+		jsonError(w, "unauthorized", 401)
+		return
+	}
+
+	var req struct {
+		NewUsername string `json:"new_username"`
+		Password    string `json:"password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonError(w, "invalid request body", 400)
+		return
+	}
+
+	newUsername := strings.TrimSpace(req.NewUsername)
+	if len(newUsername) < 3 || len(newUsername) > 32 {
+		jsonError(w, "Username baru harus antara 3 - 32 karakter", 400)
+		return
+	}
+
+	// Verify current password
+	_, storedHash, role, branch, err := s.db.GetUser(claims.Username)
+	if err != nil || storedHash != hashPassword(req.Password) {
+		jsonError(w, "Password salah", 400)
+		return
+	}
+
+	if newUsername == claims.Username {
+		jsonError(w, "Username baru tidak boleh sama dengan username saat ini", 400)
+		return
+	}
+
+	if err := s.db.UpdateUsername(claims.Username, newUsername); err != nil {
+		jsonError(w, err.Error(), 400)
+		return
+	}
+
+	log.Printf("[auth] user %s renamed to %s", claims.Username, newUsername)
+	token := generateToken(newUsername, role, branch, s.cfg.JWTSecret)
+	jsonResp(w, map[string]interface{}{
+		"status":   "success",
+		"message":  "Username berhasil diubah",
+		"username": newUsername,
+		"token":    token,
+	}, 200)
 }
