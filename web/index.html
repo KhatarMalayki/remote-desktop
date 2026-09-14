@@ -483,16 +483,73 @@
 
 
 
-<!-- SECURITY AUDIT LOGS MODAL -->
+<!-- SECURITY AUDIT LOGS & RATE LIMIT SETTINGS MODAL -->
 <div id="securityLogsModal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeSecurityLogsModal()">
-  <div class="modal" style="max-width:780px">
+  <div class="modal" style="max-width:800px">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-      <h3>&#128737; Log Audit Percobaan Login</h3>
-      <button class="btn btn-ghost btn-sm" onclick="loadSecurityLogs()">&#8635; Segarkan</button>
+      <h3>&#128737; Pusat Keamanan &amp; Proteksi Login</h3>
     </div>
-    <p style="font-size:12px;color:var(--fg2);margin-bottom:14px">Catatan real-time jika ada orang atau bot internet yang mencoba login (berhasil, salah password, atau diblokir 15 menit):</p>
-    
-    <div id="securityLogsContainer" style="max-height:55vh;overflow-y:auto"></div>
+
+    <!-- TABS -->
+    <div class="tab-nav" style="margin-bottom:14px">
+      <button class="tab-btn active" id="tabBtnSecLogs" onclick="switchSecTab('logs')">&#128221; Log Percobaan Login</button>
+      <button class="tab-btn" id="tabBtnSecSettings" onclick="switchSecTab('settings')">&#9881; Aturan Anti Brute-Force &amp; IP Blokir</button>
+    </div>
+
+    <!-- PANEL 1: LOGS -->
+    <div id="secLogsPanel">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <p style="font-size:12px;color:var(--fg2);margin:0">Riwayat percobaan login real-time (berhasil, salah password, atau diblokir):</p>
+        <button class="btn btn-ghost btn-sm" onclick="loadSecurityLogs()">&#8635; Segarkan</button>
+      </div>
+      <div id="securityLogsContainer" style="max-height:50vh;overflow-y:auto"></div>
+    </div>
+
+    <!-- PANEL 2: SETTINGS & BLOCKED IPS -->
+    <div id="secSettingsPanel" style="display:none">
+      <div style="background:var(--bg3);padding:14px;border-radius:var(--radius);margin-bottom:16px">
+        <h4 style="font-size:13px;margin-bottom:12px">&#9881; Aturan Pembatasan Login (Rate Limiting)</h4>
+        
+        <div class="form-group" style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+          <input type="checkbox" id="secRateLimitEnabled" style="width:18px;height:18px;cursor:pointer">
+          <label for="secRateLimitEnabled" style="margin:0;font-size:13px;font-weight:600;color:var(--fg);cursor:pointer">
+            Aktifkan Proteksi Anti Brute-Force (Otomatis Blokir IP)
+          </label>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div class="form-group">
+            <label>Batas Maksimal Salah Password</label>
+            <input type="number" id="secMaxAttempts" min="1" max="20" placeholder="5">
+            <small style="color:var(--fg2);font-size:11px">Percobaan gagal sebelum IP dibekukan (rekomendasi: 3 - 5).</small>
+          </div>
+          <div class="form-group">
+            <label>Durasi Pemblokiran IP (Menit)</label>
+            <input type="number" id="secBlockDuration" min="1" max="1440" placeholder="15">
+            <small style="color:var(--fg2);font-size:11px">Lama IP dibekukan sebelum bisa mencoba lagi (rekomendasi: 15 - 60).</small>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>IP Whitelist (Pengecualian, Pisahkan Koma)</label>
+          <input type="text" id="secIPWhitelist" placeholder="Contoh: 127.0.0.1, 192.168.1.10, 10.0.0.1">
+          <small style="color:var(--fg2);font-size:11px">Alamat IP kantor atau laptop admin yang TIDAK AKAN PERNAH diblokir.</small>
+        </div>
+
+        <div style="text-align:right">
+          <button class="btn btn-primary btn-sm" onclick="saveSecuritySettings()">Simpan Pengaturan</button>
+        </div>
+      </div>
+
+      <!-- BLOCKED IPS LIST -->
+      <div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <h4 style="font-size:13px">&#128683; Daftar IP yang Sedang Diblokir Saat Ini</h4>
+          <button class="btn btn-ghost btn-sm" onclick="loadSecuritySettings()">&#8635; Refresh</button>
+        </div>
+        <div id="blockedIPsContainer" style="max-height:25vh;overflow-y:auto"></div>
+      </div>
+    </div>
 
     <div class="modal-actions" style="margin-top:16px">
       <button class="btn btn-ghost" onclick="closeSecurityLogsModal()">Tutup</button>

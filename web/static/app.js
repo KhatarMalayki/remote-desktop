@@ -1243,3 +1243,108 @@ async function loadSecurityLogs() {
       '</tr>';
     }).join('') + '</tbody></table>';
 }
+
+function switchSecTab(tab) {
+  var logsBtn = document.getElementById('tabBtnSecLogs');
+  var setBtn = document.getElementById('tabBtnSecSettings');
+  var logsPanel = document.getElementById('secLogsPanel');
+  var setPanel = document.getElementById('secSettingsPanel');
+
+  if (tab === 'logs') {
+    if (logsBtn) logsBtn.classList.add('active');
+    if (setBtn) setBtn.classList.remove('active');
+    if (logsPanel) logsPanel.style.display = 'block';
+    if (setPanel) setPanel.style.display = 'none';
+    loadSecurityLogs();
+  } else {
+    if (logsBtn) logsBtn.classList.remove('active');
+    if (setBtn) setBtn.classList.add('active');
+    if (logsPanel) logsPanel.style.display = 'none';
+    if (setPanel) setPanel.style.display = 'block';
+    loadSecuritySettings();
+  }
+}
+
+async function loadSecuritySettings() {
+  var res = await api('/api/security/settings');
+  if (!res) return;
+
+  var s = res.settings || {};
+  var enCb = document.getElementById('secRateLimitEnabled');
+  var maxInput = document.getElementById('secMaxAttempts');
+  var blockInput = document.getElementById('secBlockDuration');
+  var wlInput = document.getElementById('secIPWhitelist');
+
+  if (enCb) enCb.checked = !!s.rate_limit_enabled;
+  if (maxInput) maxInput.value = s.max_login_attempts || 5;
+  if (blockInput) blockInput.value = s.block_duration_minutes || 15;
+  if (wlInput) wlInput.value = s.ip_whitelist || '';
+
+  // Render blocked IPs
+  var bContainer = document.getElementById('blockedIPsContainer');
+  if (!bContainer) return;
+  var blocked = res.blocked_ips || [];
+  if (blocked.length === 0) {
+    bContainer.innerHTML = '<div style="background:var(--bg);padding:12px;border-radius:var(--radius);text-align:center;color:var(--fg2);font-size:12px">Tidak ada IP yang sedang diblokir saat ini.</div>';
+    return;
+  }
+
+  bContainer.innerHTML = '<table class="device-table"><thead><tr><th>Alamat IP</th><th>Salah Password</th><th>Waktu Diblokir</th><th>Sisa Blokir</th><th>Aksi</th></tr></thead><tbody>' +
+    blocked.map(function(b) {
+      return '<tr>' +
+        '<td><code>' + esc(b.ip) + '</code></td>' +
+        '<td>' + b.failed_count + ' kali</td>' +
+        '<td><small>' + new Date(b.blocked_at).toLocaleTimeString() + '</small></td>' +
+        '<td><span class="badge-status discrepancy">~' + b.minutes_left + ' menit lagi</span></td>' +
+        '<td><button class="btn btn-primary btn-sm" onclick="unblockIP(\'' + esc(b.ip) + '\')">Buka Blokir</button></td>' +
+      '</tr>';
+    }).join('') + '</tbody></table>';
+}
+
+async function saveSecuritySettings() {
+  var en = (document.getElementById('secRateLimitEnabled') || {}).checked;
+  var maxAtt = parseInt((document.getElementById('secMaxAttempts') || {}).value) || 5;
+  var blockDur = parseInt((document.getElementById('secBlockDuration') || {}).value) || 15;
+  var wl = ((document.getElementById('secIPWhitelist') || {}).value || '').trim();
+
+  if (maxAtt <= 0 || maxAtt > 50) {
+    alert('Batas maksimal salah password harus antara 1 sampai 50');
+    return;
+  }
+  if (blockDur <= 0 || blockDur > 1440) {
+    alert('Durasi pemblokiran harus antara 1 sampai 1440 menit (24 jam)');
+    return;
+  }
+
+  var res = await api('/api/security/settings', {
+    method: 'POST',
+    body: JSON.stringify({
+      rate_limit_enabled: en,
+      max_login_attempts: maxAtt,
+      block_duration_minutes: blockDur,
+      ip_whitelist: wl
+    })
+  });
+
+  if (res && res.status === 'success') {
+    showToast('Pengaturan proteksi brute-force berhasil disimpan!');
+    loadSecuritySettings();
+  } else {
+    alert('Gagal menyimpan: ' + ((res && res.error) || 'Terjadi kesalahan'));
+  }
+}
+
+async function unblockIP(ip) {
+  if (!confirm('Buka blokir IP ' + ip + '? User di IP ini akan bisa mencoba login kembali segera.')) return;
+  var res = await api('/api/security/unblock', {
+    method: 'POST',
+    body: JSON.stringify({ ip: ip })
+  });
+
+  if (res && res.status === 'success') {
+    showToast('IP ' + ip + ' berhasil dibuka blokirnya!');
+    loadSecuritySettings();
+  } else {
+    alert('Gagal membuka blokir: ' + ((res && res.error) || 'Terjadi kesalahan'));
+  }
+}

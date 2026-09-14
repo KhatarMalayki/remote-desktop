@@ -86,6 +86,21 @@ type AuthLog struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
+type SecuritySettings struct {
+	RateLimitEnabled bool   `json:"rate_limit_enabled"`
+	MaxLoginAttempts int    `json:"max_login_attempts"`
+	BlockDurationMin int    `json:"block_duration_minutes"`
+	IPWhitelist      string `json:"ip_whitelist"`
+}
+
+type BlockedIPInfo struct {
+	IP          string    `json:"ip"`
+	FailedCount int       `json:"failed_count"`
+	BlockedAt   time.Time `json:"blocked_at"`
+	ExpiresAt   time.Time `json:"expires_at"`
+	MinutesLeft int       `json:"minutes_left"`
+}
+
 type DeviceHeartbeat struct {
 	ID         string  `json:"id"`
 	CPUUsage   float64 `json:"cpu_usage"`

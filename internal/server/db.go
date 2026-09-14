@@ -3,6 +3,7 @@ package server
 import (
 	"database/sql"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -131,6 +132,12 @@ func migrate(db *sql.DB) error {
 	);
 	CREATE INDEX IF NOT EXISTS idx_auth_logs_created ON auth_logs(created_at);
 	CREATE INDEX IF NOT EXISTS idx_auth_logs_status ON auth_logs(status);
+
+	CREATE TABLE IF NOT EXISTS system_settings (
+		key TEXT PRIMARY KEY,
+		value TEXT NOT NULL,
+		updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+	);
 	`
 	if _, err := db.Exec(schema); err != nil {
 		return err
@@ -767,4 +774,59 @@ func (d *DB) GetAuthLogs(limit int) ([]models.AuthLog, error) {
 		logs = append(logs, l)
 	}
 	return logs, nil
+}
+
+func (d *DB) GetSecuritySettings() models.SecuritySettings {
+	s := models.SecuritySettings{
+		RateLimitEnabled: true,
+		MaxLoginAttempts: 5,
+		BlockDurationMin: 15,
+		IPWhitelist:      "127.0.0.1, ::1",
+	}
+	var val string
+	if err := d.db.QueryRow(`SELECT value FROM system_settings WHERE key='rate_limit_enabled'`).Scan(&val); err == nil {
+		s.RateLimitEnabled = val == "true" || val == "1"
+	}
+	if err := d.db.QueryRow(`SELECT value FROM system_settings WHERE key='max_login_attempts'`).Scan(&val); err == nil {
+		if n, err := strconv.Atoi(val); err == nil && n > 0 {
+			s.MaxLoginAttempts = n
+		}
+	}
+	if err := d.db.QueryRow(`SELECT value FROM system_settings WHERE key='block_duration_minutes'`).Scan(&val); err == nil {
+		if n, err := strconv.Atoi(val); err == nil && n > 0 {
+			s.BlockDurationMin = n
+		}
+	}
+	if err := d.db.QueryRow(`SELECT value FROM system_settings WHERE key='ip_whitelist'`).Scan(&val); err == nil {
+		s.IPWhitelist = val
+	}
+	return s
+}
+
+func (d *DB) SaveSecuritySettings(s models.SecuritySettings) error {
+	tx, err := d.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	enStr := "false"
+	if s.RateLimitEnabled {
+		enStr = "true"
+	}
+	pairs := map[string]string{
+		"rate_limit_enabled":     enStr,
+		"max_login_attempts":     strconv.Itoa(s.MaxLoginAttempts),
+		"block_duration_minutes": strconv.Itoa(s.BlockDurationMin),
+		"ip_whitelist":           s.IPWhitelist,
+	}
+
+	for k, v := range pairs {
+		_, err := tx.Exec(`INSERT INTO system_settings (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)
+			ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=CURRENT_TIMESTAMP`, k, v)
+		if err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
 }

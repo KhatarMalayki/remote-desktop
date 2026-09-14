@@ -55,18 +55,66 @@ var (
 	loginAttempts = make(map[string]*loginAttempt)
 )
 
-func checkLoginRateLimit(ip string) bool {
+func (s *Server) checkLoginRateLimit(ip string) bool {
+	settings := s.db.GetSecuritySettings()
+	if !settings.RateLimitEnabled {
+		return true
+	}
+
+	// Check whitelist
+	for _, w := range strings.Split(settings.IPWhitelist, ",") {
+		wClean := strings.TrimSpace(w)
+		if wClean != "" && (wClean == ip || strings.HasPrefix(ip, wClean)) {
+			return true
+		}
+	}
+
 	loginMu.Lock()
 	defer loginMu.Unlock()
 	att, exists := loginAttempts[ip]
 	if !exists {
 		return true
 	}
-	if time.Since(att.firstFail) > 15*time.Minute {
+	blockDuration := time.Duration(settings.BlockDurationMin) * time.Minute
+	if time.Since(att.firstFail) > blockDuration {
 		delete(loginAttempts, ip)
 		return true
 	}
-	return att.count < 5
+	return att.count < settings.MaxLoginAttempts
+}
+
+func (s *Server) getBlockedIPs() []models.BlockedIPInfo {
+	settings := s.db.GetSecuritySettings()
+	blockDuration := time.Duration(settings.BlockDurationMin) * time.Minute
+
+	loginMu.Lock()
+	defer loginMu.Unlock()
+
+	var list []models.BlockedIPInfo
+	now := time.Now()
+	for ip, att := range loginAttempts {
+		if att.count >= settings.MaxLoginAttempts {
+			elapsed := now.Sub(att.firstFail)
+			if elapsed <= blockDuration {
+				expiresAt := att.firstFail.Add(blockDuration)
+				minsLeft := int(expiresAt.Sub(now).Minutes()) + 1
+				list = append(list, models.BlockedIPInfo{
+					IP:          ip,
+					FailedCount: att.count,
+					BlockedAt:   att.firstFail,
+					ExpiresAt:   expiresAt,
+					MinutesLeft: minsLeft,
+				})
+			}
+		}
+	}
+	return list
+}
+
+func (s *Server) unblockIP(ip string) {
+	loginMu.Lock()
+	defer loginMu.Unlock()
+	delete(loginAttempts, ip)
 }
 
 func recordLoginFail(ip string) {
@@ -148,6 +196,8 @@ func (s *Server) ListenAndServe() error {
 	mux.HandleFunc("/api/auth/mfa/enable", s.authMiddleware(s.handleMFAEnable))
 	mux.HandleFunc("/api/auth/mfa/disable", s.authMiddleware(s.handleMFADisable))
 	mux.HandleFunc("/api/auth/logs", s.authMiddleware(s.handleAuthLogs))
+	mux.HandleFunc("/api/security/settings", s.authMiddleware(s.handleSecuritySettings))
+	mux.HandleFunc("/api/security/unblock", s.authMiddleware(s.handleUnblockIP))
 	mux.HandleFunc("/api/devices", s.authMiddleware(s.handleDevices))
 	mux.HandleFunc("/api/devices/", s.authMiddleware(s.handleDevice))
 	mux.HandleFunc("/api/stats", s.authMiddleware(s.handleStats))
@@ -199,7 +249,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !checkLoginRateLimit(ip) {
+	if !s.checkLoginRateLimit(ip) {
 		_ = s.db.RecordAuthLog(req.Username, ip, "blocked", "IP diblokir sementara (rate limit 15 menit)", r.UserAgent())
 		log.Printf("[security] LOGIN BLOCKED ip=%s username=%s", ip, req.Username)
 		jsonError(w, "Terlalu banyak percobaan login gagal. Diblokir sementara selama 15 menit.", 429)
@@ -1205,7 +1255,7 @@ func (s *Server) handleLoginMFA(w http.ResponseWriter, r *http.Request) {
 		ip = strings.TrimSpace(realIP)
 	}
 
-	if !checkLoginRateLimit(ip) {
+	if !s.checkLoginRateLimit(ip) {
 		jsonError(w, "Terlalu banyak percobaan login gagal. Diblokir sementara 15 menit.", 429)
 		return
 	}
@@ -1424,4 +1474,69 @@ func (s *Server) handleAuthLogs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	jsonResp(w, logs, 200)
+}
+
+func (s *Server) handleSecuritySettings(w http.ResponseWriter, r *http.Request) {
+	claims := getClaims(r)
+	if claims.Role != "admin" {
+		jsonError(w, "only admin can manage security settings", 403)
+		return
+	}
+
+	switch r.Method {
+	case http.MethodGet:
+		settings := s.db.GetSecuritySettings()
+		blocked := s.getBlockedIPs()
+		jsonResp(w, map[string]interface{}{
+			"settings":    settings,
+			"blocked_ips": blocked,
+		}, 200)
+
+	case http.MethodPost:
+		var req models.SecuritySettings
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			jsonError(w, "invalid request body", 400)
+			return
+		}
+		if req.MaxLoginAttempts <= 0 {
+			req.MaxLoginAttempts = 5
+		}
+		if req.BlockDurationMin <= 0 {
+			req.BlockDurationMin = 15
+		}
+		if err := s.db.SaveSecuritySettings(req); err != nil {
+			jsonError(w, fmt.Sprintf("failed to save settings: %v", err), 500)
+			return
+		}
+		log.Printf("[security] admin %s updated security settings: max_attempts=%d block_duration=%dm enabled=%v",
+			claims.Username, req.MaxLoginAttempts, req.BlockDurationMin, req.RateLimitEnabled)
+		jsonResp(w, map[string]string{"status": "success", "message": "Pengaturan keamanan berhasil disimpan"}, 200)
+
+	default:
+		http.Error(w, "method not allowed", 405)
+	}
+}
+
+func (s *Server) handleUnblockIP(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", 405)
+		return
+	}
+	claims := getClaims(r)
+	if claims.Role != "admin" {
+		jsonError(w, "only admin can unblock IPs", 403)
+		return
+	}
+
+	var req struct {
+		IP string `json:"ip"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.IP == "" {
+		jsonError(w, "ip is required", 400)
+		return
+	}
+
+	s.unblockIP(req.IP)
+	log.Printf("[security] admin %s manually unblocked IP %s", claims.Username, req.IP)
+	jsonResp(w, map[string]string{"status": "success", "message": fmt.Sprintf("IP %s berhasil dibuka blokirnya", req.IP)}, 200)
 }

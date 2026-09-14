@@ -216,11 +216,11 @@ func TestChangePasswordAndRateLimit(t *testing.T) {
 	for i := 0; i < 5; i++ {
 		recordLoginFail(ip)
 	}
-	if checkLoginRateLimit(ip) {
+	if s.checkLoginRateLimit(ip) {
 		t.Fatalf("expected rate limit to trigger after 5 failures")
 	}
 	recordLoginSuccess(ip)
-	if !checkLoginRateLimit(ip) {
+	if !s.checkLoginRateLimit(ip) {
 		t.Fatalf("expected rate limit cleared on success")
 	}
 }
@@ -389,5 +389,82 @@ func TestAuthLogs(t *testing.T) {
 	}
 	if logs[1].Username != "hacker" || logs[1].Status != "failed" {
 		t.Fatalf("expected older log to be hacker failed, got %+v", logs[1])
+	}
+}
+
+func TestSecuritySettingsAndUnblock(t *testing.T) {
+	tempDir := t.TempDir()
+	dbPath := filepath.Join(tempDir, "test.db")
+	db, err := NewDB(dbPath)
+	if err != nil {
+		t.Fatalf("failed db: %v", err)
+	}
+	defer db.Close()
+
+	// 1. Initial default settings
+	defaults := db.GetSecuritySettings()
+	if !defaults.RateLimitEnabled || defaults.MaxLoginAttempts != 5 || defaults.BlockDurationMin != 15 {
+		t.Fatalf("unexpected defaults: %+v", defaults)
+	}
+
+	// 2. Save customized settings
+	custom := models.SecuritySettings{
+		RateLimitEnabled: true,
+		MaxLoginAttempts: 3,
+		BlockDurationMin: 30,
+		IPWhitelist:      "192.168.1.100, 10.0.0.1",
+	}
+	if err := db.SaveSecuritySettings(custom); err != nil {
+		t.Fatalf("save security settings: %v", err)
+	}
+
+	loaded := db.GetSecuritySettings()
+	if loaded.MaxLoginAttempts != 3 || loaded.BlockDurationMin != 30 || loaded.IPWhitelist != "192.168.1.100, 10.0.0.1" {
+		t.Fatalf("settings not persisted: %+v", loaded)
+	}
+
+	s := &Server{
+		cfg: Config{
+			Addr:      ":0",
+			DBPath:    dbPath,
+			JWTSecret: "test-secret-sec",
+		},
+		db: db,
+	}
+
+	// 3. Test whitelisted IP
+	for i := 0; i < 10; i++ {
+		recordLoginFail("192.168.1.100")
+	}
+	if !s.checkLoginRateLimit("192.168.1.100") {
+		t.Fatalf("whitelisted IP should never be blocked")
+	}
+
+	// 4. Test non-whitelisted IP blocked after 3 attempts
+	testIP := "203.0.113.50"
+	for i := 0; i < 3; i++ {
+		recordLoginFail(testIP)
+	}
+	if s.checkLoginRateLimit(testIP) {
+		t.Fatalf("expected IP to be blocked after 3 attempts")
+	}
+
+	// Check getBlockedIPs
+	blockedList := s.getBlockedIPs()
+	found := false
+	for _, b := range blockedList {
+		if b.IP == testIP {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected blocked IP in list")
+	}
+
+	// 5. Unblock IP
+	s.unblockIP(testIP)
+	if !s.checkLoginRateLimit(testIP) {
+		t.Fatalf("expected IP to be unblocked")
 	}
 }
