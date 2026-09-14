@@ -1,7 +1,9 @@
 package server
 
 import (
+	"context"
 	"net/http/httptest"
+	"strings"
 	"os"
 	"path/filepath"
 	"testing"
@@ -156,5 +158,66 @@ func TestAgentVersionEndpoint(t *testing.T) {
 	}
 	if wDl.Body.String() != "fake-agent-binary-content" {
 		t.Fatalf("unexpected content: %s", wDl.Body.String())
+	}
+}
+
+func TestChangePasswordAndRateLimit(t *testing.T) {
+	tempDir := t.TempDir()
+	dbPath := filepath.Join(tempDir, "test.db")
+	db, err := NewDB(dbPath)
+	if err != nil {
+		t.Fatalf("failed db: %v", err)
+	}
+	defer db.Close()
+
+	if err := db.EnsureAdmin("admin", hashPassword("admin123")); err != nil {
+		t.Fatalf("ensure admin: %v", err)
+	}
+
+	s := &Server{
+		cfg: Config{
+			Addr:      ":0",
+			DBPath:    dbPath,
+			JWTSecret: "test-secret",
+		},
+		db: db,
+	}
+
+	// 1. Test change password with wrong old password
+	bodyWrong := strings.NewReader(`{"old_password":"wrong","new_password":"newpassword123","confirm_password":"newpassword123"}`)
+	reqWrong := httptest.NewRequest("POST", "/api/auth/change-password", bodyWrong)
+	ctx := context.WithValue(reqWrong.Context(), userClaimsKey, &UserClaims{Username: "admin", Role: "admin"})
+	wWrong := httptest.NewRecorder()
+	s.handleChangePassword(wWrong, reqWrong.WithContext(ctx))
+	if wWrong.Code != 400 {
+		t.Fatalf("expected 400 for wrong old pass, got %d", wWrong.Code)
+	}
+
+	// 2. Test change password with correct old password
+	bodyOK := strings.NewReader(`{"old_password":"admin123","new_password":"newpassword123","confirm_password":"newpassword123"}`)
+	reqOK := httptest.NewRequest("POST", "/api/auth/change-password", bodyOK)
+	wOK := httptest.NewRecorder()
+	s.handleChangePassword(wOK, reqOK.WithContext(ctx))
+	if wOK.Code != 200 {
+		t.Fatalf("expected 200 for valid change pass, got %d", wOK.Code)
+	}
+
+	// 3. Verify in database
+	_, newHash, _, _, err := db.GetUser("admin")
+	if err != nil || newHash != hashPassword("newpassword123") {
+		t.Fatalf("password not updated in db: %v", err)
+	}
+
+	// 4. Test rate limiting
+	ip := "192.168.99.1"
+	for i := 0; i < 5; i++ {
+		recordLoginFail(ip)
+	}
+	if checkLoginRateLimit(ip) {
+		t.Fatalf("expected rate limit to trigger after 5 failures")
+	}
+	recordLoginSuccess(ip)
+	if !checkLoginRateLimit(ip) {
+		t.Fatalf("expected rate limit cleared on success")
 	}
 }

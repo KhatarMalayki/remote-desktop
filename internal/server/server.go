@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -41,6 +42,48 @@ type UserClaims struct {
 type contextKey string
 
 const userClaimsKey contextKey = "userClaims"
+
+
+type loginAttempt struct {
+	count     int
+	firstFail time.Time
+}
+
+var (
+	loginMu       sync.Mutex
+	loginAttempts = make(map[string]*loginAttempt)
+)
+
+func checkLoginRateLimit(ip string) bool {
+	loginMu.Lock()
+	defer loginMu.Unlock()
+	att, exists := loginAttempts[ip]
+	if !exists {
+		return true
+	}
+	if time.Since(att.firstFail) > 15*time.Minute {
+		delete(loginAttempts, ip)
+		return true
+	}
+	return att.count < 5
+}
+
+func recordLoginFail(ip string) {
+	loginMu.Lock()
+	defer loginMu.Unlock()
+	att, exists := loginAttempts[ip]
+	if !exists || time.Since(att.firstFail) > 15*time.Minute {
+		loginAttempts[ip] = &loginAttempt{count: 1, firstFail: time.Now()}
+		return
+	}
+	att.count++
+}
+
+func recordLoginSuccess(ip string) {
+	loginMu.Lock()
+	defer loginMu.Unlock()
+	delete(loginAttempts, ip)
+}
 
 type Server struct {
 	cfg      Config
@@ -96,6 +139,7 @@ func (s *Server) ListenAndServe() error {
 
 	mux.HandleFunc("/api/auth/login", s.handleLogin)
 	mux.HandleFunc("/api/auth/me", s.authMiddleware(s.handleMe))
+	mux.HandleFunc("/api/auth/change-password", s.authMiddleware(s.handleChangePassword))
 	mux.HandleFunc("/api/devices", s.authMiddleware(s.handleDevices))
 	mux.HandleFunc("/api/devices/", s.authMiddleware(s.handleDevice))
 	mux.HandleFunc("/api/stats", s.authMiddleware(s.handleStats))
@@ -111,7 +155,7 @@ func (s *Server) ListenAndServe() error {
 	mux.HandleFunc("/api/agent/broadcast-update", s.authMiddleware(s.handleBroadcastAgentUpdate))
 	mux.HandleFunc("/api/agent/reconfigure", s.authMiddleware(s.handleReconfigureAgents))
 	mux.HandleFunc("/api/users", s.authMiddleware(s.handleUsers))
-	mux.HandleFunc("/api/users/", s.authMiddleware(s.handleUserDelete))
+	mux.HandleFunc("/api/users/", s.authMiddleware(s.handleUserSubroute))
 	mux.HandleFunc("/api/logs/", s.authMiddleware(s.handleLogs))
 
 	mux.HandleFunc("/ws/agent", s.handleAgentWS)
@@ -129,6 +173,19 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", 405)
 		return
 	}
+
+	ip := r.RemoteAddr
+	if f := r.Header.Get("X-Forwarded-For"); f != "" {
+		ip = strings.TrimSpace(strings.Split(f, ",")[0])
+	} else if realIP := r.Header.Get("X-Real-IP"); realIP != "" {
+		ip = strings.TrimSpace(realIP)
+	}
+
+	if !checkLoginRateLimit(ip) {
+		jsonError(w, "Terlalu banyak percobaan login gagal. Diblokir sementara selama 15 menit.", 429)
+		return
+	}
+
 	var req struct {
 		Username string `json:"username"`
 		Password string `json:"password"`
@@ -139,9 +196,12 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	}
 	_, storedHash, role, branch, err := s.db.GetUser(req.Username)
 	if err != nil || storedHash != hashPassword(req.Password) {
+		recordLoginFail(ip)
 		jsonError(w, "invalid credentials", 401)
 		return
 	}
+
+	recordLoginSuccess(ip)
 	token := generateToken(req.Username, role, branch, s.cfg.JWTSecret)
 	jsonResp(w, map[string]string{
 		"token":    token,
@@ -989,4 +1049,106 @@ func (s *Server) handleReconfigureAgents(w http.ResponseWriter, r *http.Request)
 		"agents_notified": count,
 		"new_server_url":  req.ServerURL,
 	}, 200)
+}
+
+func (s *Server) handleChangePassword(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", 405)
+		return
+	}
+	claims := getClaims(r)
+	if claims == nil || claims.Username == "" || claims.Username == "anonymous" {
+		jsonError(w, "unauthorized", 401)
+		return
+	}
+
+	var req struct {
+		OldPassword     string `json:"old_password"`
+		NewPassword     string `json:"new_password"`
+		ConfirmPassword string `json:"confirm_password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonError(w, "invalid request body", 400)
+		return
+	}
+
+	if len(req.NewPassword) < 8 {
+		jsonError(w, "Password baru minimal 8 karakter", 400)
+		return
+	}
+	if req.NewPassword != req.ConfirmPassword {
+		jsonError(w, "Konfirmasi password baru tidak cocok", 400)
+		return
+	}
+	if req.NewPassword == req.OldPassword {
+		jsonError(w, "Password baru tidak boleh sama dengan password lama", 400)
+		return
+	}
+
+	_, storedHash, _, _, err := s.db.GetUser(claims.Username)
+	if err != nil {
+		jsonError(w, "user not found", 404)
+		return
+	}
+	if storedHash != hashPassword(req.OldPassword) {
+		jsonError(w, "Password lama salah", 400)
+		return
+	}
+
+	newHash := hashPassword(req.NewPassword)
+	if err := s.db.UpdatePassword(claims.Username, newHash); err != nil {
+		jsonError(w, fmt.Sprintf("failed to update password: %v", err), 500)
+		return
+	}
+
+	log.Printf("[auth] user %s successfully changed password", claims.Username)
+	jsonResp(w, map[string]string{"status": "success", "message": "Password berhasil diubah"}, 200)
+}
+
+func (s *Server) handleUserSubroute(w http.ResponseWriter, r *http.Request) {
+	if strings.HasSuffix(r.URL.Path, "/reset-password") {
+		s.handleResetUserPassword(w, r)
+		return
+	}
+	s.handleUserDelete(w, r)
+}
+
+func (s *Server) handleResetUserPassword(w http.ResponseWriter, r *http.Request) {
+	claims := getClaims(r)
+	if claims.Role != "admin" {
+		jsonError(w, "only admin can reset user passwords", 403)
+		return
+	}
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", 405)
+		return
+	}
+
+	idStr := strings.TrimPrefix(r.URL.Path, "/api/users/")
+	idStr = strings.TrimSuffix(idStr, "/reset-password")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		jsonError(w, "invalid user id", 400)
+		return
+	}
+
+	var req struct {
+		NewPassword string `json:"new_password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonError(w, "invalid request body", 400)
+		return
+	}
+	if len(req.NewPassword) < 8 {
+		jsonError(w, "Password baru minimal 8 karakter", 400)
+		return
+	}
+
+	if err := s.db.ResetUserPassword(id, hashPassword(req.NewPassword)); err != nil {
+		jsonError(w, err.Error(), 500)
+		return
+	}
+
+	log.Printf("[auth] admin %s reset password for user ID %d", claims.Username, id)
+	jsonResp(w, map[string]string{"status": "success", "message": "Password user berhasil direset"}, 200)
 }

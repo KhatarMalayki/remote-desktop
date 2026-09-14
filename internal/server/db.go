@@ -358,6 +358,16 @@ func (d *DB) DeleteUser(id int64) error {
 	return err
 }
 
+func (d *DB) UpdatePassword(username, passwordHash string) error {
+	_, err := d.db.Exec(`UPDATE users SET password_hash=? WHERE username=?`, passwordHash, username)
+	return err
+}
+
+func (d *DB) ResetUserPassword(id int64, passwordHash string) error {
+	_, err := d.db.Exec(`UPDATE users SET password_hash=? WHERE id=?`, passwordHash, id)
+	return err
+}
+
 // ---------------- MANUAL ASSETS ----------------
 
 func (d *DB) CreateManualAsset(a *models.ManualAsset) error {

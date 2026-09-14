@@ -569,7 +569,7 @@ async function loadUsers() {
   if (!users || users.length === 0) { container.innerHTML = '<p style="color:var(--fg2);font-size:12px">Belum ada user tambahan.</p>'; return; }
   container.innerHTML = '<table class="device-table"><thead><tr><th>Username</th><th>Role</th><th>Cabang</th><th>Aksi</th></tr></thead><tbody>' +
     users.map(function(u) {
-      return '<tr><td><strong>'+esc(u.username)+'</strong></td><td><span class="user-badge '+u.role+'">'+esc(u.role)+'</span></td><td>'+esc(u.branch||'-')+'</td><td>'+(u.role!=='admin'?'<button class="btn btn-danger btn-sm" onclick="deleteUser('+u.id+')">Hapus</button>':'<small style="color:var(--fg2)">Root</small>')+'</td></tr>';
+      return '<tr><td><strong>'+esc(u.username)+'</strong></td><td><span class="user-badge '+u.role+'">'+esc(u.role)+'</span></td><td>'+esc(u.branch||'-')+'</td><td>'+(u.role!=='admin'?'<button class="btn btn-danger btn-sm" onclick="deleteUser('+u.id+')">Hapus</button> <button class="btn btn-ghost btn-sm" onclick="resetUserPassword('+u.id+', \''+esc(u.username)+'\')">Reset Pass</button>':'<small style="color:var(--fg2)">Root</small>')+'</td></tr>';
     }).join('') + '</tbody></table>';
 }
 
@@ -853,5 +853,81 @@ async function openReconfigureModal() {
     showToast('Perintah pindah endpoint terkirim ke ' + res.agents_notified + ' agent. Config mereka akan otomatis terupdate.');
   } else {
     alert('Gagal: ' + ((res && res.error) || 'Unknown error'));
+  }
+}
+
+// ==================== CHANGE & RESET PASSWORD ====================
+
+function openChangePasswordModal() {
+  var oldEl = document.getElementById('cpOldPass');
+  var newEl = document.getElementById('cpNewPass');
+  var confEl = document.getElementById('cpConfirmPass');
+  var errEl = document.getElementById('cpError');
+  if (oldEl) oldEl.value = '';
+  if (newEl) newEl.value = '';
+  if (confEl) confEl.value = '';
+  if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
+  var modal = document.getElementById('changePasswordModal');
+  if (modal) modal.style.display = 'flex';
+}
+
+function closeChangePasswordModal() {
+  var modal = document.getElementById('changePasswordModal');
+  if (modal) modal.style.display = 'none';
+}
+
+async function submitChangePassword() {
+  var oldPass = (document.getElementById('cpOldPass') || {}).value || '';
+  var newPass = (document.getElementById('cpNewPass') || {}).value || '';
+  var confirmPass = (document.getElementById('cpConfirmPass') || {}).value || '';
+  var errEl = document.getElementById('cpError');
+
+  function showErr(msg) {
+    if (errEl) {
+      errEl.textContent = msg;
+      errEl.style.display = 'block';
+    } else {
+      alert(msg);
+    }
+  }
+
+  if (!oldPass) { showErr('Password saat ini wajib diisi'); return; }
+  if (!newPass || newPass.length < 8) { showErr('Password baru minimal 8 karakter'); return; }
+  if (newPass !== confirmPass) { showErr('Konfirmasi password baru tidak cocok'); return; }
+  if (newPass === oldPass) { showErr('Password baru tidak boleh sama dengan password lama'); return; }
+
+  var res = await api('/api/auth/change-password', {
+    method: 'POST',
+    body: JSON.stringify({
+      old_password: oldPass,
+      new_password: newPass,
+      confirm_password: confirmPass
+    })
+  });
+
+  if (res && res.status === 'success') {
+    closeChangePasswordModal();
+    showToast('Password berhasil diubah!');
+  } else {
+    showErr((res && res.error) || 'Gagal mengubah password');
+  }
+}
+
+async function resetUserPassword(id, username) {
+  var newPass = prompt('Masukkan password baru untuk user ' + username + ' (minimal 8 karakter):');
+  if (!newPass || !newPass.trim()) return;
+  newPass = newPass.trim();
+  if (newPass.length < 8) {
+    alert('Password minimal 8 karakter!');
+    return;
+  }
+  var res = await api('/api/users/' + id + '/reset-password', {
+    method: 'POST',
+    body: JSON.stringify({ new_password: newPass })
+  });
+  if (res && res.status === 'success') {
+    showToast('Password untuk ' + username + ' berhasil direset');
+  } else {
+    alert('Gagal reset password: ' + ((res && res.error) || 'Terjadi kesalahan'));
   }
 }
