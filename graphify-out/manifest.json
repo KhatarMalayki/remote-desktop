@@ -45,8 +45,8 @@
     "semantic_hash": "98114d1ea5326308f76a187b440b8d76"
   },
   "internal/server/server.go": {
-    "mtime": 1789378830.220129,
-    "ast_hash": "c9999179e588d9927f618b6f0b62a48a",
+    "mtime": 1789379480.9929378,
+    "ast_hash": "5840f0006af6cf790f2daf3a45fdf225",
     "semantic_hash": ""
   },
   "scripts/build.ps1": {
@@ -125,8 +125,8 @@
     "semantic_hash": ""
   },
   "web/index.html": {
-    "mtime": 1789378901.0114224,
-    "ast_hash": "a0e916dfcae0ede6ac7807e5cf9eda00",
+    "mtime": 1789379492.4817853,
+    "ast_hash": "19a81c274b7cd4dac5aa27016458b8a3",
     "semantic_hash": ""
   },
   "scripts/update-server.sh": {

@@ -1691,6 +1691,64 @@ func (s *Server) handleAgentPackageDownload(w http.ResponseWriter, r *http.Reque
 	}
 
 	if targetOS == "windows" {
+		// 1. start-hidden.vbs for silent background execution
+		vbsContent := `Set WshShell = CreateObject("WScript.Shell")
+WshShell.CurrentDirectory = CreateObject("Scripting.FileSystemObject").GetParentFolderName(WScript.ScriptFullName)
+WshShell.Run chr(34) & WshShell.CurrentDirectory & "\rd-agent.exe" & chr(34), 0, False
+`
+		if fVbs, err := zw.Create("start-hidden.vbs"); err == nil {
+			_, _ = fVbs.Write([]byte(vbsContent))
+		}
+
+		// 2. pasang-otomatis.bat (auto-start via Startup folder without requiring Run As Administrator)
+		installBat := fmt.Sprintf(`@echo off
+title Pasang RemoteDesk Agent - %s
+echo =========================================================
+echo   Memasang RemoteDesk Agent (Cabang: %s)
+echo =========================================================
+echo.
+
+if not exist "%%~dp0rd-agent.exe" (
+    echo Error: rd-agent.exe tidak ditemukan di folder ini!
+    pause
+    exit /b 1
+)
+
+:: Matikan proses agent lama jika sedang berjalan
+taskkill /f /im rd-agent.exe >nul 2>&1
+
+:: Daftarkan ke folder Startup Windows (Otomatis Jalan Tiap Komputer Nyala)
+set "STARTUP_FOLDER=%%APPDATA%%\Microsoft\Windows\Start Menu\Programs\Startup"
+echo Set oWS = WScript.CreateObject("WScript.Shell") > "%%TEMP%%\CreateRemoteDeskLnk.vbs"
+echo sLinkFile = "%%STARTUP_FOLDER%%\RemoteDesk-Agent.lnk" >> "%%TEMP%%\CreateRemoteDeskLnk.vbs"
+echo Set oLink = oWS.CreateShortcut(sLinkFile) >> "%%TEMP%%\CreateRemoteDeskLnk.vbs"
+echo oLink.TargetPath = "wscript.exe" >> "%%TEMP%%\CreateRemoteDeskLnk.vbs"
+echo oLink.Arguments = chr(34) ^^& "%%~dp0start-hidden.vbs" ^^& chr(34) >> "%%TEMP%%\CreateRemoteDeskLnk.vbs"
+echo oLink.WorkingDirectory = "%%~dp0" >> "%%TEMP%%\CreateRemoteDeskLnk.vbs"
+echo oLink.WindowStyle = 7 >> "%%TEMP%%\CreateRemoteDeskLnk.vbs"
+echo oLink.Save >> "%%TEMP%%\CreateRemoteDeskLnk.vbs"
+cscript //nologo "%%TEMP%%\CreateRemoteDeskLnk.vbs"
+del "%%TEMP%%\CreateRemoteDeskLnk.vbs" >nul 2>&1
+
+:: Jalankan agent sekarang di background secara silent (tanpa jendela hitam)
+wscript.exe "%%~dp0start-hidden.vbs"
+
+echo [OK] Shortcut Startup berhasil dipasang.
+echo [OK] Agent RemoteDesk sudah aktif di background!
+echo.
+echo =========================================================
+echo   SUKSES!
+echo   Komputer ini sekarang sudah terhubung ke server dan
+echo   akan OTOMATIS JALAN setiap kali komputer dinyalakan.
+echo =========================================================
+echo.
+timeout /t 5
+`, branch, branch)
+		if fInstall, err := zw.Create("pasang-otomatis.bat"); err == nil {
+			_, _ = fInstall.Write([]byte(installBat))
+		}
+
+		// 3. run-agent.bat (quick launcher)
 		batContent := fmt.Sprintf(`@echo off
 title RemoteDesk Agent - %s
 echo ===================================================
@@ -1709,23 +1767,43 @@ if %%ERRORLEVEL%% NEQ 0 (
     pause
 )
 `, branch, branch)
-		fBat, err := zw.Create("run-agent.bat")
-		if err == nil {
+		if fBat, err := zw.Create("run-agent.bat"); err == nil {
 			_, _ = fBat.Write([]byte(batContent))
+		}
+
+		// 4. hapus-otomatis.bat (uninstaller from Startup)
+		uninstallBat := `@echo off
+title Hapus RemoteDesk Auto-Start
+echo Mematikan dan mencopot auto-start RemoteDesk...
+taskkill /f /im rd-agent.exe >nul 2>&1
+del "%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup\RemoteDesk-Agent.lnk" >nul 2>&1
+echo Selesai! Auto-start telah dihapus.
+pause
+`
+		if fUn, err := zw.Create("hapus-otomatis.bat"); err == nil {
+			_, _ = fUn.Write([]byte(uninstallBat))
 		}
 	}
 
-	readmeContent := fmt.Sprintf(`PANDUAN PEMASANGAN REMOTEDESK AGENT
+	readmeContent := fmt.Sprintf(`=========================================================
+PANDUAN PEMASANGAN REMOTEDESK AGENT
 Cabang / Site : %s
 Server URL    : %s
+=========================================================
 
-CARA PAKAI SANGAT MUDAH (CUKUP KLIK 2 KALI):
-1. Ekstrak semua file di dalam file ZIP ini ke salah satu folder (misal: C:\RemoteDesk\).
-2. Cukup KLIK DUA KALI file "run-agent.bat" (atau "rd-agent.exe").
-3. Selesai! Komputer ini akan otomatis terhubung ke server dan langsung terdaftar di cabang %s.
-`, branch, serverURL, branch)
-	fReadme, err := zw.Create("PETUNJUK_CARA_PAKAI.txt")
-	if err == nil {
+CARA PASANG PALING MUDAH:
+1. Ekstrak semua isi file ZIP ini ke salah satu folder (misal: C:\RemoteDesk\).
+2. Cukup KLIK DUA KALI file "pasang-otomatis.bat" (TIDAK PERLU Run as Administrator!).
+3. SELESAI!
+   - Agent akan langsung berjalan diam-diam di background (tanpa jendela hitam).
+   - Agent akan OTOMATIS JALAN SENDIRI setiap kali komputer dinyalakan / direstart.
+
+KETERANGAN FILE:
+- pasang-otomatis.bat : Mengaktifkan auto-start dan menjalankan agent di background.
+- run-agent.bat       : Menjalankan agent di jendela hitam untuk tes melihat log.
+- hapus-otomatis.bat  : Menghapus agent dari daftar startup Windows.
+`, branch, serverURL)
+	if fReadme, err := zw.Create("PETUNJUK_CARA_PAKAI.txt"); err == nil {
 		_, _ = fReadme.Write([]byte(readmeContent))
 	}
 
