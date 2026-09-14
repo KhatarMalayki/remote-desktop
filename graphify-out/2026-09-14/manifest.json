@@ -30,8 +30,8 @@
     "semantic_hash": ""
   },
   "internal/server/db.go": {
-    "mtime": 1788835716.2962065,
-    "ast_hash": "c7f85af321190933ee062638783f1fb5",
+    "mtime": 1789368843.8773165,
+    "ast_hash": "2c815243a41b8315a7197b7a155086e2",
     "semantic_hash": ""
   },
   "internal/server/hub.go": {
@@ -45,8 +45,8 @@
     "semantic_hash": "98114d1ea5326308f76a187b440b8d76"
   },
   "internal/server/server.go": {
-    "mtime": 1789166738.197894,
-    "ast_hash": "897a4bb78ea12502e2c6a74a7b143314",
+    "mtime": 1789368870.121401,
+    "ast_hash": "c3271041cec406519fc2b09ce93b3d9e",
     "semantic_hash": ""
   },
   "scripts/build.ps1": {
@@ -65,8 +65,8 @@
     "semantic_hash": "8c9cb5d1b967f64d6abc8c1ca0fe3e90"
   },
   "web/static/app.js": {
-    "mtime": 1789166829.5873652,
-    "ast_hash": "cb6cabbde9d99b00b6b0182cf9cff62c",
+    "mtime": 1789368974.7642553,
+    "ast_hash": "662e71011f2ea0ddc2ec44491ea83047",
     "semantic_hash": ""
   },
   ".codex/hooks.json": {
@@ -75,8 +75,8 @@
     "semantic_hash": ""
   },
   "internal/server/db_test.go": {
-    "mtime": 1789153195.2298675,
-    "ast_hash": "5b68b71941dc2d6ac1041ac2b959b555",
+    "mtime": 1789368927.8805752,
+    "ast_hash": "713114463ddfd68f0395d414f71ef8db",
     "semantic_hash": ""
   },
   "AGENTS.md": {
@@ -125,18 +125,13 @@
     "semantic_hash": ""
   },
   "web/index.html": {
-    "mtime": 1789166795.1558433,
-    "ast_hash": "6d4eeddc7a217399da84330c86cb02fb",
+    "mtime": 1789368954.963986,
+    "ast_hash": "186da6d363e5ed740f9bf3bd5147c740",
     "semantic_hash": ""
   },
   "scripts/update-server.sh": {
     "mtime": 1789115796.095798,
     "ast_hash": "9a85afd8e42dda593d34b68e0e93aea8",
-    "semantic_hash": ""
-  },
-  ".github/workflows/deploy.yml": {
-    "mtime": 1789115788.9459112,
-    "ast_hash": "48b78fbaa95a0220952a5d9ed27530d3",
     "semantic_hash": ""
   },
   ".github/workflows/docker-publish.yml": {
@@ -145,8 +140,13 @@
     "semantic_hash": ""
   },
   "docker-compose.synology.yml": {
-    "mtime": 1789153237.2652433,
-    "ast_hash": "e28e95a2ece48ae0240e4c30031300a5",
+    "mtime": 1789296592.125385,
+    "ast_hash": "eaeb5304f9ea20dfb3d814600edcdd79",
+    "semantic_hash": ""
+  },
+  ".github/workflows/release-agent.yml": {
+    "mtime": 1789309348.4830832,
+    "ast_hash": "1fecae4770e8a1477fe51285a0dfbcb8",
     "semantic_hash": ""
   }
 }

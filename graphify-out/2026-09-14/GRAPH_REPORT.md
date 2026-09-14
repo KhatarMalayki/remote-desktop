@@ -1,13 +1,18 @@
-# Graph Report - remote-desktop  (2026-09-13)
+# Graph Report - remote-desktop  (2026-09-14)
 
 ## Corpus Check
-- 25 files · ~20,958 words
+- 25 files · ~22,143 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 361 nodes · 657 edges · 20 communities (15 shown, 5 thin omitted)
-- Extraction: 97% EXTRACTED · 3% INFERRED · 0% AMBIGUOUS · INFERRED: 19 edges (avg confidence: 0.78)
+- 376 nodes · 702 edges · 20 communities (15 shown, 5 thin omitted)
+- Extraction: 97% EXTRACTED · 3% INFERRED · 0% AMBIGUOUS · INFERRED: 24 edges (avg confidence: 0.79)
 - Token cost: 0 input · 0 output
+
+## Graph Freshness
+- Built from commit: `9b8bfc5c`
+- Run `git rev-parse HEAD` and compare to check if the graph is stale.
+- Run `graphify update .` after code changes (no API cost).
 
 ## Community Hubs (Navigation)
 - Community 0
@@ -30,16 +35,16 @@
 - TestAgentVersionEndpoint
 
 ## God Nodes (most connected - your core abstractions)
-1. `Server` - 33 edges
-2. `DB` - 32 edges
-3. `jsonResp()` - 21 edges
-4. `jsonError()` - 20 edges
-5. `api()` - 19 edges
-6. `Agent` - 15 edges
-7. `getClaims()` - 15 edges
+1. `Server` - 36 edges
+2. `DB` - 34 edges
+3. `jsonResp()` - 23 edges
+4. `jsonError()` - 22 edges
+5. `api()` - 21 edges
+6. `getClaims()` - 17 edges
+7. `Agent` - 15 edges
 8. `Hub` - 14 edges
-9. `loadDevices()` - 13 edges
-10. `Client` - 12 edges
+9. `showToast()` - 14 edges
+10. `loadDevices()` - 13 edges
 
 ## Surprising Connections (you probably didn't know these)
 - `main()` --calls--> `New()`  [INFERRED]
@@ -50,7 +55,7 @@
   cmd/agent/main.go → internal/agent/client.go
 - `TestAgentVersionEndpoint()` --calls--> `NewDB()`  [INFERRED]
   internal/server/db_test.go → internal/server/db.go
-- `TestDBAndBranchVerification()` --calls--> `NewDB()`  [INFERRED]
+- `TestChangePasswordAndRateLimit()` --calls--> `NewDB()`  [INFERRED]
   internal/server/db_test.go → internal/server/db.go
 
 ## Import Cycles
@@ -63,20 +68,20 @@ Cohesion: 0.12
 Nodes (20): Agent, AgentConfig, SystemInfo, envOr(), main(), CleanupOldExecutable(), generateDeviceID(), Conn (+12 more)
 
 ### Community 1 - "Community 1"
-Cohesion: 0.18
-Nodes (16): FS, HandlerFunc, getClaims(), Hub, hashPassword(), jsonError(), jsonResp(), New() (+8 more)
+Cohesion: 0.14
+Nodes (22): FS, HandlerFunc, TestChangePasswordAndRateLimit(), checkLoginRateLimit(), getClaims(), Hub, Time, hashPassword() (+14 more)
 
 ### Community 2 - "Community 2"
 Cohesion: 0.08
-Nodes (15): migrate(), NewDB(), scanDevice(), scanDeviceRows(), scanManualAsset(), AssetVerification, Device, DeviceHeartbeat (+7 more)
+Nodes (15): Time, migrate(), NewDB(), scanDevice(), scanDeviceRows(), scanManualAsset(), AssetVerification, Device (+7 more)
 
 ### Community 3 - "Community 3"
 Cohesion: 0.14
 Nodes (7): Conn, Hub, Hub, NewHub(), SignalMessage, RWMutex, Client
 
 ### Community 4 - "Community 4"
-Cohesion: 0.08
-Nodes (63): api(), buildDeviceTable(), CHART_COLORS, chartDefaults(), checkAuth(), closeDeviceModal(), closeManualAssetModal(), closeVerificationModal() (+55 more)
+Cohesion: 0.07
+Nodes (66): api(), buildDeviceTable(), CHART_COLORS, chartDefaults(), checkAuth(), closeChangePasswordModal(), closeDeviceModal(), closeManualAssetModal() (+58 more)
 
 ### Community 5 - "Community 5"
 Cohesion: 0.06
@@ -119,16 +124,16 @@ Nodes (5): TestAgentVersionEndpoint(), TestDBAndBranchVerification(), TestTokenC
 _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `DB` connect `Community 2` to `Community 1`, `Community 3`?**
-  _High betweenness centrality (0.093) - this node is a cross-community bridge._
+  _High betweenness centrality (0.100) - this node is a cross-community bridge._
 - **Why does `Server` connect `Community 1` to `Community 2`, `Community 3`?**
-  _High betweenness centrality (0.070) - this node is a cross-community bridge._
+  _High betweenness centrality (0.076) - this node is a cross-community bridge._
 - **Why does `WSMessage` connect `Community 2` to `Community 0`?**
   _High betweenness centrality (0.058) - this node is a cross-community bridge._
 - **What connects `github.com/user/remote-desktop`, `Hub`, `contextKey` to the rest of the system?**
   _100 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `Community 0` be split into smaller, more focused modules?**
   _Cohesion score 0.11553030303030302 - nodes in this community are weakly interconnected._
+- **Should `Community 1` be split into smaller, more focused modules?**
+  _Cohesion score 0.14448979591836736 - nodes in this community are weakly interconnected._
 - **Should `Community 2` be split into smaller, more focused modules?**
-  _Cohesion score 0.08305647840531562 - nodes in this community are weakly interconnected._
-- **Should `Community 3` be split into smaller, more focused modules?**
-  _Cohesion score 0.14285714285714285 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.07777777777777778 - nodes in this community are weakly interconnected._

@@ -2,11 +2,14 @@ package server
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"net/http/httptest"
 	"strings"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/user/remote-desktop/internal/models"
 )
@@ -219,5 +222,85 @@ func TestChangePasswordAndRateLimit(t *testing.T) {
 	recordLoginSuccess(ip)
 	if !checkLoginRateLimit(ip) {
 		t.Fatalf("expected rate limit cleared on success")
+	}
+}
+
+func TestMFAWorkflow(t *testing.T) {
+	tempDir := t.TempDir()
+	dbPath := filepath.Join(tempDir, "test.db")
+	db, err := NewDB(dbPath)
+	if err != nil {
+		t.Fatalf("failed db: %v", err)
+	}
+	defer db.Close()
+
+	if err := db.EnsureAdmin("admin", hashPassword("admin123")); err != nil {
+		t.Fatalf("ensure admin: %v", err)
+	}
+
+	s := &Server{
+		cfg: Config{
+			Addr:      ":0",
+			DBPath:    dbPath,
+			JWTSecret: "test-secret-mfa",
+		},
+		db: db,
+	}
+
+	// 1. Check initial MFA status (should be disabled)
+	en, _, err := db.GetUserMFA("admin")
+	if err != nil || en {
+		t.Fatalf("expected initial MFA disabled, got %v", en)
+	}
+
+	// 2. Setup MFA - generate secret
+	secret := GenerateTOTPSecret()
+	code, err := GenerateTOTPCode(secret, time.Now())
+	if err != nil {
+		t.Fatalf("generate totp code: %v", err)
+	}
+
+	// Enable MFA with valid code
+	if !ValidateTOTPCode(secret, code) {
+		t.Fatalf("expected valid code")
+	}
+	if err := db.SetUserMFA("admin", secret, true); err != nil {
+		t.Fatalf("enable MFA in db: %v", err)
+	}
+
+	// 3. Test login when MFA is enabled
+	// 3a. Login without code -> should require MFA
+	bodyNoCode := strings.NewReader(`{"username":"admin","password":"admin123"}`)
+	reqNoCode := httptest.NewRequest("POST", "/api/auth/login", bodyNoCode)
+	wNoCode := httptest.NewRecorder()
+	s.handleLogin(wNoCode, reqNoCode)
+	if wNoCode.Code != 200 || !strings.Contains(wNoCode.Body.String(), "mfa_required") {
+		t.Fatalf("expected mfa_required, got %s", wNoCode.Body.String())
+	}
+
+	// Extract mfa_ticket
+	var resMFA map[string]interface{}
+	_ = json.Unmarshal(wNoCode.Body.Bytes(), &resMFA)
+	ticket, _ := resMFA["mfa_ticket"].(string)
+	if ticket == "" {
+		t.Fatalf("expected mfa_ticket in response")
+	}
+
+	// 3b. Verify second-step MFA login with code
+	bodyMFA := strings.NewReader(fmt.Sprintf(`{"mfa_ticket":"%s","code":"%s"}`, ticket, code))
+	reqMFA := httptest.NewRequest("POST", "/api/auth/login/mfa", bodyMFA)
+	wMFA := httptest.NewRecorder()
+	s.handleLoginMFA(wMFA, reqMFA)
+	if wMFA.Code != 200 || !strings.Contains(wMFA.Body.String(), "token") {
+		t.Fatalf("expected token after MFA login, got %s", wMFA.Body.String())
+	}
+
+	// 4. Test disable MFA
+	if err := db.SetUserMFA("admin", "", false); err != nil {
+		t.Fatalf("disable MFA: %v", err)
+	}
+	enAfter, _, _ := db.GetUserMFA("admin")
+	if enAfter {
+		t.Fatalf("expected MFA disabled")
 	}
 }

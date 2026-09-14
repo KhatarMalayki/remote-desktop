@@ -54,6 +54,16 @@ async function doLogin() {
       body: JSON.stringify({ username: user, password: pass })
     });
     const data = await res.json();
+    if (res.ok && data.mfa_required) {
+      document.getElementById('loginMFATicket').value = data.mfa_ticket || '';
+      document.getElementById('loginCreds').style.display = 'none';
+      document.getElementById('loginMFA').style.display = 'block';
+      const codeInput = document.getElementById('loginMFACode');
+      if (codeInput) { codeInput.value = ''; codeInput.focus(); }
+      const errEl = document.getElementById('loginError');
+      if (errEl) errEl.style.display = 'none';
+      return;
+    }
     if (res.ok && data.token) {
       token = data.token;
       localStorage.setItem('rd_token', token);
@@ -569,7 +579,7 @@ async function loadUsers() {
   if (!users || users.length === 0) { container.innerHTML = '<p style="color:var(--fg2);font-size:12px">Belum ada user tambahan.</p>'; return; }
   container.innerHTML = '<table class="device-table"><thead><tr><th>Username</th><th>Role</th><th>Cabang</th><th>Aksi</th></tr></thead><tbody>' +
     users.map(function(u) {
-      return '<tr><td><strong>'+esc(u.username)+'</strong></td><td><span class="user-badge '+u.role+'">'+esc(u.role)+'</span></td><td>'+esc(u.branch||'-')+'</td><td>'+(u.role!=='admin'?'<button class="btn btn-danger btn-sm" onclick="deleteUser('+u.id+')">Hapus</button> <button class="btn btn-ghost btn-sm" onclick="resetUserPassword('+u.id+', \''+esc(u.username)+'\')">Reset Pass</button>':'<small style="color:var(--fg2)">Root</small>')+'</td></tr>';
+      return '<tr><td><strong>'+esc(u.username)+'</strong>'+(u.mfa_enabled?' <span class="badge-status verified" style="font-size:10px;padding:1px 6px">2FA ON</span>':'')+'</td><td><span class="user-badge '+u.role+'">'+esc(u.role)+'</span></td><td>'+esc(u.branch||'-')+'</td><td>'+(u.role!=='admin'?'<button class="btn btn-danger btn-sm" onclick="deleteUser('+u.id+')">Hapus</button> <button class="btn btn-ghost btn-sm" onclick="resetUserPassword('+u.id+', \''+esc(u.username)+'\')">Reset Pass</button>'+(u.mfa_enabled?' <button class="btn btn-ghost btn-sm" onclick="resetUserMFA('+u.id+', \''+esc(u.username)+'\')">Reset 2FA</button>':''):'<small style="color:var(--fg2)">Root</small>')+'</td></tr>';
     }).join('') + '</tbody></table>';
 }
 
@@ -929,5 +939,172 @@ async function resetUserPassword(id, username) {
     showToast('Password untuk ' + username + ' berhasil direset');
   } else {
     alert('Gagal reset password: ' + ((res && res.error) || 'Terjadi kesalahan'));
+  }
+}
+
+// ==================== 2FA / MFA FUNCTIONS ====================
+
+async function doLoginMFA() {
+  const ticket = (document.getElementById('loginMFATicket') || {}).value || '';
+  const code = ((document.getElementById('loginMFACode') || {}).value || '').trim();
+  const errEl = document.getElementById('loginError');
+
+  if (!code || code.length !== 6) {
+    if (errEl) {
+      errEl.textContent = 'Masukkan 6 digit kode dari aplikasi Authenticator';
+      errEl.style.display = 'block';
+    }
+    return;
+  }
+
+  try {
+    const res = await fetch('/api/auth/login/mfa', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mfa_ticket: ticket, code: code })
+    });
+    const data = await res.json();
+    if (res.ok && data.token) {
+      token = data.token;
+      localStorage.setItem('rd_token', token);
+      currentUser = { username: data.username, role: data.role, branch: data.branch };
+      updateUserUI();
+      document.getElementById('loginPage').style.display = 'none';
+      document.getElementById('appContainer').style.display = 'flex';
+      init();
+    } else {
+      if (errEl) {
+        errEl.textContent = data.error || 'Kode 2FA salah / kedaluwarsa';
+        errEl.style.display = 'block';
+      }
+    }
+  } catch (e) {
+    if (errEl) {
+      errEl.textContent = 'Connection error';
+      errEl.style.display = 'block';
+    }
+  }
+}
+
+function cancelMFA() {
+  document.getElementById('loginMFA').style.display = 'none';
+  document.getElementById('loginCreds').style.display = 'block';
+  const errEl = document.getElementById('loginError');
+  if (errEl) errEl.style.display = 'none';
+}
+
+let currentMFASetupSecret = '';
+
+async function openMFAModal() {
+  const modal = document.getElementById('mfaModal');
+  if (!modal) return;
+  modal.style.display = 'flex';
+
+  const status = await api('/api/auth/mfa/status');
+  if (status && status.mfa_enabled) {
+    document.getElementById('mfaActiveSection').style.display = 'block';
+    document.getElementById('mfaSetupSection').style.display = 'none';
+    document.getElementById('mfaCloseAction').style.display = 'flex';
+    document.getElementById('mfaDisablePass').value = '';
+  } else {
+    document.getElementById('mfaActiveSection').style.display = 'none';
+    document.getElementById('mfaSetupSection').style.display = 'block';
+    document.getElementById('mfaCloseAction').style.display = 'none';
+    document.getElementById('mfaVerifyCode').value = '';
+    const errEl = document.getElementById('mfaError');
+    if (errEl) errEl.style.display = 'none';
+
+    const setup = await api('/api/auth/mfa/setup', { method: 'POST' });
+    if (setup && setup.secret) {
+      currentMFASetupSecret = setup.secret;
+      document.getElementById('mfaSecretText').textContent = setup.secret;
+      const qrEl = document.getElementById('mfaQRCode');
+      qrEl.innerHTML = '';
+      if (typeof QRCode !== 'undefined') {
+        new QRCode(qrEl, {
+          text: setup.otpauth_url,
+          width: 180,
+          height: 180,
+          colorDark: '#000000',
+          colorLight: '#ffffff',
+          correctLevel: QRCode.CorrectLevel.M
+        });
+      } else {
+        qrEl.innerHTML = '<p style="color:#111;font-size:11px;padding:10px">Gunakan kunci manual di bawah untuk memasukkan ke Authenticator.</p>';
+      }
+    }
+  }
+}
+
+function closeMFAModal() {
+  const modal = document.getElementById('mfaModal');
+  if (modal) modal.style.display = 'none';
+}
+
+function copyMFASecret() {
+  const sec = document.getElementById('mfaSecretText').textContent;
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(sec).then(() => showToast('Kunci rahasia disalin ke clipboard'));
+  } else {
+    showToast('Kunci: ' + sec);
+  }
+}
+
+async function submitEnableMFA() {
+  const code = ((document.getElementById('mfaVerifyCode') || {}).value || '').trim();
+  const errEl = document.getElementById('mfaError');
+  if (!code || code.length !== 6) {
+    if (errEl) {
+      errEl.textContent = 'Masukkan 6 digit kode dari aplikasi Authenticator';
+      errEl.style.display = 'block';
+    }
+    return;
+  }
+
+  const res = await api('/api/auth/mfa/enable', {
+    method: 'POST',
+    body: JSON.stringify({ secret: currentMFASetupSecret, code: code })
+  });
+
+  if (res && res.status === 'success') {
+    closeMFAModal();
+    showToast('2FA / MFA Berhasil Diaktifkan! Akun Anda sekarang aman.');
+  } else {
+    if (errEl) {
+      errEl.textContent = (res && res.error) || 'Kode verifikasi salah, pastikan jam di HP Anda akurat.';
+      errEl.style.display = 'block';
+    }
+  }
+}
+
+async function submitDisableMFA() {
+  const pass = (document.getElementById('mfaDisablePass') || {}).value || '';
+  if (!pass) {
+    alert('Masukkan password akun Anda untuk menonaktifkan 2FA');
+    return;
+  }
+  if (!confirm('Yakin ingin menonaktifkan 2FA? Keamanan akun akan berkurang.')) return;
+
+  const res = await api('/api/auth/mfa/disable', {
+    method: 'POST',
+    body: JSON.stringify({ password: pass })
+  });
+
+  if (res && res.status === 'success') {
+    closeMFAModal();
+    showToast('2FA / MFA berhasil dinonaktifkan.');
+  } else {
+    alert('Gagal: ' + ((res && res.error) || 'Password salah'));
+  }
+}
+
+async function resetUserMFA(id, username) {
+  if (!confirm('Reset 2FA untuk user ' + username + '? User akan bisa login tanpa kode 2FA sampai dia mengaktifkannya lagi.')) return;
+  const res = await api('/api/users/' + id + '/reset-mfa', { method: 'POST' });
+  if (res && res.status === 'success') {
+    showToast('2FA untuk ' + username + ' berhasil direset');
+    loadUsers();
+  } else {
+    alert('Gagal reset 2FA: ' + ((res && res.error) || 'Terjadi kesalahan'));
   }
 }

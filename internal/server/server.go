@@ -11,6 +11,7 @@ import (
 	"io/fs"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -138,8 +139,13 @@ func (s *Server) ListenAndServe() error {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/api/auth/login", s.handleLogin)
+	mux.HandleFunc("/api/auth/login/mfa", s.handleLoginMFA)
 	mux.HandleFunc("/api/auth/me", s.authMiddleware(s.handleMe))
 	mux.HandleFunc("/api/auth/change-password", s.authMiddleware(s.handleChangePassword))
+	mux.HandleFunc("/api/auth/mfa/status", s.authMiddleware(s.handleMFAStatus))
+	mux.HandleFunc("/api/auth/mfa/setup", s.authMiddleware(s.handleMFASetup))
+	mux.HandleFunc("/api/auth/mfa/enable", s.authMiddleware(s.handleMFAEnable))
+	mux.HandleFunc("/api/auth/mfa/disable", s.authMiddleware(s.handleMFADisable))
 	mux.HandleFunc("/api/devices", s.authMiddleware(s.handleDevices))
 	mux.HandleFunc("/api/devices/", s.authMiddleware(s.handleDevice))
 	mux.HandleFunc("/api/stats", s.authMiddleware(s.handleStats))
@@ -189,6 +195,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Username string `json:"username"`
 		Password string `json:"password"`
+		Code     string `json:"code"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		jsonError(w, "invalid body", 400)
@@ -199,6 +206,24 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		recordLoginFail(ip)
 		jsonError(w, "invalid credentials", 401)
 		return
+	}
+
+	mfaEnabled, mfaSecret, _ := s.db.GetUserMFA(req.Username)
+	if mfaEnabled {
+		if req.Code == "" {
+			ticket := generateMFATicket(req.Username, role, branch, s.cfg.JWTSecret)
+			jsonResp(w, map[string]interface{}{
+				"mfa_required": true,
+				"mfa_ticket":   ticket,
+				"username":     req.Username,
+			}, 200)
+			return
+		}
+		if !ValidateTOTPCode(mfaSecret, req.Code) {
+			recordLoginFail(ip)
+			jsonError(w, "Kode 2FA / Authenticator salah atau kedaluwarsa", 401)
+			return
+		}
 	}
 
 	recordLoginSuccess(ip)
@@ -1110,6 +1135,10 @@ func (s *Server) handleUserSubroute(w http.ResponseWriter, r *http.Request) {
 		s.handleResetUserPassword(w, r)
 		return
 	}
+	if strings.HasSuffix(r.URL.Path, "/reset-mfa") {
+		s.handleResetUserMFA(w, r)
+		return
+	}
 	s.handleUserDelete(w, r)
 }
 
@@ -1151,4 +1180,165 @@ func (s *Server) handleResetUserPassword(w http.ResponseWriter, r *http.Request)
 
 	log.Printf("[auth] admin %s reset password for user ID %d", claims.Username, id)
 	jsonResp(w, map[string]string{"status": "success", "message": "Password user berhasil direset"}, 200)
+}
+
+func (s *Server) handleLoginMFA(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", 405)
+		return
+	}
+	ip := r.RemoteAddr
+	if f := r.Header.Get("X-Forwarded-For"); f != "" {
+		ip = strings.TrimSpace(strings.Split(f, ",")[0])
+	} else if realIP := r.Header.Get("X-Real-IP"); realIP != "" {
+		ip = strings.TrimSpace(realIP)
+	}
+
+	if !checkLoginRateLimit(ip) {
+		jsonError(w, "Terlalu banyak percobaan login gagal. Diblokir sementara 15 menit.", 429)
+		return
+	}
+
+	var req struct {
+		MFATicket string `json:"mfa_ticket"`
+		Code      string `json:"code"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonError(w, "invalid request body", 400)
+		return
+	}
+
+	claims, ok := parseMFATicket(req.MFATicket, s.cfg.JWTSecret)
+	if !ok {
+		jsonError(w, "Sesi 2FA kedaluwarsa, silakan login ulang", 401)
+		return
+	}
+
+	_, mfaSecret, err := s.db.GetUserMFA(claims.Username)
+	if err != nil || !ValidateTOTPCode(mfaSecret, req.Code) {
+		recordLoginFail(ip)
+		jsonError(w, "Kode 2FA / Authenticator salah atau kedaluwarsa", 401)
+		return
+	}
+
+	recordLoginSuccess(ip)
+	token := generateToken(claims.Username, claims.Role, claims.Branch, s.cfg.JWTSecret)
+	jsonResp(w, map[string]string{
+		"token":    token,
+		"username": claims.Username,
+		"role":     claims.Role,
+		"branch":   claims.Branch,
+	}, 200)
+}
+
+func (s *Server) handleMFAStatus(w http.ResponseWriter, r *http.Request) {
+	claims := getClaims(r)
+	enabled, _, err := s.db.GetUserMFA(claims.Username)
+	if err != nil {
+		jsonError(w, "failed to get MFA status", 500)
+		return
+	}
+	jsonResp(w, map[string]interface{}{"mfa_enabled": enabled}, 200)
+}
+
+func (s *Server) handleMFASetup(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", 405)
+		return
+	}
+	claims := getClaims(r)
+	secret := GenerateTOTPSecret()
+	otpauthURL := fmt.Sprintf("otpauth://totp/RemoteDesk:%s?secret=%s&issuer=RemoteDesk", url.PathEscape(claims.Username), secret)
+	jsonResp(w, map[string]string{
+		"secret":      secret,
+		"otpauth_url": otpauthURL,
+	}, 200)
+}
+
+func (s *Server) handleMFAEnable(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", 405)
+		return
+	}
+	claims := getClaims(r)
+
+	var req struct {
+		Secret string `json:"secret"`
+		Code   string `json:"code"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonError(w, "invalid body", 400)
+		return
+	}
+
+	if !ValidateTOTPCode(req.Secret, req.Code) {
+		jsonError(w, "Kode 2FA salah, pastikan waktu di HP Anda sudah akurat", 400)
+		return
+	}
+
+	if err := s.db.SetUserMFA(claims.Username, req.Secret, true); err != nil {
+		jsonError(w, err.Error(), 500)
+		return
+	}
+
+	log.Printf("[mfa] user %s enabled 2FA / MFA", claims.Username)
+	jsonResp(w, map[string]string{"status": "success", "message": "2FA / MFA berhasil diaktifkan"}, 200)
+}
+
+func (s *Server) handleMFADisable(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", 405)
+		return
+	}
+	claims := getClaims(r)
+
+	var req struct {
+		Password string `json:"password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonError(w, "invalid body", 400)
+		return
+	}
+
+	_, storedHash, _, _, err := s.db.GetUser(claims.Username)
+	if err != nil || storedHash != hashPassword(req.Password) {
+		jsonError(w, "Password salah", 400)
+		return
+	}
+
+	if err := s.db.SetUserMFA(claims.Username, "", false); err != nil {
+		jsonError(w, err.Error(), 500)
+		return
+	}
+
+	log.Printf("[mfa] user %s disabled 2FA / MFA", claims.Username)
+	jsonResp(w, map[string]string{"status": "success", "message": "2FA / MFA dinonaktifkan"}, 200)
+}
+
+func (s *Server) handleResetUserMFA(w http.ResponseWriter, r *http.Request) {
+	claims := getClaims(r)
+	if claims.Role != "admin" {
+		jsonError(w, "only admin can reset user MFA", 403)
+		return
+	}
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", 405)
+		return
+	}
+
+	idStr := strings.TrimPrefix(r.URL.Path, "/api/users/")
+	idStr = strings.TrimSuffix(idStr, "/reset-mfa")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		jsonError(w, "invalid user id", 400)
+		return
+	}
+
+	if err := s.db.ResetUserMFA(id); err != nil {
+		jsonError(w, err.Error(), 500)
+		return
+	}
+
+	log.Printf("[mfa] admin %s reset MFA for user ID %d", claims.Username, id)
+	jsonResp(w, map[string]string{"status": "success", "message": "2FA / MFA user berhasil direset"}, 200)
 }

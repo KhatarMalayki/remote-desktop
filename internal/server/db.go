@@ -77,6 +77,8 @@ func migrate(db *sql.DB) error {
 		password_hash TEXT NOT NULL,
 		role TEXT NOT NULL DEFAULT 'viewer',
 		branch TEXT NOT NULL DEFAULT '',
+		mfa_enabled INTEGER NOT NULL DEFAULT 0,
+		mfa_secret TEXT NOT NULL DEFAULT '',
 		created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 	);
 
@@ -125,6 +127,8 @@ func migrate(db *sql.DB) error {
 	// Dynamic column migrations for existing databases
 	alters := []string{
 		`ALTER TABLE users ADD COLUMN branch TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE users ADD COLUMN mfa_enabled INTEGER NOT NULL DEFAULT 0`,
+		`ALTER TABLE users ADD COLUMN mfa_secret TEXT NOT NULL DEFAULT ''`,
 		`ALTER TABLE devices ADD COLUMN branch TEXT NOT NULL DEFAULT ''`,
 		`ALTER TABLE devices ADD COLUMN verification_status TEXT NOT NULL DEFAULT 'unverified'`,
 		`ALTER TABLE devices ADD COLUMN verified_at DATETIME`,
@@ -330,7 +334,7 @@ func (d *DB) GetUser(username string) (int, string, string, string, error) {
 }
 
 func (d *DB) ListUsers() ([]models.User, error) {
-	rows, err := d.db.Query(`SELECT id, username, role, branch, created_at FROM users ORDER BY username ASC`)
+	rows, err := d.db.Query(`SELECT id, username, role, branch, COALESCE(mfa_enabled, 0), created_at FROM users ORDER BY username ASC`)
 	if err != nil {
 		return nil, err
 	}
@@ -338,9 +342,11 @@ func (d *DB) ListUsers() ([]models.User, error) {
 	var users []models.User
 	for rows.Next() {
 		var u models.User
-		if err := rows.Scan(&u.ID, &u.Username, &u.Role, &u.Branch, &u.CreatedAt); err != nil {
+		var mfaInt int
+		if err := rows.Scan(&u.ID, &u.Username, &u.Role, &u.Branch, &mfaInt, &u.CreatedAt); err != nil {
 			return nil, err
 		}
+		u.MFAEnabled = mfaInt == 1
 		users = append(users, u)
 	}
 	return users, nil
@@ -360,6 +366,29 @@ func (d *DB) DeleteUser(id int64) error {
 
 func (d *DB) UpdatePassword(username, passwordHash string) error {
 	_, err := d.db.Exec(`UPDATE users SET password_hash=? WHERE username=?`, passwordHash, username)
+	return err
+}
+
+
+func (d *DB) GetUserMFA(username string) (bool, string, error) {
+	var enabled int
+	var secret string
+	err := d.db.QueryRow(`SELECT COALESCE(mfa_enabled, 0), COALESCE(mfa_secret, '') FROM users WHERE username=?`, username).
+		Scan(&enabled, &secret)
+	return enabled == 1, secret, err
+}
+
+func (d *DB) SetUserMFA(username, secret string, enabled bool) error {
+	en := 0
+	if enabled {
+		en = 1
+	}
+	_, err := d.db.Exec(`UPDATE users SET mfa_enabled=?, mfa_secret=? WHERE username=?`, en, secret, username)
+	return err
+}
+
+func (d *DB) ResetUserMFA(id int64) error {
+	_, err := d.db.Exec(`UPDATE users SET mfa_enabled=0, mfa_secret='' WHERE id=?`, id)
 	return err
 }
 
