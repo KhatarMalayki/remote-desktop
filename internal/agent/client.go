@@ -22,6 +22,7 @@ type AgentConfig struct {
 	ServerURL string `json:"server_url"`
 	APIKey    string `json:"api_key"`
 	DeviceID  string `json:"device_id"`
+	Branch    string `json:"branch"`
 	Heartbeat int    `json:"heartbeat_seconds"`
 	UpdateURL string `json:"update_url"`
 }
@@ -103,6 +104,7 @@ func (a *Agent) connect() error {
 func (a *Agent) register() {
 	info := CollectSystemInfo()
 	info.Version = a.version
+	info.Branch = a.cfg.Branch
 	data, _ := json.Marshal(info)
 	msg := map[string]interface{}{
 		"action": "register",

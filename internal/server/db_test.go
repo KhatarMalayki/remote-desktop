@@ -1,7 +1,10 @@
 package server
 
 import (
+	"archive/zip"
+	"bytes"
 	"context"
+	"io"
 	"encoding/json"
 	"fmt"
 	"net/http/httptest"
@@ -529,5 +532,79 @@ func TestKacabBranchIsolation(t *testing.T) {
 	_ = json.Unmarshal(wCreate.Body.Bytes(), &created)
 	if created.Branch != "Medan" {
 		t.Fatalf("expected branch forced to 'Medan', got %s", created.Branch)
+	}
+}
+
+func TestAgentPackageDownload(t *testing.T) {
+	tempDir := t.TempDir()
+	dbPath := filepath.Join(tempDir, "test.db")
+	db, err := NewDB(dbPath)
+	if err != nil {
+		t.Fatalf("failed db: %v", err)
+	}
+	defer db.Close()
+
+	// Write dummy agent
+	dummyAgent := filepath.Join(tempDir, "rd-agent-windows-amd64.exe")
+	_ = os.WriteFile(dummyAgent, []byte("MOCK_EXE_CONTENT"), 0755)
+
+	s := &Server{
+		cfg: Config{
+			Addr:      ":0",
+			DBPath:    dbPath,
+			APIKey:    "my-test-api-key",
+			AgentsDir: tempDir,
+		},
+		db: db,
+	}
+
+	// 1. Kacab Medan requests package
+	req := httptest.NewRequest("GET", "/api/agent/package?os=windows&arch=amd64", nil)
+	req.Host = "testserver.example.com"
+	ctx := context.WithValue(req.Context(), userClaimsKey, &UserClaims{Username: "kacab_medan", Role: "kacab", Branch: "Medan"})
+	w := httptest.NewRecorder()
+	s.handleAgentPackageDownload(w, req.WithContext(ctx))
+
+	if w.Code != 200 {
+		t.Fatalf("expected 200 for zip download, got %d, body=%s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Header().Get("Content-Disposition"), "RemoteDesk-Agent-Medan.zip") {
+		t.Fatalf("expected filename containing Medan.zip, got %s", w.Header().Get("Content-Disposition"))
+	}
+
+	// 2. Inspect ZIP contents
+	zipBytes := w.Body.Bytes()
+	zr, err := zip.NewReader(bytes.NewReader(zipBytes), int64(len(zipBytes)))
+	if err != nil {
+		t.Fatalf("read zip archive: %v", err)
+	}
+
+	foundExe := false
+	foundCfg := false
+	foundBat := false
+
+	for _, f := range zr.File {
+		if f.Name == "rd-agent.exe" {
+			foundExe = true
+		}
+		if f.Name == "run-agent.bat" {
+			foundBat = true
+		}
+		if f.Name == "agent.json" {
+			foundCfg = true
+			rc, _ := f.Open()
+			cfgData, _ := io.ReadAll(rc)
+			rc.Close()
+			if !strings.Contains(string(cfgData), `"branch": "Medan"`) {
+				t.Fatalf("expected agent.json to have branch Medan, got: %s", string(cfgData))
+			}
+			if !strings.Contains(string(cfgData), `"api_key": "my-test-api-key"`) {
+				t.Fatalf("expected agent.json to have api key, got: %s", string(cfgData))
+			}
+		}
+	}
+
+	if !foundExe || !foundCfg || !foundBat {
+		t.Fatalf("zip archive missing expected files: exe=%v cfg=%v bat=%v", foundExe, foundCfg, foundBat)
 	}
 }

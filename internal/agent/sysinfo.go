@@ -21,6 +21,7 @@ type SystemInfo struct {
 	DiskUsed    uint64 `json:"disk_used"`
 	LocalIP     string `json:"local_ip"`
 	Version     string `json:"version"`
+	Branch      string `json:"branch"`
 }
 
 func CollectSystemInfo() SystemInfo {

@@ -1,16 +1,16 @@
 # Graph Report - remote-desktop  (2026-09-14)
 
 ## Corpus Check
-- 27 files · ~28,249 words
+- 27 files · ~29,436 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 442 nodes · 891 edges · 22 communities (17 shown, 5 thin omitted)
-- Extraction: 95% EXTRACTED · 5% INFERRED · 0% AMBIGUOUS · INFERRED: 46 edges (avg confidence: 0.77)
+- 447 nodes · 907 edges · 21 communities (16 shown, 5 thin omitted)
+- Extraction: 95% EXTRACTED · 5% INFERRED · 0% AMBIGUOUS · INFERRED: 48 edges (avg confidence: 0.78)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `e8165720`
+- Built from commit: `efa0183c`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -32,20 +32,19 @@
 - AGENTS.md
 - main
 - update-server.sh
-- TestAgentVersionEndpoint
 - qrcode.min.js
 
 ## God Nodes (most connected - your core abstractions)
-1. `Server` - 49 edges
+1. `Server` - 50 edges
 2. `DB` - 42 edges
 3. `jsonResp()` - 33 edges
-4. `jsonError()` - 31 edges
-5. `api()` - 30 edges
-6. `getClaims()` - 26 edges
-7. `showToast()` - 21 edges
+4. `jsonError()` - 32 edges
+5. `api()` - 31 edges
+6. `getClaims()` - 27 edges
+7. `showToast()` - 22 edges
 8. `Agent` - 15 edges
 9. `Hub` - 14 edges
-10. `loadDevices()` - 13 edges
+10. `NewDB()` - 13 edges
 
 ## Surprising Connections (you probably didn't know these)
 - `main()` --calls--> `New()`  [INFERRED]
@@ -62,27 +61,27 @@
 ## Import Cycles
 - None detected.
 
-## Communities (22 total, 5 thin omitted)
+## Communities (21 total, 5 thin omitted)
 
 ### Community 0 - "Community 0"
 Cohesion: 0.12
 Nodes (20): Agent, AgentConfig, SystemInfo, envOr(), main(), CleanupOldExecutable(), generateDeviceID(), Conn (+12 more)
 
 ### Community 1 - "Community 1"
-Cohesion: 0.13
-Nodes (22): FS, HandlerFunc, generateToken(), getClaims(), Hub, Time, hashPassword(), jsonError() (+14 more)
+Cohesion: 0.11
+Nodes (26): FS, HandlerFunc, generateToken(), getClaims(), Hub, Time, hashPassword(), jsonError() (+18 more)
 
 ### Community 2 - "Community 2"
-Cohesion: 0.06
-Nodes (17): Time, migrate(), scanDevice(), scanDeviceRows(), scanManualAsset(), AssetVerification, AuthLog, BlockedIPInfo (+9 more)
+Cohesion: 0.05
+Nodes (31): Time, migrate(), NewDB(), scanDevice(), scanDeviceRows(), scanManualAsset(), TestAgentPackageDownload(), TestAgentVersionEndpoint() (+23 more)
 
 ### Community 3 - "Community 3"
-Cohesion: 0.14
-Nodes (7): Conn, Hub, Hub, NewHub(), SignalMessage, RWMutex, Client
+Cohesion: 0.16
+Nodes (6): Conn, Hub, Hub, NewHub(), RWMutex, Client
 
 ### Community 4 - "Community 4"
 Cohesion: 0.06
-Nodes (80): api(), buildDeviceTable(), CHART_COLORS, chartDefaults(), checkAuth(), closeChangePasswordModal(), closeChangeUsernameModal(), closeDeviceModal() (+72 more)
+Nodes (84): api(), buildDeviceTable(), CHART_COLORS, chartDefaults(), checkAuth(), closeChangePasswordModal(), closeChangeUsernameModal(), closeDeviceModal() (+76 more)
 
 ### Community 5 - "Community 5"
 Cohesion: 0.06
@@ -112,13 +111,9 @@ Nodes (15): Activity Log Device, API Reference, Cara 1: Pakai Token dari Login, 
 Cohesion: 0.12
 Nodes (16): 1. Upload `rd-server` ke VPS, 2. Jalankan server di VPS, 3. Jalankan agent di komputer Windows, Apa Itu RemoteDesk?, Build Agent untuk Linux dari Windows, Cara Build (Step by Step), Di Linux / macOS (Terminal), Di Windows (PowerShell) (+8 more)
 
-### Community 19 - "TestAgentVersionEndpoint"
-Cohesion: 0.22
-Nodes (16): NewDB(), TestAgentVersionEndpoint(), TestAuthLogs(), TestChangePasswordAndRateLimit(), TestChangeUsername(), TestDBAndBranchVerification(), TestKacabBranchIsolation(), TestMFAWorkflow() (+8 more)
-
 ### Community 20 - "qrcode.min.js"
-Cohesion: 0.21
-Nodes (7): loadGroups(), a(), b(), d(), g(), r(), s()
+Cohesion: 0.23
+Nodes (6): a(), b(), d(), g(), r(), s()
 
 ## Knowledge Gaps
 - **100 isolated node(s):** `github.com/user/remote-desktop`, `Hub`, `contextKey`, `build.sh script`, `update-server.sh script` (+95 more)
@@ -130,7 +125,7 @@ _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `Server` connect `Community 1` to `Community 2`, `Community 3`?**
   _High betweenness centrality (0.086) - this node is a cross-community bridge._
-- **Why does `DB` connect `Community 2` to `Community 3`, `Community 1`, `TestAgentVersionEndpoint`?**
+- **Why does `DB` connect `Community 2` to `Community 1`, `Community 3`?**
   _High betweenness centrality (0.082) - this node is a cross-community bridge._
 - **Why does `WSMessage` connect `Community 2` to `Community 0`?**
   _High betweenness centrality (0.054) - this node is a cross-community bridge._
@@ -139,6 +134,6 @@ _Questions this graph is uniquely positioned to answer:_
 - **Should `Community 0` be split into smaller, more focused modules?**
   _Cohesion score 0.11553030303030302 - nodes in this community are weakly interconnected._
 - **Should `Community 1` be split into smaller, more focused modules?**
-  _Cohesion score 0.1264720942140297 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.11167945439045183 - nodes in this community are weakly interconnected._
 - **Should `Community 2` be split into smaller, more focused modules?**
-  _Cohesion score 0.06127946127946128 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.051106639839034206 - nodes in this community are weakly interconnected._

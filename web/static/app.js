@@ -1348,3 +1348,67 @@ async function unblockIP(ip) {
     alert('Gagal membuka blokir: ' + ((res && res.error) || 'Terjadi kesalahan'));
   }
 }
+
+// ==================== DOWNLOAD AGENT PACKAGE ====================
+
+async function openDownloadAgentModal() {
+  var modal = document.getElementById('downloadAgentModal');
+  if (!modal) return;
+
+  var sel = document.getElementById('dlAgentBranch');
+  if (sel) {
+    var branches = await api('/api/branches') || [];
+    if (currentUser && currentUser.role === 'kacab' && currentUser.branch) {
+      sel.innerHTML = '<option value="' + esc(currentUser.branch) + '">' + esc(currentUser.branch) + ' (Cabang Anda)</option>';
+      sel.value = currentUser.branch;
+      sel.disabled = true;
+    } else {
+      sel.disabled = false;
+      var opts = ['Pusat'];
+      branches.forEach(function(b) {
+        if (b && opts.indexOf(b) === -1) opts.push(b);
+      });
+      sel.innerHTML = '';
+      opts.forEach(function(b) {
+        sel.innerHTML += '<option value="' + esc(b) + '">' + esc(b) + '</option>';
+      });
+      var currentFilter = (document.getElementById('branchSelectFilter') || {}).value;
+      if (currentFilter && opts.indexOf(currentFilter) !== -1) {
+        sel.value = currentFilter;
+      } else {
+        sel.value = 'Pusat';
+      }
+    }
+  }
+
+  modal.style.display = 'flex';
+}
+
+function closeDownloadAgentModal() {
+  var modal = document.getElementById('downloadAgentModal');
+  if (modal) modal.style.display = 'none';
+}
+
+function submitDownloadAgentPackage() {
+  var sel = document.getElementById('dlAgentBranch');
+  var branch = (sel && sel.value) ? sel.value.trim() : 'Pusat';
+  if (currentUser && currentUser.role === 'kacab' && currentUser.branch) {
+    branch = currentUser.branch;
+  }
+  var os = (document.getElementById('dlAgentOS') || {}).value || 'windows';
+
+  var downloadURL = '/api/agent/package?branch=' + encodeURIComponent(branch) + '&os=' + encodeURIComponent(os) + '&token=' + encodeURIComponent(token);
+  
+  showToast('Menyiapkan paket installer untuk cabang ' + branch + '...');
+  
+  var a = document.createElement('a');
+  a.href = downloadURL;
+  a.setAttribute('download', 'RemoteDesk-Agent-' + branch + '.zip');
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+
+  setTimeout(function() {
+    closeDownloadAgentModal();
+  }, 1000);
+}

@@ -16,6 +16,7 @@ func main() {
 	serverURL := flag.String("server", envOr("RD_SERVER_URL", ""), "server URL")
 	apiKey := flag.String("key", envOr("RD_API_KEY", ""), "API key")
 	deviceID := flag.String("id", envOr("RD_DEVICE_ID", ""), "device ID (auto-generated if empty)")
+	branch := flag.String("branch", envOr("RD_BRANCH", ""), "branch name (e.g. Medan, Surabaya)")
 	heartbeat := flag.Int("heartbeat", 30, "heartbeat interval in seconds")
 	configFile := flag.String("config", "", "config file path (JSON)")
 	flag.Parse()
@@ -49,10 +50,14 @@ func main() {
 			ServerURL: *serverURL,
 			APIKey:    *apiKey,
 			DeviceID:  *deviceID,
+			Branch:    *branch,
 			Heartbeat: *heartbeat,
 		}
 	}
 
+	if cfg.Branch == "" && *branch != "" {
+		cfg.Branch = *branch
+	}
 	if cfg.ServerURL == "" {
 		cfg.ServerURL = envOr("RD_SERVER_URL", "http://localhost:8080")
 	}

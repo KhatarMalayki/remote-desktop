@@ -1,6 +1,8 @@
 package server
 
 import (
+	"archive/zip"
+	"bytes"
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
@@ -210,6 +212,7 @@ func (s *Server) ListenAndServe() error {
 	mux.HandleFunc("/api/assets/verifications", s.authMiddleware(s.handleAssetVerifications))
 	mux.HandleFunc("/api/agent/version", s.handleAgentVersion)
 	mux.HandleFunc("/api/agent/download", s.handleAgentDownload)
+	mux.HandleFunc("/api/agent/package", s.authMiddleware(s.handleAgentPackageDownload))
 	mux.HandleFunc("/api/agent/broadcast-update", s.authMiddleware(s.handleBroadcastAgentUpdate))
 	mux.HandleFunc("/api/agent/reconfigure", s.authMiddleware(s.handleReconfigureAgents))
 	mux.HandleFunc("/api/users", s.authMiddleware(s.handleUsers))
@@ -854,7 +857,9 @@ func (s *Server) handleAgentMessage(c *Client, raw []byte) {
 		if dev.Status == "" {
 			dev.Status = "active"
 		}
-		if dev.GroupName == "" {
+		if dev.Branch != "" {
+			dev.GroupName = dev.Branch
+		} else if dev.GroupName == "" {
 			dev.GroupName = "default"
 		}
 		s.db.UpsertDevice(&dev)
@@ -1587,4 +1592,149 @@ func (s *Server) handleUnblockIP(w http.ResponseWriter, r *http.Request) {
 	s.unblockIP(req.IP)
 	log.Printf("[security] admin %s manually unblocked IP %s", claims.Username, req.IP)
 	jsonResp(w, map[string]string{"status": "success", "message": fmt.Sprintf("IP %s berhasil dibuka blokirnya", req.IP)}, 200)
+}
+
+func (s *Server) handleAgentPackageDownload(w http.ResponseWriter, r *http.Request) {
+	claims := getClaims(r)
+	if claims.Role == "viewer" {
+		jsonError(w, "forbidden", 403)
+		return
+	}
+
+	branch := strings.TrimSpace(r.URL.Query().Get("branch"))
+	if claims.Role == "kacab" && claims.Branch != "" {
+		branch = claims.Branch
+	}
+	if branch == "" {
+		branch = "Pusat"
+	}
+
+	targetOS := strings.ToLower(r.URL.Query().Get("os"))
+	targetArch := strings.ToLower(r.URL.Query().Get("arch"))
+	if targetOS == "" {
+		targetOS = "windows"
+	}
+	if targetArch == "" {
+		targetArch = "amd64"
+	}
+
+	candidates := []string{}
+	if s.cfg.AgentsDir != "" {
+		candidates = append(candidates,
+			filepath.Join(s.cfg.AgentsDir, fmt.Sprintf("rd-agent-%s-%s.exe", targetOS, targetArch)),
+			filepath.Join(s.cfg.AgentsDir, fmt.Sprintf("rd-agent-%s-%s", targetOS, targetArch)),
+			filepath.Join(s.cfg.AgentsDir, "rd-agent.exe"),
+			filepath.Join(s.cfg.AgentsDir, "rd-agent"),
+		)
+	}
+	candidates = append(candidates,
+		filepath.Join("bin", "agents", fmt.Sprintf("rd-agent-%s-%s.exe", targetOS, targetArch)),
+		filepath.Join("bin", "agents", fmt.Sprintf("rd-agent-%s-%s", targetOS, targetArch)),
+		filepath.Join("bin", "rd-agent.exe"),
+		filepath.Join("bin", "rd-agent"),
+		"rd-agent.exe",
+		"rd-agent",
+	)
+
+	var foundPath string
+	for _, p := range candidates {
+		if fi, err := os.Stat(p); err == nil && !fi.IsDir() && fi.Size() > 0 {
+			foundPath = p
+			break
+		}
+	}
+
+	if foundPath == "" {
+		jsonError(w, "File binary agent belum tersedia di server. Jalankan build agent terlebih dahulu.", 404)
+		return
+	}
+
+	agentBytes, err := os.ReadFile(foundPath)
+	if err != nil {
+		jsonError(w, fmt.Sprintf("failed to read agent binary: %v", err), 500)
+		return
+	}
+
+	// Determine server URL
+	proto := "http"
+	if r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https" || strings.Contains(r.Host, "synology.me") {
+		proto = "https"
+	}
+	serverURL := fmt.Sprintf("%s://%s", proto, r.Host)
+
+	// Create pre-configured agent.json
+	cfgObj := map[string]interface{}{
+		"server_url":        serverURL,
+		"api_key":           s.cfg.APIKey,
+		"branch":            branch,
+		"heartbeat_seconds": 60,
+		"update_url":        "https://github.com/KhatarMalayki/remote-desktop/releases/latest",
+	}
+	cfgBytes, _ := json.MarshalIndent(cfgObj, "", "  ")
+
+	// Create in-memory zip
+	buf := new(bytes.Buffer)
+	zw := zip.NewWriter(buf)
+
+	binName := "rd-agent.exe"
+	if targetOS != "windows" {
+		binName = "rd-agent"
+	}
+	fBin, err := zw.Create(binName)
+	if err == nil {
+		_, _ = fBin.Write(agentBytes)
+	}
+
+	fCfg, err := zw.Create("agent.json")
+	if err == nil {
+		_, _ = fCfg.Write(cfgBytes)
+	}
+
+	if targetOS == "windows" {
+		batContent := fmt.Sprintf(`@echo off
+title RemoteDesk Agent - %s
+echo ===================================================
+echo   Memulai RemoteDesk Agent Cabang: %s
+echo ===================================================
+if exist "%%~dp0rd-agent.exe" (
+    "%%~dp0rd-agent.exe" %%*
+) else (
+    echo Error: rd-agent.exe tidak ditemukan!
+    pause
+    exit /b 1
+)
+if %%ERRORLEVEL%% NEQ 0 (
+    echo.
+    echo Agent terhenti. Pastikan koneksi internet aktif.
+    pause
+)
+`, branch, branch)
+		fBat, err := zw.Create("run-agent.bat")
+		if err == nil {
+			_, _ = fBat.Write([]byte(batContent))
+		}
+	}
+
+	readmeContent := fmt.Sprintf(`PANDUAN PEMASANGAN REMOTEDESK AGENT
+Cabang / Site : %s
+Server URL    : %s
+
+CARA PAKAI SANGAT MUDAH (CUKUP KLIK 2 KALI):
+1. Ekstrak semua file di dalam file ZIP ini ke salah satu folder (misal: C:\RemoteDesk\).
+2. Cukup KLIK DUA KALI file "run-agent.bat" (atau "rd-agent.exe").
+3. Selesai! Komputer ini akan otomatis terhubung ke server dan langsung terdaftar di cabang %s.
+`, branch, serverURL, branch)
+	fReadme, err := zw.Create("PETUNJUK_CARA_PAKAI.txt")
+	if err == nil {
+		_, _ = fReadme.Write([]byte(readmeContent))
+	}
+
+	_ = zw.Close()
+
+	cleanBranch := strings.ReplaceAll(branch, " ", "-")
+	zipName := fmt.Sprintf("RemoteDesk-Agent-%s.zip", cleanBranch)
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", zipName))
+	w.Header().Set("Content-Type", "application/zip")
+	w.Header().Set("Content-Length", strconv.Itoa(buf.Len()))
+	_, _ = w.Write(buf.Bytes())
 }
