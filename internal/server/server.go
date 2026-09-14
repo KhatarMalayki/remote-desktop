@@ -147,6 +147,7 @@ func (s *Server) ListenAndServe() error {
 	mux.HandleFunc("/api/auth/mfa/setup", s.authMiddleware(s.handleMFASetup))
 	mux.HandleFunc("/api/auth/mfa/enable", s.authMiddleware(s.handleMFAEnable))
 	mux.HandleFunc("/api/auth/mfa/disable", s.authMiddleware(s.handleMFADisable))
+	mux.HandleFunc("/api/auth/logs", s.authMiddleware(s.handleAuthLogs))
 	mux.HandleFunc("/api/devices", s.authMiddleware(s.handleDevices))
 	mux.HandleFunc("/api/devices/", s.authMiddleware(s.handleDevice))
 	mux.HandleFunc("/api/stats", s.authMiddleware(s.handleStats))
@@ -188,11 +189,6 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		ip = strings.TrimSpace(realIP)
 	}
 
-	if !checkLoginRateLimit(ip) {
-		jsonError(w, "Terlalu banyak percobaan login gagal. Diblokir sementara selama 15 menit.", 429)
-		return
-	}
-
 	var req struct {
 		Username string `json:"username"`
 		Password string `json:"password"`
@@ -202,9 +198,19 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "invalid body", 400)
 		return
 	}
+
+	if !checkLoginRateLimit(ip) {
+		_ = s.db.RecordAuthLog(req.Username, ip, "blocked", "IP diblokir sementara (rate limit 15 menit)", r.UserAgent())
+		log.Printf("[security] LOGIN BLOCKED ip=%s username=%s", ip, req.Username)
+		jsonError(w, "Terlalu banyak percobaan login gagal. Diblokir sementara selama 15 menit.", 429)
+		return
+	}
+
 	_, storedHash, role, branch, err := s.db.GetUser(req.Username)
 	if err != nil || storedHash != hashPassword(req.Password) {
 		recordLoginFail(ip)
+		_ = s.db.RecordAuthLog(req.Username, ip, "failed", "Password salah atau username tidak ditemukan", r.UserAgent())
+		log.Printf("[security] LOGIN FAILED ip=%s username=%s", ip, req.Username)
 		jsonError(w, "invalid credentials", 401)
 		return
 	}
@@ -222,12 +228,16 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		}
 		if !ValidateTOTPCode(mfaSecret, req.Code) {
 			recordLoginFail(ip)
+			_ = s.db.RecordAuthLog(req.Username, ip, "mfa_failed", "Kode 2FA salah atau kedaluwarsa", r.UserAgent())
+			log.Printf("[security] MFA LOGIN FAILED ip=%s username=%s", ip, req.Username)
 			jsonError(w, "Kode 2FA / Authenticator salah atau kedaluwarsa", 401)
 			return
 		}
 	}
 
 	recordLoginSuccess(ip)
+	_ = s.db.RecordAuthLog(req.Username, ip, "success", "Login berhasil", r.UserAgent())
+	log.Printf("[security] LOGIN SUCCESS ip=%s username=%s role=%s", ip, req.Username, role)
 	token := generateToken(req.Username, role, branch, s.cfg.JWTSecret)
 	jsonResp(w, map[string]string{
 		"token":    token,
@@ -1218,11 +1228,15 @@ func (s *Server) handleLoginMFA(w http.ResponseWriter, r *http.Request) {
 	_, mfaSecret, err := s.db.GetUserMFA(claims.Username)
 	if err != nil || !ValidateTOTPCode(mfaSecret, req.Code) {
 		recordLoginFail(ip)
+		_ = s.db.RecordAuthLog(claims.Username, ip, "mfa_failed", "Kode 2FA salah atau kedaluwarsa", r.UserAgent())
+		log.Printf("[security] MFA LOGIN FAILED ip=%s username=%s", ip, claims.Username)
 		jsonError(w, "Kode 2FA / Authenticator salah atau kedaluwarsa", 401)
 		return
 	}
 
 	recordLoginSuccess(ip)
+	_ = s.db.RecordAuthLog(claims.Username, ip, "success", "Login 2FA berhasil", r.UserAgent())
+	log.Printf("[security] MFA LOGIN SUCCESS ip=%s username=%s role=%s", ip, claims.Username, claims.Role)
 	token := generateToken(claims.Username, claims.Role, claims.Branch, s.cfg.JWTSecret)
 	jsonResp(w, map[string]string{
 		"token":    token,
@@ -1395,4 +1409,19 @@ func (s *Server) handleChangeUsername(w http.ResponseWriter, r *http.Request) {
 		"username": newUsername,
 		"token":    token,
 	}, 200)
+}
+
+func (s *Server) handleAuthLogs(w http.ResponseWriter, r *http.Request) {
+	claims := getClaims(r)
+	if claims.Role != "admin" {
+		jsonError(w, "only admin can view security logs", 403)
+		return
+	}
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	logs, err := s.db.GetAuthLogs(limit)
+	if err != nil {
+		jsonError(w, err.Error(), 500)
+		return
+	}
+	jsonResp(w, logs, 200)
 }

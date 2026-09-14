@@ -356,3 +356,38 @@ func TestChangeUsername(t *testing.T) {
 		t.Fatalf("expected new username 'khatar_ops' to exist as admin, err=%v", errNew)
 	}
 }
+
+func TestAuthLogs(t *testing.T) {
+	tempDir := t.TempDir()
+	dbPath := filepath.Join(tempDir, "test.db")
+	db, err := NewDB(dbPath)
+	if err != nil {
+		t.Fatalf("failed db: %v", err)
+	}
+	defer db.Close()
+
+	// 1. Record failed attempt
+	if err := db.RecordAuthLog("hacker", "1.2.3.4", "failed", "Password salah", "Mozilla/5.0"); err != nil {
+		t.Fatalf("record auth log: %v", err)
+	}
+
+	// 2. Record success attempt
+	if err := db.RecordAuthLog("admin", "192.168.1.10", "success", "Login berhasil", "Chrome/120"); err != nil {
+		t.Fatalf("record auth log: %v", err)
+	}
+
+	// 3. Fetch logs
+	logs, err := db.GetAuthLogs(10)
+	if err != nil {
+		t.Fatalf("get auth logs: %v", err)
+	}
+	if len(logs) != 2 {
+		t.Fatalf("expected 2 logs, got %d", len(logs))
+	}
+	if logs[0].Username != "admin" || logs[0].Status != "success" {
+		t.Fatalf("expected most recent log to be admin success, got %+v", logs[0])
+	}
+	if logs[1].Username != "hacker" || logs[1].Status != "failed" {
+		t.Fatalf("expected older log to be hacker failed, got %+v", logs[1])
+	}
+}

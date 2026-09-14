@@ -112,6 +112,8 @@ function updateUserUI() {
   if (navUsers) navUsers.style.display = currentUser.role === 'admin' ? 'flex' : 'none';
   var navReconf = document.getElementById('navReconfigure');
   if (navReconf) navReconf.style.display = currentUser.role === 'admin' ? 'flex' : 'none';
+  var navSec = document.getElementById('navSecurityLogs');
+  if (navSec) navSec.style.display = currentUser.role === 'admin' ? 'flex' : 'none';
   var bTitle = document.getElementById('branchBannerTitle');
   var bSub = document.getElementById('branchBannerSubtitle');
   if (currentUser.role === 'kacab') {
@@ -1188,4 +1190,56 @@ async function submitChangeUsername() {
   } else {
     showErr((res && res.error) || 'Gagal mengubah username');
   }
+}
+
+// ==================== SECURITY AUDIT LOGS ====================
+
+async function openSecurityLogsModal() {
+  var modal = document.getElementById('securityLogsModal');
+  if (modal) modal.style.display = 'flex';
+  loadSecurityLogs();
+}
+
+function closeSecurityLogsModal() {
+  var modal = document.getElementById('securityLogsModal');
+  if (modal) modal.style.display = 'none';
+}
+
+async function loadSecurityLogs() {
+  var container = document.getElementById('securityLogsContainer');
+  if (!container) return;
+  container.innerHTML = '<p style="color:var(--fg2);font-size:12px;padding:12px">Memuat log audit...</p>';
+
+  var logs = await api('/api/auth/logs?limit=50');
+  if (!logs || logs.length === 0) {
+    container.innerHTML = '<div class="empty-state"><p>Belum ada catatan aktivitas login.</p></div>';
+    return;
+  }
+
+  container.innerHTML = '<table class="device-table"><thead><tr><th>Waktu</th><th>Username</th><th>Alamat IP</th><th>Status</th><th>Keterangan</th></tr></thead><tbody>' +
+    logs.map(function(l) {
+      var badgeClass = 'unverified';
+      var label = 'GAGAL';
+      if (l.status === 'success') {
+        badgeClass = 'verified';
+        label = '&#10004; BERHASIL';
+      } else if (l.status === 'blocked') {
+        badgeClass = 'discrepancy';
+        label = '&#9888; BLOCKED (15m)';
+      } else if (l.status === 'mfa_failed') {
+        badgeClass = 'discrepancy';
+        label = '&#10060; 2FA SALAH';
+      } else {
+        badgeClass = 'discrepancy';
+        label = '&#10060; GAGAL';
+      }
+
+      return '<tr>' +
+        '<td><small>' + new Date(l.created_at).toLocaleString() + '</small></td>' +
+        '<td><strong>' + esc(l.username) + '</strong></td>' +
+        '<td><code>' + esc(l.ip) + '</code></td>' +
+        '<td><span class="badge-status ' + badgeClass + '">' + label + '</span></td>' +
+        '<td><small style="color:var(--fg2)">' + esc(l.reason || '-') + '</small></td>' +
+      '</tr>';
+    }).join('') + '</tbody></table>';
 }

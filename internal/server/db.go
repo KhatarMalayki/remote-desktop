@@ -119,6 +119,18 @@ func migrate(db *sql.DB) error {
 	);
 	CREATE INDEX IF NOT EXISTS idx_asset_verifications_asset ON asset_verifications(asset_id);
 	CREATE INDEX IF NOT EXISTS idx_asset_verifications_branch ON asset_verifications(branch);
+
+	CREATE TABLE IF NOT EXISTS auth_logs (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		username TEXT NOT NULL,
+		ip TEXT NOT NULL,
+		status TEXT NOT NULL,
+		reason TEXT NOT NULL DEFAULT '',
+		user_agent TEXT NOT NULL DEFAULT '',
+		created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+	);
+	CREATE INDEX IF NOT EXISTS idx_auth_logs_created ON auth_logs(created_at);
+	CREATE INDEX IF NOT EXISTS idx_auth_logs_status ON auth_logs(status);
 	`
 	if _, err := db.Exec(schema); err != nil {
 		return err
@@ -728,4 +740,31 @@ func scanManualAsset(row scanner) (*models.ManualAsset, error) {
 		a.VerificationStatus = "unverified"
 	}
 	return a, nil
+}
+
+func (d *DB) RecordAuthLog(username, ip, status, reason, userAgent string) error {
+	_, err := d.db.Exec(`INSERT INTO auth_logs (username, ip, status, reason, user_agent) VALUES (?, ?, ?, ?, ?)`,
+		username, ip, status, reason, userAgent)
+	return err
+}
+
+func (d *DB) GetAuthLogs(limit int) ([]models.AuthLog, error) {
+	if limit <= 0 || limit > 200 {
+		limit = 50
+	}
+	rows, err := d.db.Query(`SELECT id, username, ip, status, reason, user_agent, created_at FROM auth_logs ORDER BY created_at DESC LIMIT ?`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var logs []models.AuthLog
+	for rows.Next() {
+		var l models.AuthLog
+		if err := rows.Scan(&l.ID, &l.Username, &l.IP, &l.Status, &l.Reason, &l.UserAgent, &l.CreatedAt); err != nil {
+			return nil, err
+		}
+		logs = append(logs, l)
+	}
+	return logs, nil
 }

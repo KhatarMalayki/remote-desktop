@@ -78,6 +78,14 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
       Akun Cabang
     </div>
+    <div class="nav-item admin-only" id="navSecurityLogs" onclick="openSecurityLogsModal()" style="display:none">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
+      Log Keamanan
+    </div>
+    <div class="nav-item admin-only" id="navReconfigure" onclick="openReconfigureModal()" style="display:none">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+      Ubah Endpoint
+    </div>
 
     <div style="flex:1"></div>
 
@@ -473,6 +481,24 @@
   </div>
 </div>
 
+
+
+<!-- SECURITY AUDIT LOGS MODAL -->
+<div id="securityLogsModal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeSecurityLogsModal()">
+  <div class="modal" style="max-width:780px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <h3>&#128737; Log Audit Percobaan Login</h3>
+      <button class="btn btn-ghost btn-sm" onclick="loadSecurityLogs()">&#8635; Segarkan</button>
+    </div>
+    <p style="font-size:12px;color:var(--fg2);margin-bottom:14px">Catatan real-time jika ada orang atau bot internet yang mencoba login (berhasil, salah password, atau diblokir 15 menit):</p>
+    
+    <div id="securityLogsContainer" style="max-height:55vh;overflow-y:auto"></div>
+
+    <div class="modal-actions" style="margin-top:16px">
+      <button class="btn btn-ghost" onclick="closeSecurityLogsModal()">Tutup</button>
+    </div>
+  </div>
+</div>
 
 <!-- CHANGE USERNAME MODAL -->
 <div id="changeUsernameModal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeChangeUsernameModal()">

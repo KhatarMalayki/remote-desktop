@@ -76,6 +76,16 @@ type User struct {
 	CreatedAt  time.Time `json:"created_at"`
 }
 
+type AuthLog struct {
+	ID        int64     `json:"id"`
+	Username  string    `json:"username"`
+	IP        string    `json:"ip"`
+	Status    string    `json:"status"` // success, failed, blocked, mfa_failed
+	Reason    string    `json:"reason"`
+	UserAgent string    `json:"user_agent"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
 type DeviceHeartbeat struct {
 	ID         string  `json:"id"`
 	CPUUsage   float64 `json:"cpu_usage"`
