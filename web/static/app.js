@@ -114,6 +114,8 @@ function updateUserUI() {
   if (navReconf) navReconf.style.display = currentUser.role === 'admin' ? 'flex' : 'none';
   var navSec = document.getElementById('navSecurityLogs');
   if (navSec) navSec.style.display = currentUser.role === 'admin' ? 'flex' : 'none';
+  var adminHdr = document.getElementById('adminSectionHeader');
+  if (adminHdr) adminHdr.style.display = currentUser.role === 'admin' ? 'block' : 'none';
   var bTitle = document.getElementById('branchBannerTitle');
   var bSub = document.getElementById('branchBannerSubtitle');
   if (currentUser.role === 'kacab') {

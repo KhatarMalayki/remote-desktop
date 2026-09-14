@@ -1,7 +1,7 @@
 {
   "cmd/agent/main.go": {
-    "mtime": 1789166685.7658894,
-    "ast_hash": "a34eb3c872b64730a41ac93153692985",
+    "mtime": 1789378783.0435438,
+    "ast_hash": "77a4f134f1ef4d769c8159ac6915b37e",
     "semantic_hash": ""
   },
   "cmd/server/main.go": {
@@ -15,13 +15,13 @@
     "semantic_hash": "d921a25c66b3f0612dc9cfc5c86e9dee"
   },
   "internal/agent/client.go": {
-    "mtime": 1789282562.9675052,
-    "ast_hash": "d736668702ebed9271f1c1389df2495f",
+    "mtime": 1789378774.6716247,
+    "ast_hash": "6ee1d666c115dd2ae8a6c53ae10d333c",
     "semantic_hash": ""
   },
   "internal/agent/sysinfo.go": {
-    "mtime": 1789152945.8172688,
-    "ast_hash": "1968f43f80eca932e2a9052d53c8f295",
+    "mtime": 1789378757.5258,
+    "ast_hash": "1df60a9514c4d26251fd1e01b27124a3",
     "semantic_hash": ""
   },
   "internal/models/device.go": {
@@ -45,8 +45,8 @@
     "semantic_hash": "98114d1ea5326308f76a187b440b8d76"
   },
   "internal/server/server.go": {
-    "mtime": 1789377639.2055874,
-    "ast_hash": "aae3f3dced40cd993c5817651123645c",
+    "mtime": 1789379480.9929378,
+    "ast_hash": "5840f0006af6cf790f2daf3a45fdf225",
     "semantic_hash": ""
   },
   "scripts/build.ps1": {
@@ -65,8 +65,8 @@
     "semantic_hash": "8c9cb5d1b967f64d6abc8c1ca0fe3e90"
   },
   "web/static/app.js": {
-    "mtime": 1789376463.5471497,
-    "ast_hash": "45dc583ad7cd3b621befc15591ba841a",
+    "mtime": 1789378920.4450557,
+    "ast_hash": "79c93b10d929c71a9c2ac61fe110d7e1",
     "semantic_hash": ""
   },
   ".codex/hooks.json": {
@@ -75,8 +75,8 @@
     "semantic_hash": ""
   },
   "internal/server/db_test.go": {
-    "mtime": 1789377649.1905882,
-    "ast_hash": "db535757306d0482b7d01524f5f4e111",
+    "mtime": 1789378840.0621626,
+    "ast_hash": "b268e153571222354b82b3463ca557f7",
     "semantic_hash": ""
   },
   "AGENTS.md": {
@@ -125,8 +125,8 @@
     "semantic_hash": ""
   },
   "web/index.html": {
-    "mtime": 1789376384.6094606,
-    "ast_hash": "e6d4a032e92336a03608b6fb04c91bbc",
+    "mtime": 1789379492.4817853,
+    "ast_hash": "19a81c274b7cd4dac5aa27016458b8a3",
     "semantic_hash": ""
   },
   "scripts/update-server.sh": {

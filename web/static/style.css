@@ -25,52 +25,81 @@ body {
 .app { display: flex; min-height: 100vh; }
 
 .sidebar {
-  width: 220px;
+  width: 230px;
   background: var(--bg2);
   border-right: 1px solid var(--border);
-  padding: 16px 0;
+  padding: 12px 0 20px 0;
   display: flex;
   flex-direction: column;
   position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
   height: 100vh;
   z-index: 10;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.sidebar::-webkit-scrollbar {
+  width: 4px;
+}
+.sidebar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.sidebar::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 4px;
+}
+.sidebar::-webkit-scrollbar-thumb:hover {
+  background: var(--accent);
 }
 
 .sidebar-logo {
-  padding: 0 20px 20px;
+  padding: 0 16px 14px;
   border-bottom: 1px solid var(--border);
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 
 .sidebar-logo h1 {
-  font-size: 18px;
+  font-size: 17px;
   font-weight: 700;
   color: var(--accent);
 }
 
 .sidebar-logo small {
   color: var(--fg2);
-  font-size: 11px;
+  font-size: 10.5px;
+}
+
+.sidebar-section-title {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  font-weight: 700;
+  color: #636882;
+  padding: 10px 16px 4px;
 }
 
 .nav-item {
   display: flex;
   align-items: center;
-  padding: 10px 20px;
+  padding: 7px 16px;
   color: var(--fg2);
   cursor: pointer;
   transition: all 0.15s;
   border-left: 3px solid transparent;
-  font-size: 14px;
-  gap: 10px;
+  font-size: 13px;
+  gap: 9px;
+  user-select: none;
 }
 
 .nav-item:hover { background: var(--bg3); color: var(--fg); }
-.nav-item.active { color: var(--accent); border-left-color: var(--accent); background: var(--bg3); }
+.nav-item.active { color: var(--accent); border-left-color: var(--accent); background: var(--bg3); font-weight: 500; }
 
-.nav-item svg { width: 18px; height: 18px; }
+.nav-item svg { width: 16px; height: 16px; flex-shrink: 0; }
 
-.main { margin-left: 220px; flex: 1; padding: 24px; }
+.main { margin-left: 230px; flex: 1; padding: 24px; min-width: 0; }
 
 .header {
   display: flex;

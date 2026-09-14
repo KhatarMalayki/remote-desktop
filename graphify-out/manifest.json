@@ -65,8 +65,8 @@
     "semantic_hash": "8c9cb5d1b967f64d6abc8c1ca0fe3e90"
   },
   "web/static/app.js": {
-    "mtime": 1789378920.4450557,
-    "ast_hash": "79c93b10d929c71a9c2ac61fe110d7e1",
+    "mtime": 1789383208.5278275,
+    "ast_hash": "c67ab4111a79d6996447522c2edb5b4b",
     "semantic_hash": ""
   },
   ".codex/hooks.json": {
@@ -125,8 +125,8 @@
     "semantic_hash": ""
   },
   "web/index.html": {
-    "mtime": 1789379492.4817853,
-    "ast_hash": "19a81c274b7cd4dac5aa27016458b8a3",
+    "mtime": 1789383191.4640617,
+    "ast_hash": "7257ed934e4fe8f1be190cc3dda0885d",
     "semantic_hash": ""
   },
   "scripts/update-server.sh": {
