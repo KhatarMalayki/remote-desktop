@@ -350,17 +350,35 @@ func (s *Server) handleDevice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	switch r.Method {
-	case http.MethodGet:
-		dev, err := s.db.GetDevice(id)
-		if err != nil {
-			jsonError(w, "not found", 404)
+	claims := getClaims(r)
+	dev, err := s.db.GetDevice(id)
+	if err != nil {
+		jsonError(w, "device not found", 404)
+		return
+	}
+
+	// Strict branch isolation for Kacab
+	if claims.Role == "kacab" && claims.Branch != "" {
+		devBranch := dev.Branch
+		if devBranch == "" {
+			devBranch = dev.GroupName
+		}
+		if devBranch != claims.Branch {
+			jsonError(w, "forbidden: perangkat milik cabang lain", 403)
 			return
 		}
+	}
+
+	switch r.Method {
+	case http.MethodGet:
 		dev.Online = s.hub.IsOnline(id)
 		jsonResp(w, dev, 200)
 
 	case http.MethodPut:
+		if claims.Role == "viewer" {
+			jsonError(w, "forbidden", 403)
+			return
+		}
 		var req struct {
 			Tags  string `json:"tags"`
 			Group string `json:"group"`
@@ -370,6 +388,9 @@ func (s *Server) handleDevice(w http.ResponseWriter, r *http.Request) {
 			jsonError(w, "invalid body", 400)
 			return
 		}
+		if claims.Role == "kacab" && claims.Branch != "" {
+			req.Group = claims.Branch
+		}
 		if err := s.db.UpdateDeviceMeta(id, req.Tags, req.Group, req.Note); err != nil {
 			jsonError(w, err.Error(), 500)
 			return
@@ -378,9 +399,8 @@ func (s *Server) handleDevice(w http.ResponseWriter, r *http.Request) {
 		jsonResp(w, map[string]string{"status": "ok"}, 200)
 
 	case http.MethodDelete:
-		claims := getClaims(r)
-		if claims.Role == "viewer" {
-			jsonError(w, "forbidden", 403)
+		if claims.Role != "admin" {
+			jsonError(w, "only admin can delete monitored devices", 403)
 			return
 		}
 		if err := s.db.DeleteDevice(id); err != nil {
@@ -586,6 +606,34 @@ func (s *Server) handleVerifyAsset(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.Status != "verified" && req.Status != "discrepancy" && req.Status != "unverified" {
 		req.Status = "verified"
+	}
+
+	if claims.Role == "kacab" && claims.Branch != "" {
+		if req.AssetType == "manual" {
+			existing, err := s.db.GetManualAsset(req.AssetID)
+			if err != nil {
+				jsonError(w, "asset not found", 404)
+				return
+			}
+			if existing.Branch != claims.Branch {
+				jsonError(w, "forbidden: aset milik cabang lain", 403)
+				return
+			}
+		} else if req.AssetType == "device" {
+			dev, err := s.db.GetDevice(req.AssetID)
+			if err != nil {
+				jsonError(w, "device not found", 404)
+				return
+			}
+			devBranch := dev.Branch
+			if devBranch == "" {
+				devBranch = dev.GroupName
+			}
+			if devBranch != claims.Branch {
+				jsonError(w, "forbidden: perangkat milik cabang lain", 403)
+				return
+			}
+		}
 	}
 
 	verifier := claims.Username

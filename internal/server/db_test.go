@@ -468,3 +468,66 @@ func TestSecuritySettingsAndUnblock(t *testing.T) {
 		t.Fatalf("expected IP to be unblocked")
 	}
 }
+
+func TestKacabBranchIsolation(t *testing.T) {
+	tempDir := t.TempDir()
+	dbPath := filepath.Join(tempDir, "test.db")
+	db, err := NewDB(dbPath)
+	if err != nil {
+		t.Fatalf("failed db: %v", err)
+	}
+	defer db.Close()
+
+	s := &Server{
+		cfg: Config{Addr: ":0", DBPath: dbPath, JWTSecret: "sec-jwt"},
+		db:  db,
+	}
+
+	// 1. Create asset for Surabaya
+	sbyAsset := &models.ManualAsset{
+		AssetTag: "SBY-01",
+		Name:     "PC Kasir Surabaya",
+		Branch:   "Surabaya",
+	}
+	_ = db.CreateManualAsset(sbyAsset)
+
+	// 2. Kacab Medan tries to edit Surabaya asset -> should be 403 Forbidden
+	reqEdit := httptest.NewRequest("PUT", "/api/assets/manual/"+sbyAsset.ID, strings.NewReader(`{"name":"Hacked PC"}`))
+	ctxMedan := context.WithValue(reqEdit.Context(), userClaimsKey, &UserClaims{Username: "kacab_medan", Role: "kacab", Branch: "Medan"})
+	wEdit := httptest.NewRecorder()
+	s.handleManualAsset(wEdit, reqEdit.WithContext(ctxMedan))
+	if wEdit.Code != 403 {
+		t.Fatalf("expected 403 when Kacab Medan tries to edit Surabaya asset, got %d", wEdit.Code)
+	}
+
+	// 3. Kacab Medan tries to delete Surabaya asset -> should be 403 Forbidden
+	reqDel := httptest.NewRequest("DELETE", "/api/assets/manual/"+sbyAsset.ID, nil)
+	wDel := httptest.NewRecorder()
+	s.handleManualAsset(wDel, reqDel.WithContext(ctxMedan))
+	if wDel.Code != 403 {
+		t.Fatalf("expected 403 when Kacab Medan tries to delete Surabaya asset, got %d", wDel.Code)
+	}
+
+	// 4. Kacab Medan tries to verify Surabaya asset -> should be 403 Forbidden
+	bodyVerify := strings.NewReader(fmt.Sprintf(`{"asset_id":"%s","asset_type":"manual","status":"verified"}`, sbyAsset.ID))
+	reqVer := httptest.NewRequest("POST", "/api/assets/verify", bodyVerify)
+	wVer := httptest.NewRecorder()
+	s.handleVerifyAsset(wVer, reqVer.WithContext(ctxMedan))
+	if wVer.Code != 403 {
+		t.Fatalf("expected 403 when Kacab Medan tries to verify Surabaya asset, got %d", wVer.Code)
+	}
+
+	// 5. Kacab Medan creates new asset -> must be locked to Medan even if passing Surabaya
+	bodyCreate := strings.NewReader(`{"asset_tag":"MDN-01","name":"Printer Medan","branch":"Surabaya"}`)
+	reqCreate := httptest.NewRequest("POST", "/api/assets/manual", bodyCreate)
+	wCreate := httptest.NewRecorder()
+	s.handleManualAssets(wCreate, reqCreate.WithContext(ctxMedan))
+	if wCreate.Code != 201 {
+		t.Fatalf("expected 201 on create, got %d", wCreate.Code)
+	}
+	var created models.ManualAsset
+	_ = json.Unmarshal(wCreate.Body.Bytes(), &created)
+	if created.Branch != "Medan" {
+		t.Fatalf("expected branch forced to 'Medan', got %s", created.Branch)
+	}
+}
