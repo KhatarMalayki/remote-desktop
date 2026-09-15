@@ -110,6 +110,8 @@ function updateUserUI() {
     }
   }
   if (navUsers) navUsers.style.display = currentUser.role === 'admin' ? 'flex' : 'none';
+  var navBranches = document.getElementById('navBranches');
+  if (navBranches) navBranches.style.display = currentUser.role === 'admin' ? 'flex' : 'none';
   var navReconf = document.getElementById('navReconfigure');
   if (navReconf) navReconf.style.display = currentUser.role === 'admin' ? 'flex' : 'none';
   var navSec = document.getElementById('navSecurityLogs');
