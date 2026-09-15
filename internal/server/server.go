@@ -46,7 +46,6 @@ type contextKey string
 
 const userClaimsKey contextKey = "userClaims"
 
-
 type loginAttempt struct {
 	count     int
 	firstFail time.Time
@@ -205,6 +204,7 @@ func (s *Server) ListenAndServe() error {
 	mux.HandleFunc("/api/stats", s.authMiddleware(s.handleStats))
 	mux.HandleFunc("/api/groups", s.authMiddleware(s.handleGroups))
 	mux.HandleFunc("/api/branches", s.authMiddleware(s.handleBranches))
+	mux.HandleFunc("/api/branches/", s.authMiddleware(s.handleBranchSubroute))
 	mux.HandleFunc("/api/branches/stats", s.authMiddleware(s.handleBranchStats))
 	mux.HandleFunc("/api/assets/manual", s.authMiddleware(s.handleManualAssets))
 	mux.HandleFunc("/api/assets/manual/", s.authMiddleware(s.handleManualAsset))
@@ -437,12 +437,55 @@ func (s *Server) handleGroups(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleBranches(w http.ResponseWriter, r *http.Request) {
-	branches, err := s.db.GetBranches()
-	if err != nil {
-		jsonError(w, err.Error(), 500)
-		return
+	switch r.Method {
+	case http.MethodGet:
+		if r.URL.Query().Get("detail") == "true" || r.URL.Query().Get("full") == "true" {
+			branches, err := s.db.ListBranches()
+			if err != nil {
+				jsonError(w, err.Error(), 500)
+				return
+			}
+			jsonResp(w, branches, 200)
+			return
+		}
+		branches, err := s.db.GetBranches()
+		if err != nil {
+			jsonError(w, err.Error(), 500)
+			return
+		}
+		jsonResp(w, branches, 200)
+
+	case http.MethodPost:
+		claims := getClaims(r)
+		if claims.Role != "admin" {
+			jsonError(w, "only admin can manage branches", 403)
+			return
+		}
+		var req struct {
+			Name string `json:"name"`
+			Type string `json:"type"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			jsonError(w, "invalid request body", 400)
+			return
+		}
+		req.Name = strings.TrimSpace(req.Name)
+		if req.Name == "" {
+			jsonError(w, "Nama lokasi wajib diisi", 400)
+			return
+		}
+		if req.Type == "" {
+			req.Type = "cabang"
+		}
+		if err := s.db.CreateBranch(req.Name, req.Type); err != nil {
+			jsonError(w, err.Error(), 400)
+			return
+		}
+		jsonResp(w, map[string]string{"status": "created"}, 201)
+
+	default:
+		http.Error(w, "method not allowed", 405)
 	}
-	jsonResp(w, branches, 200)
 }
 
 func (s *Server) handleBranchStats(w http.ResponseWriter, r *http.Request) {
@@ -1039,7 +1082,6 @@ func parseToken(token, secret string) (*UserClaims, bool) {
 	}
 	return nil, false
 }
-
 
 func (s *Server) handleAgentVersion(w http.ResponseWriter, r *http.Request) {
 	jsonResp(w, map[string]interface{}{
@@ -1815,4 +1857,47 @@ KETERANGAN FILE:
 	w.Header().Set("Content-Type", "application/zip")
 	w.Header().Set("Content-Length", strconv.Itoa(buf.Len()))
 	_, _ = w.Write(buf.Bytes())
+}
+
+func (s *Server) handleBranchSubroute(w http.ResponseWriter, r *http.Request) {
+	claims := getClaims(r)
+	if claims.Role != "admin" {
+		jsonError(w, "only admin can manage branches", 403)
+		return
+	}
+
+	idStr := strings.TrimPrefix(r.URL.Path, "/api/branches/")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		jsonError(w, "invalid branch id", 400)
+		return
+	}
+
+	switch r.Method {
+	case http.MethodPut:
+		var req struct {
+			Name string `json:"name"`
+			Type string `json:"type"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			jsonError(w, "invalid request body", 400)
+			return
+		}
+		req.Name = strings.TrimSpace(req.Name)
+		if err := s.db.UpdateBranch(id, req.Name, req.Type); err != nil {
+			jsonError(w, err.Error(), 400)
+			return
+		}
+		jsonResp(w, map[string]string{"status": "updated"}, 200)
+
+	case http.MethodDelete:
+		if err := s.db.DeleteBranch(id); err != nil {
+			jsonError(w, err.Error(), 500)
+			return
+		}
+		jsonResp(w, map[string]string{"status": "deleted"}, 200)
+
+	default:
+		http.Error(w, "method not allowed", 405)
+	}
 }

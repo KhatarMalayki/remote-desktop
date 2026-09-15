@@ -138,10 +138,19 @@ func migrate(db *sql.DB) error {
 		value TEXT NOT NULL,
 		updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 	);
+
+	CREATE TABLE IF NOT EXISTS branches (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		name TEXT UNIQUE NOT NULL,
+		type TEXT NOT NULL DEFAULT 'cabang',
+		created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+	);
+	CREATE INDEX IF NOT EXISTS idx_branches_name ON branches(name);
 	`
 	if _, err := db.Exec(schema); err != nil {
 		return err
 	}
+	_, _ = db.Exec(`INSERT OR IGNORE INTO branches (name, type) VALUES ('Pusat', 'pusat')`)
 
 	// Dynamic column migrations for existing databases
 	alters := []string{
@@ -410,7 +419,6 @@ func (d *DB) UpdatePassword(username, passwordHash string) error {
 	return err
 }
 
-
 func (d *DB) GetUserMFA(username string) (bool, string, error) {
 	var enabled int
 	var secret string
@@ -658,19 +666,21 @@ func (d *DB) GetBranchStats(branch string) (map[string]interface{}, error) {
 	unverifiedAll := totalAll - (verifiedAll + discrepancyAll)
 
 	return map[string]interface{}{
-		"branch":              branch,
-		"total_assets":        totalAll,
-		"manual_assets":       mTotal,
-		"device_assets":       dTotal,
-		"verified":            verifiedAll,
-		"unverified":          unverifiedAll,
-		"discrepancy":         discrepancyAll,
+		"branch":        branch,
+		"total_assets":  totalAll,
+		"manual_assets": mTotal,
+		"device_assets": dTotal,
+		"verified":      verifiedAll,
+		"unverified":    unverifiedAll,
+		"discrepancy":   discrepancyAll,
 	}, nil
 }
 
 func (d *DB) GetBranches() ([]string, error) {
 	q := `
 	SELECT DISTINCT branch FROM (
+		SELECT name AS branch FROM branches WHERE name != ''
+		UNION
 		SELECT branch FROM manual_assets WHERE branch != ''
 		UNION
 		SELECT branch FROM devices WHERE branch != ''
@@ -829,4 +839,109 @@ func (d *DB) SaveSecuritySettings(s models.SecuritySettings) error {
 		}
 	}
 	return tx.Commit()
+}
+
+func (d *DB) ListBranches() ([]models.Branch, error) {
+	rows, err := d.db.Query(`SELECT id, name, type, created_at FROM branches ORDER BY type ASC, name ASC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var list []models.Branch
+	for rows.Next() {
+		var b models.Branch
+		if err := rows.Scan(&b.ID, &b.Name, &b.Type, &b.CreatedAt); err != nil {
+			return nil, err
+		}
+		list = append(list, b)
+	}
+	return list, nil
+}
+
+func (d *DB) GetBranch(id int64) (*models.Branch, error) {
+	row := d.db.QueryRow(`SELECT id, name, type, created_at FROM branches WHERE id=?`, id)
+	var b models.Branch
+	if err := row.Scan(&b.ID, &b.Name, &b.Type, &b.CreatedAt); err != nil {
+		return nil, err
+	}
+	return &b, nil
+}
+
+func (d *DB) CreateBranch(name, branchType string) error {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return fmt.Errorf("branch name is required")
+	}
+	if !validBranchType(branchType) {
+		return fmt.Errorf("invalid branch type")
+	}
+	_, err := d.db.Exec(`INSERT INTO branches (name, type) VALUES (?, ?)`, name, branchType)
+	return err
+}
+
+func (d *DB) UpdateBranch(id int64, name, branchType string) error {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return fmt.Errorf("branch name is required")
+	}
+	if !validBranchType(branchType) {
+		return fmt.Errorf("invalid branch type")
+	}
+	tx, err := d.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	var oldName string
+	if err := tx.QueryRow(`SELECT name FROM branches WHERE id=?`, id).Scan(&oldName); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`UPDATE branches SET name=?, type=? WHERE id=?`, name, branchType, id); err != nil {
+		return err
+	}
+	if oldName != name {
+		if _, err := tx.Exec(`UPDATE manual_assets SET branch=? WHERE branch=?`, name, oldName); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(`UPDATE devices SET branch=?, group_name=CASE WHEN group_name=? THEN ? ELSE group_name END WHERE branch=? OR group_name=?`, name, oldName, name, oldName, oldName); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(`UPDATE users SET branch=? WHERE branch=?`, name, oldName); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(`UPDATE asset_verifications SET branch=? WHERE branch=?`, name, oldName); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+func (d *DB) DeleteBranch(id int64) error {
+	var name string
+	if err := d.db.QueryRow(`SELECT name FROM branches WHERE id=?`, id).Scan(&name); err != nil {
+		return err
+	}
+	if name == "Pusat" {
+		return fmt.Errorf("Pusat is a required location and cannot be deleted")
+	}
+	var used int
+	err := d.db.QueryRow(`SELECT ((SELECT COUNT(*) FROM manual_assets WHERE branch=?) + (SELECT COUNT(*) FROM devices WHERE branch=? OR group_name=?) + (SELECT COUNT(*) FROM users WHERE branch=?))`, name, name, name, name).Scan(&used)
+	if err != nil {
+		return err
+	}
+	if used > 0 {
+		return fmt.Errorf("location is still used by %d record(s); rename it or reassign its records first", used)
+	}
+	_, err = d.db.Exec(`DELETE FROM branches WHERE id=?`, id)
+	return err
+}
+
+func validBranchType(branchType string) bool {
+	switch branchType {
+	case "pusat", "cabang", "bisnis_unit", "service_point", "pool", "site":
+		return true
+	default:
+		return false
+	}
 }

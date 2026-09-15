@@ -4,13 +4,13 @@ import (
 	"archive/zip"
 	"bytes"
 	"context"
-	"io"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http/httptest"
-	"strings"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -99,6 +99,56 @@ func TestDBAndBranchVerification(t *testing.T) {
 	}
 	if stats["total_assets"] != 1 || stats["verified"] != 1 {
 		t.Fatalf("unexpected stats: %+v", stats)
+	}
+}
+
+func TestBranchManagement(t *testing.T) {
+	db, err := NewDB(filepath.Join(t.TempDir(), "test.db"))
+	if err != nil {
+		t.Fatalf("failed db: %v", err)
+	}
+	defer db.Close()
+
+	branches, err := db.ListBranches()
+	if err != nil || len(branches) != 1 || branches[0].Name != "Pusat" {
+		t.Fatalf("expected seeded Pusat location, got %#v (err=%v)", branches, err)
+	}
+	if err := db.CreateBranch("Surabaya", "cabang"); err != nil {
+		t.Fatalf("create branch: %v", err)
+	}
+	if err := db.CreateBranch("Invalid", "unknown"); err == nil {
+		t.Fatal("expected invalid type to fail")
+	}
+
+	branches, err = db.ListBranches()
+	if err != nil || len(branches) != 2 {
+		t.Fatalf("expected two locations, got %#v (err=%v)", branches, err)
+	}
+	var surabaya models.Branch
+	for _, b := range branches {
+		if b.Name == "Surabaya" {
+			surabaya = b
+		}
+	}
+	if surabaya.ID == 0 {
+		t.Fatal("Surabaya location missing")
+	}
+
+	if err := db.CreateUser("kacab_sby", hashPassword("password"), "kacab", "Surabaya"); err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+	if err := db.UpdateBranch(surabaya.ID, "Surabaya Timur", "site"); err != nil {
+		t.Fatalf("rename location: %v", err)
+	}
+	_, _, _, branch, err := db.GetUser("kacab_sby")
+	if err != nil || branch != "Surabaya Timur" {
+		t.Fatalf("expected user assignment to follow rename, branch=%q err=%v", branch, err)
+	}
+	if err := db.DeleteBranch(surabaya.ID); err == nil {
+		t.Fatal("expected deletion of used location to fail")
+	}
+	if err := db.DeleteBranch(branches[0].ID); err == nil {
+		t.Fatal("expected Pusat deletion to fail")
 	}
 }
 

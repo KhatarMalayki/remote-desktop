@@ -1351,6 +1351,84 @@ async function unblockIP(ip) {
   }
 }
 
+// ==================== LOCATION MANAGEMENT ====================
+
+var branchTypeLabels = { pusat:'Pusat', cabang:'Cabang', bisnis_unit:'Bisnis Unit', service_point:'Service Point', pool:'Pool', site:'Site' };
+var branchManagementRows = {};
+
+async function openBranchesModal() {
+  var modal = document.getElementById('branchesModal');
+  if (!modal) return;
+  modal.style.display = 'flex';
+  await loadBranchesManagement();
+}
+
+function closeBranchesModal() {
+  var modal = document.getElementById('branchesModal');
+  if (modal) modal.style.display = 'none';
+}
+
+async function loadBranchesManagement() {
+  var container = document.getElementById('branchesTableContainer');
+  if (!container) return;
+  container.innerHTML = '<div style="padding:12px;color:var(--fg2);font-size:12px">Memuat lokasi...</div>';
+  var branches = await api('/api/branches?detail=true');
+  if (!Array.isArray(branches)) {
+    container.innerHTML = '<div style="padding:12px;color:var(--danger);font-size:12px">Gagal memuat daftar lokasi.</div>';
+    return;
+  }
+  if (!branches.length) {
+    container.innerHTML = '<div style="padding:12px;color:var(--fg2);font-size:12px">Belum ada lokasi tersimpan.</div>';
+    return;
+  }
+  branchManagementRows = {};
+  branches.forEach(function(b) { branchManagementRows[b.id] = b; });
+  container.innerHTML = '<table class="device-table"><thead><tr><th>Nama Lokasi</th><th>Tipe</th><th>Aksi</th></tr></thead><tbody>' + branches.map(function(b) {
+    var isPusat = b.name === 'Pusat';
+    return '<tr><td><strong>' + esc(b.name) + '</strong></td><td><span class="tag">' + esc(branchTypeLabels[b.type] || b.type) + '</span></td><td><button class="btn btn-ghost btn-sm" onclick="editBranch(' + b.id + ')">Ubah</button> ' + (isPusat ? '' : '<button class="btn btn-danger btn-sm" onclick="deleteBranch(' + b.id + ')">Hapus</button>') + '</td></tr>';
+  }).join('') + '</tbody></table>';
+}
+
+async function createBranch() {
+  var nameInput = document.getElementById('branchNameInput');
+  var typeInput = document.getElementById('branchTypeInput');
+  var name = (nameInput.value || '').trim();
+  if (!name) { alert('Nama lokasi wajib diisi.'); nameInput.focus(); return; }
+  var res = await api('/api/branches', { method:'POST', body:JSON.stringify({ name:name, type:typeInput.value }) });
+  if (!res || res.error) { alert('Gagal menambahkan lokasi: ' + ((res && res.error) || 'Terjadi kesalahan')); return; }
+  nameInput.value = '';
+  showToast('Lokasi ' + name + ' berhasil ditambahkan.');
+  await Promise.all([loadBranchesManagement(), loadBranches()]);
+}
+
+async function editBranch(id) {
+  var branch = branchManagementRows[id];
+  if (!branch) return;
+  var oldName = branch.name;
+  var oldType = branch.type;
+  var name = prompt('Nama lokasi:', oldName);
+  if (name === null) return;
+  name = name.trim();
+  if (!name) { alert('Nama lokasi wajib diisi.'); return; }
+  var type = prompt('Tipe lokasi (pusat, cabang, bisnis_unit, service_point, pool, site):', oldType);
+  if (type === null) return;
+  var res = await api('/api/branches/' + id, { method:'PUT', body:JSON.stringify({ name:name, type:type.trim() }) });
+  if (!res || res.error) { alert('Gagal mengubah lokasi: ' + ((res && res.error) || 'Terjadi kesalahan')); return; }
+  showToast('Lokasi berhasil diperbarui.');
+  await Promise.all([loadBranchesManagement(), loadBranches(), loadBranchAssets()]);
+}
+
+async function deleteBranch(id) {
+  var branch = branchManagementRows[id];
+  if (!branch) return;
+  var name = branch.name;
+  if (!confirm('Hapus lokasi ' + name + '? Lokasi yang masih dipakai tidak dapat dihapus.')) return;
+  var res = await api('/api/branches/' + id, { method:'DELETE' });
+  if (!res || res.error) { alert('Gagal menghapus lokasi: ' + ((res && res.error) || 'Terjadi kesalahan')); return; }
+  showToast('Lokasi ' + name + ' berhasil dihapus.');
+  await Promise.all([loadBranchesManagement(), loadBranches()]);
+}
+
 // ==================== DOWNLOAD AGENT PACKAGE ====================
 
 async function openDownloadAgentModal() {

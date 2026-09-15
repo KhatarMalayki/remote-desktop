@@ -88,6 +88,10 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
       Akun Cabang
     </div>
+    <div class="nav-item admin-only" id="navBranches" onclick="openBranchesModal()" style="display:none">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 12-9 12s-9-5-9-12a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+      Kelola Lokasi
+    </div>
     <div class="nav-item admin-only" id="navSecurityLogs" onclick="openSecurityLogsModal()" style="display:none">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
       Log Keamanan
@@ -533,6 +537,46 @@
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeDownloadAgentModal()">Tutup</button>
       <button class="btn btn-primary" onclick="submitDownloadAgentPackage()">&#128229; Unduh Paket Agent (.ZIP)</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- KELLOLA LOKASI MODAL -->
+<div id="branchesModal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeBranchesModal()">
+  <div class="modal" style="max-width:640px">
+    <h3>&#127758; Kelola Lokasi / Site</h3>
+    <p style="font-size:12px;color:var(--fg2);margin-bottom:14px">Atur daftar lokasi cabang, bisnis unit, service point, pool, atau site. Lokasi ini akan otomatis muncul di dropdown Download Agent.</p>
+    
+    <div style="background:var(--bg3);padding:14px;border-radius:var(--radius);margin-bottom:16px">
+      <h4 style="font-size:13px;margin-bottom:10px">+ Tambah Lokasi Baru</h4>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="form-group">
+          <label>Nama Lokasi</label>
+          <input type="text" id="branchNameInput" placeholder="Contoh: Service Point Jakarta">
+        </div>
+        <div class="form-group">
+          <label>Tipe Lokasi</label>
+          <select id="branchTypeInput">
+            <option value="pusat">Pusat</option>
+            <option value="cabang">Cabang</option>
+            <option value="bisnis_unit">Bisnis Unit</option>
+            <option value="service_point">Service Point</option>
+            <option value="pool">Pool</option>
+            <option value="site">Site</option>
+          </select>
+        </div>
+      </div>
+      <div style="text-align:right">
+        <button class="btn btn-primary btn-sm" onclick="createBranch()">+ Tambah Lokasi</button>
+      </div>
+    </div>
+
+    <h4 style="font-size:13px;margin-bottom:10px">Daftar Lokasi Tersimpan</h4>
+    <div id="branchesTableContainer" style="max-height:45vh;overflow-y:auto"></div>
+
+    <div class="modal-actions" style="margin-top:16px">
+      <button class="btn btn-ghost" onclick="closeBranchesModal()">Tutup</button>
     </div>
   </div>
 </div>
