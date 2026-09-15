@@ -19,10 +19,10 @@ type Client struct {
 }
 
 type Hub struct {
-	mu       sync.RWMutex
-	agents   map[string]*Client
-	viewers  map[*Client]bool
-	db       *DB
+	mu      sync.RWMutex
+	agents  map[string]*Client
+	viewers map[*Client]bool
+	db      *DB
 }
 
 func NewHub(db *DB) *Hub {
@@ -68,6 +68,21 @@ func (h *Hub) IsOnline(deviceID string) bool {
 	defer h.mu.RUnlock()
 	_, ok := h.agents[deviceID]
 	return ok
+}
+
+func (h *Hub) SendToAgent(deviceID string, data []byte) bool {
+	h.mu.RLock()
+	agent, ok := h.agents[deviceID]
+	h.mu.RUnlock()
+	if !ok {
+		return false
+	}
+	select {
+	case agent.Send <- data:
+		return true
+	default:
+		return false
+	}
 }
 
 func (h *Hub) OnlineCount() int {

@@ -295,6 +295,24 @@ func (a *Agent) handleMessage(raw []byte) {
 
 	case "signal":
 		log.Printf("[agent] received signal message")
+	case "network_scan":
+		var req struct {
+			ScanID string `json:"scan_id"`
+		}
+		if err := json.Unmarshal(msg.Data, &req); err == nil && req.ScanID != "" {
+			go func() {
+				subnet, hosts, scanErr := ScanLocalNetwork()
+				result := map[string]interface{}{"scan_id": req.ScanID, "subnet": subnet, "hosts": hosts}
+				if scanErr != nil {
+					result["error"] = scanErr.Error()
+				}
+				data, _ := json.Marshal(result)
+				raw, _ := json.Marshal(map[string]interface{}{"action": "network_scan_result", "data": json.RawMessage(data)})
+				if err := a.conn.WriteMessage(websocket.TextMessage, raw); err != nil {
+					log.Printf("[agent] network scan result failed: %v", err)
+				}
+			}()
+		}
 	case "command":
 		log.Printf("[agent] received command: %s", string(msg.Data))
 	}

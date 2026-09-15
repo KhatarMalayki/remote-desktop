@@ -673,6 +673,28 @@ async function openDeviceModal(id) {
 
 function closeDeviceModal() { document.getElementById('deviceModal').style.display = 'none'; currentDevice = null; }
 
+async function startNetworkScan() {
+  if (!currentDevice) return;
+  if (!currentDevice.online) { alert('Agent harus online untuk memindai jaringan lokal.'); return; }
+  if (!confirm('Pindai subnet lokal dari Agent ini? Scan dibatasi ke jaringan /24 Agent.')) return;
+  var box = document.getElementById('networkScanResult');
+  box.style.display = 'block'; box.innerHTML = '<small>Meminta Agent memindai jaringan lokal...</small>';
+  var scan = await api('/api/network-scans', { method:'POST', body:JSON.stringify({device_id:currentDevice.id}) });
+  if (!scan || scan.error) { box.innerHTML = '<small style="color:var(--danger)">Gagal: '+esc((scan&&scan.error)||'Terjadi kesalahan')+'</small>'; return; }
+  var attempts = 0;
+  var timer = setInterval(async function() {
+    attempts++;
+    var result = await api('/api/network-scans/' + encodeURIComponent(scan.id));
+    if (!result) return;
+    if (result.status === 'completed' || result.status === 'failed' || attempts >= 45) {
+      clearInterval(timer);
+      if (result.status !== 'completed') { box.innerHTML = '<small style="color:var(--danger)">Scan gagal atau timeout: '+esc(result.error||'Agent tidak merespons')+'</small>'; return; }
+      var rows = (result.hosts||[]).map(function(h){ return '<tr><td>'+esc(h.ip)+'</td><td><code>'+esc(h.mac||'-')+'</code></td></tr>'; }).join('');
+      box.innerHTML = '<div style="font-size:12px;margin-bottom:6px">Hasil scan '+esc(result.subnet)+' — '+(result.hosts||[]).length+' perangkat terdeteksi</div><table class="device-table"><thead><tr><th>IP Lokal</th><th>MAC Address</th></tr></thead><tbody>'+rows+'</tbody></table>';
+    }
+  }, 1000);
+}
+
 async function saveDeviceMeta() {
   if (!currentDevice) return;
   await api('/api/devices/' + currentDevice.id, {

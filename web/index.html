@@ -52,7 +52,7 @@
   <aside class="sidebar">
     <div class="sidebar-logo">
       <h1>&#128421; RemoteDesk</h1>
-      <small>v0.1.0 &bull; Enterprise Asset</small>
+      <small>v0.1.4 &bull; Enterprise Asset</small>
     </div>
 
     <div class="sidebar-section-title">Menu Utama</div>
@@ -297,9 +297,11 @@
     </div>
     <div class="modal-actions">
       <button class="btn btn-danger btn-sm" onclick="deleteDevice()">Delete</button>
+      <button class="btn btn-ghost" onclick="startNetworkScan()">Scan IP Lokal</button>
       <button class="btn btn-ghost" onclick="closeDeviceModal()">Cancel</button>
       <button class="btn btn-primary" onclick="saveDeviceMeta()">Save</button>
     </div>
+    <div id="networkScanResult" style="display:none;margin-top:14px"></div>
   </div>
 </div>
 

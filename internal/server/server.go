@@ -141,6 +141,8 @@ type Server struct {
 	hub      *Hub
 	upgrader websocket.Upgrader
 	webFS    fs.FS
+	scanMu   sync.RWMutex
+	scans    map[string]*models.NetworkScan
 }
 
 func New(cfg Config, webFS embed.FS) (*Server, error) {
@@ -175,6 +177,7 @@ func New(cfg Config, webFS embed.FS) (*Server, error) {
 		db:    db,
 		hub:   NewHub(db),
 		webFS: sub,
+		scans: make(map[string]*models.NetworkScan),
 		upgrader: websocket.Upgrader{
 			ReadBufferSize:  4096,
 			WriteBufferSize: 4096,
@@ -206,6 +209,8 @@ func (s *Server) ListenAndServe() error {
 	mux.HandleFunc("/api/branches", s.authMiddleware(s.handleBranches))
 	mux.HandleFunc("/api/branches/", s.authMiddleware(s.handleBranchSubroute))
 	mux.HandleFunc("/api/branches/stats", s.authMiddleware(s.handleBranchStats))
+	mux.HandleFunc("/api/network-scans", s.authMiddleware(s.handleNetworkScans))
+	mux.HandleFunc("/api/network-scans/", s.authMiddleware(s.handleNetworkScan))
 	mux.HandleFunc("/api/assets/manual", s.authMiddleware(s.handleManualAssets))
 	mux.HandleFunc("/api/assets/manual/", s.authMiddleware(s.handleManualAsset))
 	mux.HandleFunc("/api/assets/verify", s.authMiddleware(s.handleVerifyAsset))
@@ -415,6 +420,88 @@ func (s *Server) handleDevice(w http.ResponseWriter, r *http.Request) {
 	default:
 		http.Error(w, "method not allowed", 405)
 	}
+}
+
+// handleNetworkScans asks an online agent to discover hosts on its own /24 LAN.
+// No caller-supplied subnet is accepted, preventing scans of arbitrary networks.
+func (s *Server) handleNetworkScans(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", 405)
+		return
+	}
+	claims := getClaims(r)
+	if claims.Role == "viewer" {
+		jsonError(w, "forbidden", 403)
+		return
+	}
+	var req struct {
+		DeviceID string `json:"device_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || strings.TrimSpace(req.DeviceID) == "" {
+		jsonError(w, "device_id is required", 400)
+		return
+	}
+	dev, err := s.db.GetDevice(req.DeviceID)
+	if err != nil {
+		jsonError(w, "device not found", 404)
+		return
+	}
+	branch := dev.Branch
+	if branch == "" {
+		branch = dev.GroupName
+	}
+	if claims.Role == "kacab" && claims.Branch != "" && branch != claims.Branch {
+		jsonError(w, "forbidden: perangkat milik cabang lain", 403)
+		return
+	}
+	if !s.hub.IsOnline(req.DeviceID) {
+		jsonError(w, "agent must be online to scan its local network", 409)
+		return
+	}
+	scan := &models.NetworkScan{ID: fmt.Sprintf("scan-%x", time.Now().UnixNano()), DeviceID: req.DeviceID, Status: "queued", StartedAt: time.Now()}
+	s.scanMu.Lock()
+	s.scans[scan.ID] = scan
+	s.scanMu.Unlock()
+	payload, _ := json.Marshal(map[string]interface{}{"action": "network_scan", "data": map[string]string{"scan_id": scan.ID}})
+	if !s.hub.SendToAgent(req.DeviceID, payload) {
+		s.scanMu.Lock()
+		delete(s.scans, scan.ID)
+		s.scanMu.Unlock()
+		jsonError(w, "agent is no longer online", 409)
+		return
+	}
+	s.db.AddLog(req.DeviceID, "network_scan_requested", fmt.Sprintf("scan=%s by=%s", scan.ID, claims.Username))
+	jsonResp(w, scan, http.StatusAccepted)
+}
+
+func (s *Server) handleNetworkScan(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", 405)
+		return
+	}
+	id := strings.TrimPrefix(r.URL.Path, "/api/network-scans/")
+	s.scanMu.RLock()
+	scan, ok := s.scans[id]
+	s.scanMu.RUnlock()
+	if !ok {
+		jsonError(w, "scan not found", 404)
+		return
+	}
+	claims := getClaims(r)
+	dev, err := s.db.GetDevice(scan.DeviceID)
+	if err != nil {
+		jsonError(w, "device not found", 404)
+		return
+	}
+	branch := dev.Branch
+	if branch == "" {
+		branch = dev.GroupName
+	}
+	if claims.Role == "viewer" || (claims.Role == "kacab" && claims.Branch != "" && branch != claims.Branch) {
+		jsonError(w, "forbidden", 403)
+		return
+	}
+	jsonResp(w, scan, 200)
 }
 
 func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) {
@@ -940,6 +1027,28 @@ func (s *Server) handleAgentMessage(c *Client, raw []byte) {
 		}
 		sig.From = c.DeviceID
 		s.hub.ForwardSignal(&sig)
+
+	case "network_scan_result":
+		var result struct {
+			ScanID string                   `json:"scan_id"`
+			Subnet string                   `json:"subnet"`
+			Hosts  []models.NetworkScanHost `json:"hosts"`
+			Error  string                   `json:"error"`
+		}
+		if err := json.Unmarshal(msg.Data, &result); err != nil || result.ScanID == "" {
+			return
+		}
+		s.scanMu.Lock()
+		if scan := s.scans[result.ScanID]; scan != nil && scan.DeviceID == c.DeviceID {
+			now := time.Now()
+			scan.Subnet, scan.Hosts, scan.Error, scan.FinishedAt = result.Subnet, result.Hosts, result.Error, &now
+			if result.Error != "" {
+				scan.Status = "failed"
+			} else {
+				scan.Status = "completed"
+			}
+		}
+		s.scanMu.Unlock()
 	}
 }
 

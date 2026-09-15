@@ -55,16 +55,16 @@ type ManualAsset struct {
 }
 
 type AssetVerification struct {
-	ID        int64     `json:"id"`
-	AssetID   string    `json:"asset_id"`
-	AssetType string    `json:"asset_type"` // manual, device
-	AssetName string    `json:"asset_name"`
-	Status    string    `json:"status"` // verified, discrepancy, unverified
-	Condition string    `json:"condition"`
-	VerifiedBy string   `json:"verified_by"`
-	Branch    string    `json:"branch"`
-	Notes     string    `json:"notes"`
-	CreatedAt time.Time `json:"created_at"`
+	ID         int64     `json:"id"`
+	AssetID    string    `json:"asset_id"`
+	AssetType  string    `json:"asset_type"` // manual, device
+	AssetName  string    `json:"asset_name"`
+	Status     string    `json:"status"` // verified, discrepancy, unverified
+	Condition  string    `json:"condition"`
+	VerifiedBy string    `json:"verified_by"`
+	Branch     string    `json:"branch"`
+	Notes      string    `json:"notes"`
+	CreatedAt  time.Time `json:"created_at"`
 }
 
 type User struct {
@@ -126,4 +126,21 @@ type SignalMessage struct {
 type WSMessage struct {
 	Action string          `json:"action"`
 	Data   json.RawMessage `json:"data,omitempty"`
+}
+
+type NetworkScanHost struct {
+	IP       string `json:"ip"`
+	MAC      string `json:"mac"`
+	Hostname string `json:"hostname,omitempty"`
+}
+
+type NetworkScan struct {
+	ID         string            `json:"id"`
+	DeviceID   string            `json:"device_id"`
+	Subnet     string            `json:"subnet,omitempty"`
+	Status     string            `json:"status"`
+	Error      string            `json:"error,omitempty"`
+	Hosts      []NetworkScanHost `json:"hosts,omitempty"`
+	StartedAt  time.Time         `json:"started_at"`
+	FinishedAt *time.Time        `json:"finished_at,omitempty"`
 }
