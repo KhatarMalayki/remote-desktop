@@ -155,6 +155,7 @@ func migrate(db *sql.DB) error {
 	CREATE INDEX IF NOT EXISTS idx_branches_name ON branches(name);
 	CREATE TABLE IF NOT EXISTS business_units (name TEXT PRIMARY KEY);
 	CREATE TABLE IF NOT EXISTS branch_business_units (branch_id INTEGER NOT NULL, business_unit TEXT NOT NULL, PRIMARY KEY(branch_id, business_unit), FOREIGN KEY(branch_id) REFERENCES branches(id) ON DELETE CASCADE);
+	CREATE TABLE IF NOT EXISTS asset_deletion_logs (id INTEGER PRIMARY KEY AUTOINCREMENT, asset_id TEXT NOT NULL, asset_type TEXT NOT NULL, asset_name TEXT NOT NULL, branch TEXT NOT NULL, deleted_by TEXT NOT NULL, reason TEXT NOT NULL, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP);
 	`
 	if _, err := db.Exec(schema); err != nil {
 		return err
@@ -580,6 +581,11 @@ func (d *DB) UpdateManualAsset(a *models.ManualAsset) error {
 
 func (d *DB) DeleteManualAsset(id string) error {
 	_, err := d.db.Exec(`DELETE FROM manual_assets WHERE id=?`, id)
+	return err
+}
+
+func (d *DB) RecordAssetDeletion(id, assetType, name, branch, deletedBy, reason string) error {
+	_, err := d.db.Exec(`INSERT INTO asset_deletion_logs (asset_id, asset_type, asset_name, branch, deleted_by, reason) VALUES (?, ?, ?, ?, ?, ?)`, id, assetType, name, branch, deletedBy, reason)
 	return err
 }
 

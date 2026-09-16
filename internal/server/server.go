@@ -419,8 +419,23 @@ func (s *Server) handleDevice(w http.ResponseWriter, r *http.Request) {
 		jsonResp(w, map[string]string{"status": "ok"}, 200)
 
 	case http.MethodDelete:
-		if !canDeleteAssets(claims.Role) {
-			jsonError(w, "only admin or GA Pusat can delete monitored devices", 403)
+		if claims.Role == "viewer" {
+			jsonError(w, "forbidden", 403)
+			return
+		}
+		var req struct {
+			Reason string `json:"reason"`
+		}
+		if json.NewDecoder(r.Body).Decode(&req) != nil || strings.TrimSpace(req.Reason) == "" {
+			jsonError(w, "deletion reason is required", 400)
+			return
+		}
+		branch := dev.Branch
+		if branch == "" {
+			branch = dev.GroupName
+		}
+		if err := s.db.RecordAssetDeletion(id, "device", dev.Hostname, branch, claims.Username, strings.TrimSpace(req.Reason)); err != nil {
+			jsonError(w, err.Error(), 500)
 			return
 		}
 		if err := s.db.DeleteDevice(id); err != nil {
@@ -773,8 +788,19 @@ func (s *Server) handleManualAsset(w http.ResponseWriter, r *http.Request) {
 		jsonResp(w, map[string]string{"status": "updated"}, 200)
 
 	case http.MethodDelete:
-		if !canDeleteAssets(claims.Role) {
-			jsonError(w, "only admin or GA Pusat can delete assets", 403)
+		if claims.Role == "viewer" {
+			jsonError(w, "forbidden", 403)
+			return
+		}
+		var req struct {
+			Reason string `json:"reason"`
+		}
+		if json.NewDecoder(r.Body).Decode(&req) != nil || strings.TrimSpace(req.Reason) == "" {
+			jsonError(w, "deletion reason is required", 400)
+			return
+		}
+		if err := s.db.RecordAssetDeletion(id, "manual", existing.Name, existing.Branch, claims.Username, strings.TrimSpace(req.Reason)); err != nil {
+			jsonError(w, err.Error(), 500)
 			return
 		}
 		if err := s.db.DeleteManualAsset(id); err != nil {

@@ -500,7 +500,10 @@ async function saveManualAsset() {
 
 async function deleteManualAsset(id) {
   if (!confirm('Hapus data aset manual ini?')) return;
-  await api('/api/assets/manual/' + id, { method: 'DELETE' });
+  var reason = prompt('Alasan penghapusan aset (wajib):');
+  if (!reason || !reason.trim()) { alert('Alasan penghapusan wajib diisi.'); return; }
+  var res = await api('/api/assets/manual/' + id, { method: 'DELETE', body: JSON.stringify({reason:reason.trim()}) });
+  if (!res || res.error) { alert('Gagal menghapus: '+((res&&res.error)||'Terjadi kesalahan')); return; }
   showToast('Aset dihapus');
   loadBranchAssets();
 }
@@ -726,7 +729,10 @@ async function saveDeviceMeta() {
 async function deleteDevice() {
   if (!currentDevice) return;
   if (!confirm('Delete device ' + currentDevice.hostname + '?')) return;
-  await api('/api/devices/' + currentDevice.id, { method: 'DELETE' });
+  var reason = prompt('Alasan penghapusan perangkat (wajib):');
+  if (!reason || !reason.trim()) { alert('Alasan penghapusan wajib diisi.'); return; }
+  var res = await api('/api/devices/' + currentDevice.id, { method: 'DELETE', body: JSON.stringify({reason:reason.trim()}) });
+  if (!res || res.error) { alert('Gagal menghapus: '+((res&&res.error)||'Terjadi kesalahan')); return; }
   closeDeviceModal();
   loadDevices();
   loadBranchAssets();
