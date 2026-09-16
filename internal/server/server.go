@@ -42,6 +42,8 @@ type UserClaims struct {
 	Branch   string `json:"branch"`
 }
 
+func canDeleteAssets(role string) bool { return role == "admin" || role == "ga_pusat" }
+
 type contextKey string
 
 const userClaimsKey contextKey = "userClaims"
@@ -407,7 +409,7 @@ func (s *Server) handleDevice(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if claims.Role == "adh" && claims.Branch != "" {
-			req.Group = claims.Branch
+			req.Group, req.Tags = dev.GroupName, dev.Tags
 		}
 		if err := s.db.UpdateDeviceMeta(id, req.Tags, req.Group, req.Note); err != nil {
 			jsonError(w, err.Error(), 500)
@@ -417,8 +419,8 @@ func (s *Server) handleDevice(w http.ResponseWriter, r *http.Request) {
 		jsonResp(w, map[string]string{"status": "ok"}, 200)
 
 	case http.MethodDelete:
-		if claims.Role != "admin" {
-			jsonError(w, "only admin can delete monitored devices", 403)
+		if !canDeleteAssets(claims.Role) {
+			jsonError(w, "only admin or GA Pusat can delete monitored devices", 403)
 			return
 		}
 		if err := s.db.DeleteDevice(id); err != nil {
@@ -743,7 +745,7 @@ func (s *Server) handleManualAsset(w http.ResponseWriter, r *http.Request) {
 		jsonResp(w, existing, 200)
 
 	case http.MethodPut:
-		if claims.Role == "viewer" {
+		if claims.Role == "viewer" || claims.Role == "adh" {
 			jsonError(w, "forbidden", 403)
 			return
 		}
@@ -771,8 +773,8 @@ func (s *Server) handleManualAsset(w http.ResponseWriter, r *http.Request) {
 		jsonResp(w, map[string]string{"status": "updated"}, 200)
 
 	case http.MethodDelete:
-		if claims.Role == "viewer" {
-			jsonError(w, "forbidden", 403)
+		if !canDeleteAssets(claims.Role) {
+			jsonError(w, "only admin or GA Pusat can delete assets", 403)
 			return
 		}
 		if err := s.db.DeleteManualAsset(id); err != nil {
