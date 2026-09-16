@@ -248,9 +248,10 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
-		Username string `json:"username"`
-		Password string `json:"password"`
-		Code     string `json:"code"`
+		Username       string `json:"username"`
+		Password       string `json:"password"`
+		Code           string `json:"code"`
+		RememberDevice bool   `json:"remember_device"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		jsonError(w, "invalid body", 400)
@@ -274,7 +275,11 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	mfaEnabled, mfaSecret, _ := s.db.GetUserMFA(req.Username)
-	if mfaEnabled {
+	trusted := false
+	if c, err := r.Cookie("rd_trusted_device"); err == nil {
+		trusted = s.db.IsTrustedDevice(req.Username, hashPassword(c.Value))
+	}
+	if mfaEnabled && !trusted {
 		if req.Code == "" {
 			ticket := generateMFATicket(req.Username, role, branch, s.cfg.JWTSecret)
 			jsonResp(w, map[string]interface{}{
@@ -297,6 +302,9 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	_ = s.db.RecordAuthLog(req.Username, ip, "success", "Login berhasil", r.UserAgent())
 	log.Printf("[security] LOGIN SUCCESS ip=%s username=%s role=%s", ip, req.Username, role)
 	token := generateToken(req.Username, role, branch, s.cfg.JWTSecret)
+	if req.RememberDevice && mfaEnabled {
+		s.setTrustedDeviceCookie(w, req.Username)
+	}
 	jsonResp(w, map[string]string{
 		"token":    token,
 		"username": req.Username,
@@ -1390,6 +1398,7 @@ func (s *Server) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, fmt.Sprintf("failed to update password: %v", err), 500)
 		return
 	}
+	s.db.RevokeTrustedDevices(claims.Username)
 
 	log.Printf("[auth] user %s successfully changed password", claims.Username)
 	jsonResp(w, map[string]string{"status": "success", "message": "Password berhasil diubah"}, 200)
@@ -1465,8 +1474,9 @@ func (s *Server) handleLoginMFA(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
-		MFATicket string `json:"mfa_ticket"`
-		Code      string `json:"code"`
+		MFATicket      string `json:"mfa_ticket"`
+		Code           string `json:"code"`
+		RememberDevice bool   `json:"remember_device"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		jsonError(w, "invalid request body", 400)
@@ -1492,12 +1502,28 @@ func (s *Server) handleLoginMFA(w http.ResponseWriter, r *http.Request) {
 	_ = s.db.RecordAuthLog(claims.Username, ip, "success", "Login 2FA berhasil", r.UserAgent())
 	log.Printf("[security] MFA LOGIN SUCCESS ip=%s username=%s role=%s", ip, claims.Username, claims.Role)
 	token := generateToken(claims.Username, claims.Role, claims.Branch, s.cfg.JWTSecret)
+	if req.RememberDevice {
+		s.setTrustedDeviceCookie(w, claims.Username)
+	}
 	jsonResp(w, map[string]string{
 		"token":    token,
 		"username": claims.Username,
 		"role":     claims.Role,
 		"branch":   claims.Branch,
 	}, 200)
+}
+
+func (s *Server) setTrustedDeviceCookie(w http.ResponseWriter, username string) {
+	b := make([]byte, 32)
+	if _, err := rand.Read(b); err != nil {
+		return
+	}
+	value := hex.EncodeToString(b)
+	expires := time.Now().Add(14 * 24 * time.Hour)
+	if s.db.TrustDevice(username, hashPassword(value), expires) != nil {
+		return
+	}
+	http.SetCookie(w, &http.Cookie{Name: "rd_trusted_device", Value: value, Path: "/", Expires: expires, MaxAge: 14 * 24 * 60 * 60, HttpOnly: true, Secure: true, SameSite: http.SameSiteLaxMode})
 }
 
 func (s *Server) handleMFAStatus(w http.ResponseWriter, r *http.Request) {

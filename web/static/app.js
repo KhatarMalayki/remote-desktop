@@ -11,6 +11,8 @@ let currentDevice = null;
 let ws = null;
 let remoteWS = null;
 let searchTimeout = null;
+let idleTimer = null;
+const IDLE_TIMEOUT_MS = 30 * 60 * 1000;
 let currentOffset = 0;
 const PAGE_SIZE = 50;
 
@@ -51,7 +53,7 @@ async function doLogin() {
     const res = await fetch('/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username: user, password: pass })
+      body: JSON.stringify({ username: user, password: pass, remember_device: !!(document.getElementById('rememberDevice') || {}).checked })
     });
     const data = await res.json();
     if (res.ok && data.mfa_required) {
@@ -697,6 +699,13 @@ async function startNetworkScan() {
   }, 1000);
 }
 
+function resetIdleTimer() {
+  if (!token) return;
+  clearTimeout(idleTimer);
+  idleTimer = setTimeout(function(){ alert('Sesi berakhir karena 30 menit tidak ada aktivitas.'); doLogout(); }, IDLE_TIMEOUT_MS);
+}
+['click','keydown','mousemove','touchstart'].forEach(function(e){ document.addEventListener(e, resetIdleTimer, {passive:true}); });
+
 async function saveDeviceMeta() {
   if (!currentDevice) return;
   await api('/api/devices/' + currentDevice.id, {
@@ -1005,7 +1014,7 @@ async function doLoginMFA() {
     const res = await fetch('/api/auth/login/mfa', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ mfa_ticket: ticket, code: code })
+      body: JSON.stringify({ mfa_ticket: ticket, code: code, remember_device: !!(document.getElementById('rememberDevice') || {}).checked })
     });
     const data = await res.json();
     if (res.ok && data.token) {

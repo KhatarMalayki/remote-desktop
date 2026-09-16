@@ -82,6 +82,12 @@ func migrate(db *sql.DB) error {
 		mfa_secret TEXT NOT NULL DEFAULT '',
 		created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 	);
+	CREATE TABLE IF NOT EXISTS trusted_devices (
+		token_hash TEXT PRIMARY KEY,
+		username TEXT NOT NULL,
+		expires_at DATETIME NOT NULL
+	);
+	CREATE INDEX IF NOT EXISTS idx_trusted_devices_user ON trusted_devices(username);
 
 	CREATE TABLE IF NOT EXISTS manual_assets (
 		id TEXT PRIMARY KEY,
@@ -417,6 +423,21 @@ func (d *DB) UpdateUsername(oldUsername, newUsername string) error {
 func (d *DB) UpdatePassword(username, passwordHash string) error {
 	_, err := d.db.Exec(`UPDATE users SET password_hash=? WHERE username=?`, passwordHash, username)
 	return err
+}
+
+func (d *DB) TrustDevice(username, tokenHash string, expiresAt time.Time) error {
+	_, err := d.db.Exec(`INSERT INTO trusted_devices (token_hash, username, expires_at) VALUES (?, ?, ?)`, tokenHash, username, expiresAt)
+	return err
+}
+
+func (d *DB) IsTrustedDevice(username, tokenHash string) bool {
+	var count int
+	err := d.db.QueryRow(`SELECT COUNT(*) FROM trusted_devices WHERE username=? AND token_hash=? AND expires_at>?`, username, tokenHash, time.Now()).Scan(&count)
+	return err == nil && count == 1
+}
+
+func (d *DB) RevokeTrustedDevices(username string) {
+	_, _ = d.db.Exec(`DELETE FROM trusted_devices WHERE username=?`, username)
 }
 
 func (d *DB) GetUserMFA(username string) (bool, string, error) {
