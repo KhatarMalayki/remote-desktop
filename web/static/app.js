@@ -103,9 +103,9 @@ function updateUserUI() {
     if (currentUser.role === 'admin') {
       badgeEl.textContent = 'Administrator';
       badgeEl.className = 'user-badge admin';
-    } else if (currentUser.role === 'kacab') {
-      badgeEl.textContent = 'Kacab: ' + (currentUser.branch || 'Cabang');
-      badgeEl.className = 'user-badge kacab';
+    } else if (currentUser.role === 'adh') {
+      badgeEl.textContent = 'ADH: ' + (currentUser.branch || 'Cabang');
+      badgeEl.className = 'user-badge adh';
     } else {
       badgeEl.textContent = currentUser.role.toUpperCase();
       badgeEl.className = 'user-badge viewer';
@@ -122,7 +122,7 @@ function updateUserUI() {
   if (adminHdr) adminHdr.style.display = currentUser.role === 'admin' ? 'block' : 'none';
   var bTitle = document.getElementById('branchBannerTitle');
   var bSub = document.getElementById('branchBannerSubtitle');
-  if (currentUser.role === 'kacab') {
+  if (currentUser.role === 'adh') {
     if (bTitle) bTitle.textContent = 'Inventaris & Verifikasi Cabang ' + (currentUser.branch || '');
     if (bSub) bSub.textContent = 'Portal verifikasi fisik dan pendaftaran aset operasional cabang ' + (currentUser.branch || '') + '.';
   }
@@ -329,9 +329,9 @@ async function loadBranches() {
   var sel = document.getElementById('branchSelectFilter');
   if (!sel) return;
   var cur = sel.value;
-  sel.innerHTML = currentUser && currentUser.role === 'kacab' ? '' : '<option value="">Semua Cabang</option>';
+  sel.innerHTML = currentUser && currentUser.role === 'adh' ? '' : '<option value="">Semua Cabang</option>';
   (branches || []).forEach(function(b) { sel.innerHTML += '<option value="'+esc(b)+'">'+esc(b)+'</option>'; });
-  if (currentUser && currentUser.role === 'kacab' && currentUser.branch) { sel.value = currentUser.branch; sel.disabled = true; }
+  if (currentUser && currentUser.role === 'adh' && currentUser.branch) { sel.value = currentUser.branch; sel.disabled = true; }
   else if (cur) { sel.value = cur; }
 }
 
@@ -348,7 +348,7 @@ function setAssetTab(tab) {
 
 async function loadBranchAssets() {
   var branch = (document.getElementById('branchSelectFilter')||{}).value || '';
-  if (currentUser && currentUser.role === 'kacab' && currentUser.branch) branch = currentUser.branch;
+  if (currentUser && currentUser.role === 'adh' && currentUser.branch) branch = currentUser.branch;
   var cat = (document.getElementById('branchCategoryFilter')||{}).value || '';
   var vs = (document.getElementById('branchStatusFilter')||{}).value || '';
   var search = (document.getElementById('branchAssetSearch')||{}).value || '';
@@ -380,7 +380,7 @@ function renderBranchAssets() {
   var catFilter = (document.getElementById('branchCategoryFilter')||{}).value || '';
   var statusFilter = (document.getElementById('branchStatusFilter')||{}).value || '';
   var branchFilter = (document.getElementById('branchSelectFilter')||{}).value || '';
-  if (currentUser && currentUser.role === 'kacab' && currentUser.branch) branchFilter = currentUser.branch;
+  if (currentUser && currentUser.role === 'adh' && currentUser.branch) branchFilter = currentUser.branch;
 
   var items = [];
   if (currentAssetTab === 'all' || currentAssetTab === 'manual') {
@@ -435,7 +435,7 @@ function openAddAssetModal() {
   document.getElementById('assetNameInput').value = '';
   document.getElementById('assetCategoryInput').value = 'pc';
   document.getElementById('assetBranchInput').value = (currentUser && currentUser.branch) ? currentUser.branch : ((document.getElementById('branchSelectFilter')||{}).value || '');
-  if (currentUser && currentUser.role === 'kacab') document.getElementById('assetBranchInput').disabled = true;
+  if (currentUser && currentUser.role === 'adh') document.getElementById('assetBranchInput').disabled = true;
   else document.getElementById('assetBranchInput').disabled = false;
   document.getElementById('assetLocationInput').value = '';
   document.getElementById('assetAssignedInput').value = '';
@@ -454,7 +454,7 @@ function openEditAssetModal(id) {
   document.getElementById('assetNameInput').value = asset.name;
   document.getElementById('assetCategoryInput').value = asset.category || 'other';
   document.getElementById('assetBranchInput').value = asset.branch;
-  if (currentUser && currentUser.role === 'kacab') document.getElementById('assetBranchInput').disabled = true;
+  if (currentUser && currentUser.role === 'adh') document.getElementById('assetBranchInput').disabled = true;
   else document.getElementById('assetBranchInput').disabled = false;
   document.getElementById('assetLocationInput').value = asset.location || '';
   document.getElementById('assetAssignedInput').value = asset.assigned_to || '';
@@ -474,7 +474,7 @@ async function saveManualAsset() {
   var name = document.getElementById('assetNameInput').value.trim();
   var category = document.getElementById('assetCategoryInput').value;
   var branch = document.getElementById('assetBranchInput').value.trim();
-  if (currentUser && currentUser.role === 'kacab' && currentUser.branch) branch = currentUser.branch;
+  if (currentUser && currentUser.role === 'adh' && currentUser.branch) branch = currentUser.branch;
   var location = document.getElementById('assetLocationInput').value.trim();
   var assignedTo = document.getElementById('assetAssignedInput').value.trim();
   var sn = document.getElementById('assetSNInput').value.trim();
@@ -549,7 +549,7 @@ async function submitVerification() {
 
 function exportBranchAssetsCSV() {
   var branch = (document.getElementById('branchSelectFilter')||{}).value || '';
-  if (currentUser && currentUser.role === 'kacab') branch = currentUser.branch;
+  if (currentUser && currentUser.role === 'adh') branch = currentUser.branch;
 
   var rows = [
     ['Tipe', 'Tag / Hostname', 'Nama Aset', 'Kategori', 'Cabang', 'Lokasi', 'PIC', 'Kondisi', 'Status Verifikasi', 'Diverifikasi Oleh', 'Tanggal', 'Catatan']
@@ -608,7 +608,7 @@ async function createUser() {
   var role = document.getElementById('newUserRole').value;
   var branch = document.getElementById('newUserBranch').value.trim();
   if (!username || !password) { alert('Username dan Password wajib diisi'); return; }
-  if (role === 'kacab' && !branch) { alert('Nama cabang wajib diisi untuk Kacab'); return; }
+  if (role === 'adh' && !branch) { alert('Nama cabang wajib diisi untuk ADH'); return; }
 
   var res = await api('/api/users', { method:'POST', body:JSON.stringify({ username:username, password:password, role:role, branch:branch }) });
   if (res && res.status === 'created') {
@@ -640,7 +640,7 @@ async function deleteUser(id, username) {
 async function openHistoryModal() {
   document.getElementById('historyModal').style.display = 'flex';
   var branch = (document.getElementById('branchSelectFilter')||{}).value || '';
-  if (currentUser && currentUser.role === 'kacab') branch = currentUser.branch;
+  if (currentUser && currentUser.role === 'adh') branch = currentUser.branch;
   var logs = await api('/api/assets/verifications?branch=' + encodeURIComponent(branch) + '&limit=40');
   var container = document.getElementById('historyTimeline');
   if (!container) return;
@@ -1497,7 +1497,7 @@ async function openDownloadAgentModal() {
   var sel = document.getElementById('dlAgentBranch');
   if (sel) {
     var branches = await api('/api/branches') || [];
-    if (currentUser && currentUser.role === 'kacab' && currentUser.branch) {
+    if (currentUser && currentUser.role === 'adh' && currentUser.branch) {
       sel.innerHTML = '<option value="' + esc(currentUser.branch) + '">' + esc(currentUser.branch) + ' (Cabang Anda)</option>';
       sel.value = currentUser.branch;
       sel.disabled = true;
@@ -1531,7 +1531,7 @@ function closeDownloadAgentModal() {
 function submitDownloadAgentPackage() {
   var sel = document.getElementById('dlAgentBranch');
   var branch = (sel && sel.value) ? sel.value.trim() : 'Pusat';
-  if (currentUser && currentUser.role === 'kacab' && currentUser.branch) {
+  if (currentUser && currentUser.role === 'adh' && currentUser.branch) {
     branch = currentUser.branch;
   }
   var os = (document.getElementById('dlAgentOS') || {}).value || 'windows';
@@ -1551,3 +1551,4 @@ function submitDownloadAgentPackage() {
     closeDownloadAgentModal();
   }, 1000);
 }
+

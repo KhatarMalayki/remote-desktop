@@ -37,14 +37,14 @@ func TestDBAndBranchVerification(t *testing.T) {
 		t.Fatalf("failed getting admin user: err=%v role=%s id=%d branch=%s", err, role, id, branch)
 	}
 
-	// 2. Test CreateUser (Kacab)
-	kacabPassHash := hashPassword("kacab123")
-	if err := db.CreateUser("kacab_sby", kacabPassHash, "kacab", "Surabaya"); err != nil {
-		t.Fatalf("failed creating kacab user: %v", err)
+	// 2. Test CreateUser (ADH)
+	adhPassHash := hashPassword("adh123")
+	if err := db.CreateUser("adh_sby", adhPassHash, "adh", "Surabaya"); err != nil {
+		t.Fatalf("failed creating adh user: %v", err)
 	}
-	_, _, kRole, kBranch, err := db.GetUser("kacab_sby")
-	if err != nil || kRole != "kacab" || kBranch != "Surabaya" {
-		t.Fatalf("failed getting kacab user: role=%s branch=%s err=%v", kRole, kBranch, err)
+	_, _, kRole, kBranch, err := db.GetUser("adh_sby")
+	if err != nil || kRole != "adh" || kBranch != "Surabaya" {
+		t.Fatalf("failed getting adh user: role=%s branch=%s err=%v", kRole, kBranch, err)
 	}
 
 	// 3. Test Manual Assets CRUD
@@ -56,7 +56,7 @@ func TestDBAndBranchVerification(t *testing.T) {
 		Location:   "Meja Kasir 1",
 		AssignedTo: "Budi",
 		Condition:  "good",
-		CreatedBy:  "kacab_sby",
+		CreatedBy:  "adh_sby",
 	}
 	if err := db.CreateManualAsset(asset); err != nil {
 		t.Fatalf("create manual asset failed: %v", err)
@@ -71,7 +71,7 @@ func TestDBAndBranchVerification(t *testing.T) {
 	}
 
 	// 4. Test Verification
-	if err := db.VerifyManualAsset(asset.ID, "verified", "good", "kacab_sby", "Barang lengkap & berfungsi"); err != nil {
+	if err := db.VerifyManualAsset(asset.ID, "verified", "good", "adh_sby", "Barang lengkap & berfungsi"); err != nil {
 		t.Fatalf("verify manual asset failed: %v", err)
 	}
 
@@ -134,13 +134,13 @@ func TestBranchManagement(t *testing.T) {
 		t.Fatal("Surabaya location missing")
 	}
 
-	if err := db.CreateUser("kacab_sby", hashPassword("password"), "kacab", "Surabaya"); err != nil {
+	if err := db.CreateUser("adh_sby", hashPassword("password"), "adh", "Surabaya"); err != nil {
 		t.Fatalf("create user: %v", err)
 	}
 	if err := db.UpdateBranch(surabaya.ID, "Surabaya Timur", "site", "Operasional"); err != nil {
 		t.Fatalf("rename location: %v", err)
 	}
-	_, _, _, branch, err := db.GetUser("kacab_sby")
+	_, _, _, branch, err := db.GetUser("adh_sby")
 	if err != nil || branch != "Surabaya Timur" {
 		t.Fatalf("expected user assignment to follow rename, branch=%q err=%v", branch, err)
 	}
@@ -154,12 +154,12 @@ func TestBranchManagement(t *testing.T) {
 
 func TestTokenClaims(t *testing.T) {
 	secret := "secret-jwt-key"
-	tok := generateToken("kacab_bdg", "kacab", "Bandung", secret)
+	tok := generateToken("adh_bdg", "adh", "Bandung", secret)
 	claims, ok := parseToken(tok, secret)
 	if !ok {
 		t.Fatalf("failed to parse token")
 	}
-	if claims.Username != "kacab_bdg" || claims.Role != "kacab" || claims.Branch != "Bandung" {
+	if claims.Username != "adh_bdg" || claims.Role != "adh" || claims.Branch != "Bandung" {
 		t.Fatalf("unexpected claims: %+v", claims)
 	}
 }
@@ -522,7 +522,7 @@ func TestSecuritySettingsAndUnblock(t *testing.T) {
 	}
 }
 
-func TestKacabBranchIsolation(t *testing.T) {
+func TestADHBranchIsolation(t *testing.T) {
 	tempDir := t.TempDir()
 	dbPath := filepath.Join(tempDir, "test.db")
 	db, err := NewDB(dbPath)
@@ -544,33 +544,33 @@ func TestKacabBranchIsolation(t *testing.T) {
 	}
 	_ = db.CreateManualAsset(sbyAsset)
 
-	// 2. Kacab Medan tries to edit Surabaya asset -> should be 403 Forbidden
+	// 2. ADH Medan tries to edit Surabaya asset -> should be 403 Forbidden
 	reqEdit := httptest.NewRequest("PUT", "/api/assets/manual/"+sbyAsset.ID, strings.NewReader(`{"name":"Hacked PC"}`))
-	ctxMedan := context.WithValue(reqEdit.Context(), userClaimsKey, &UserClaims{Username: "kacab_medan", Role: "kacab", Branch: "Medan"})
+	ctxMedan := context.WithValue(reqEdit.Context(), userClaimsKey, &UserClaims{Username: "adh_medan", Role: "adh", Branch: "Medan"})
 	wEdit := httptest.NewRecorder()
 	s.handleManualAsset(wEdit, reqEdit.WithContext(ctxMedan))
 	if wEdit.Code != 403 {
-		t.Fatalf("expected 403 when Kacab Medan tries to edit Surabaya asset, got %d", wEdit.Code)
+		t.Fatalf("expected 403 when ADH Medan tries to edit Surabaya asset, got %d", wEdit.Code)
 	}
 
-	// 3. Kacab Medan tries to delete Surabaya asset -> should be 403 Forbidden
+	// 3. ADH Medan tries to delete Surabaya asset -> should be 403 Forbidden
 	reqDel := httptest.NewRequest("DELETE", "/api/assets/manual/"+sbyAsset.ID, nil)
 	wDel := httptest.NewRecorder()
 	s.handleManualAsset(wDel, reqDel.WithContext(ctxMedan))
 	if wDel.Code != 403 {
-		t.Fatalf("expected 403 when Kacab Medan tries to delete Surabaya asset, got %d", wDel.Code)
+		t.Fatalf("expected 403 when ADH Medan tries to delete Surabaya asset, got %d", wDel.Code)
 	}
 
-	// 4. Kacab Medan tries to verify Surabaya asset -> should be 403 Forbidden
+	// 4. ADH Medan tries to verify Surabaya asset -> should be 403 Forbidden
 	bodyVerify := strings.NewReader(fmt.Sprintf(`{"asset_id":"%s","asset_type":"manual","status":"verified"}`, sbyAsset.ID))
 	reqVer := httptest.NewRequest("POST", "/api/assets/verify", bodyVerify)
 	wVer := httptest.NewRecorder()
 	s.handleVerifyAsset(wVer, reqVer.WithContext(ctxMedan))
 	if wVer.Code != 403 {
-		t.Fatalf("expected 403 when Kacab Medan tries to verify Surabaya asset, got %d", wVer.Code)
+		t.Fatalf("expected 403 when ADH Medan tries to verify Surabaya asset, got %d", wVer.Code)
 	}
 
-	// 5. Kacab Medan creates new asset -> must be locked to Medan even if passing Surabaya
+	// 5. ADH Medan creates new asset -> must be locked to Medan even if passing Surabaya
 	bodyCreate := strings.NewReader(`{"asset_tag":"MDN-01","name":"Printer Medan","branch":"Surabaya"}`)
 	reqCreate := httptest.NewRequest("POST", "/api/assets/manual", bodyCreate)
 	wCreate := httptest.NewRecorder()
@@ -608,10 +608,10 @@ func TestAgentPackageDownload(t *testing.T) {
 		db: db,
 	}
 
-	// 1. Kacab Medan requests package
+	// 1. ADH Medan requests package
 	req := httptest.NewRequest("GET", "/api/agent/package?os=windows&arch=amd64", nil)
 	req.Host = "testserver.example.com"
-	ctx := context.WithValue(req.Context(), userClaimsKey, &UserClaims{Username: "kacab_medan", Role: "kacab", Branch: "Medan"})
+	ctx := context.WithValue(req.Context(), userClaimsKey, &UserClaims{Username: "adh_medan", Role: "adh", Branch: "Medan"})
 	w := httptest.NewRecorder()
 	s.handleAgentPackageDownload(w, req.WithContext(ctx))
 

@@ -70,7 +70,7 @@ type AssetVerification struct {
 type User struct {
 	ID         int64     `json:"id"`
 	Username   string    `json:"username"`
-	Role       string    `json:"role"` // admin, kacab, viewer
+	Role       string    `json:"role"` // admin, adh, viewer
 	Branch     string    `json:"branch"`
 	MFAEnabled bool      `json:"mfa_enabled"`
 	CreatedAt  time.Time `json:"created_at"`

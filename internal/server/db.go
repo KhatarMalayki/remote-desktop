@@ -160,6 +160,8 @@ func migrate(db *sql.DB) error {
 		return err
 	}
 	_, _ = db.Exec(`INSERT OR IGNORE INTO branches (name, type) VALUES ('Pusat', 'pusat')`)
+	// Role Kacab has been replaced by ADH; preserve every existing account and scope.
+	_, _ = db.Exec(`UPDATE users SET role='adh' WHERE role='kacab'`)
 	_, _ = db.Exec(`INSERT OR IGNORE INTO business_units(name) SELECT business_unit FROM branches WHERE TRIM(business_unit) != ''`)
 	_, _ = db.Exec(`INSERT OR IGNORE INTO branch_business_units(branch_id, business_unit) SELECT id, business_unit FROM branches WHERE TRIM(business_unit) != ''`)
 

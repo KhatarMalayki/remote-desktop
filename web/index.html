@@ -399,7 +399,7 @@
       </select>
     </div>
     <div class="form-group">
-      <label>Catatan Pemeriksaan Kacab</label>
+      <label>Catatan Pemeriksaan ADH</label>
       <textarea id="verifyNotesInput" placeholder="Contoh: Unit fisik ada di meja kasir 1, stiker inventaris jelas, adaptor charger ori."></textarea>
     </div>
     <div class="modal-actions">
@@ -412,21 +412,21 @@
 <!-- USER MANAGEMENT MODAL (ADMIN ONLY) -->
 <div id="usersModal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeUsersModal()">
   <div class="modal" style="max-width:700px">
-    <h3>Kelola Akun Kepala Cabang (Kacab)</h3>
+    <h3>Kelola Akun Kepala Cabang (ADH)</h3>
     <p style="font-size:12px;color:var(--fg2);margin-bottom:14px">Buat akun untuk Kepala Cabang agar mereka dapat login dan memverifikasi inventaris cabangnya.</p>
     <div style="background:var(--bg3);padding:14px;border-radius:var(--radius);margin-bottom:16px">
       <h4 style="font-size:13px;margin-bottom:10px">Tambah User Baru</h4>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-        <div class="form-group"><label>Username</label><input type="text" id="newUserUsername" placeholder="kacab_sby"></div>
+        <div class="form-group"><label>Username</label><input type="text" id="newUserUsername" placeholder="adh_sby"></div>
         <div class="form-group"><label>Password</label><input type="password" id="newUserPassword" placeholder="******"></div>
         <div class="form-group"><label>Role</label>
           <select id="newUserRole">
-            <option value="kacab">Kepala Cabang (Kacab)</option>
+            <option value="adh">Kepala Cabang (ADH)</option>
             <option value="admin">Administrator (Pusat)</option>
             <option value="viewer">Viewer</option>
           </select>
         </div>
-        <div class="form-group"><label>Nama Cabang (untuk Kacab)</label><input type="text" id="newUserBranch" placeholder="Contoh: Surabaya"></div>
+        <div class="form-group"><label>Nama Cabang (untuk ADH)</label><input type="text" id="newUserBranch" placeholder="Contoh: Surabaya"></div>
       </div>
       <div style="text-align:right"><button class="btn btn-primary btn-sm" onclick="createUser()">+ Tambah Akun</button></div>
     </div>
@@ -701,3 +701,4 @@
 <script src="/static/app.js"></script>
 </body>
 </html>
+

@@ -325,7 +325,7 @@ func (s *Server) handleDevices(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
 		group := r.URL.Query().Get("group")
-		if claims.Role == "kacab" && claims.Branch != "" {
+		if claims.Role == "adh" && claims.Branch != "" {
 			group = claims.Branch
 		}
 		search := r.URL.Query().Get("search")
@@ -375,8 +375,8 @@ func (s *Server) handleDevice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Strict branch isolation for Kacab
-	if claims.Role == "kacab" && claims.Branch != "" {
+	// Strict branch isolation for ADH
+	if claims.Role == "adh" && claims.Branch != "" {
 		devBranch := dev.Branch
 		if devBranch == "" {
 			devBranch = dev.GroupName
@@ -406,7 +406,7 @@ func (s *Server) handleDevice(w http.ResponseWriter, r *http.Request) {
 			jsonError(w, "invalid body", 400)
 			return
 		}
-		if claims.Role == "kacab" && claims.Branch != "" {
+		if claims.Role == "adh" && claims.Branch != "" {
 			req.Group = claims.Branch
 		}
 		if err := s.db.UpdateDeviceMeta(id, req.Tags, req.Group, req.Note); err != nil {
@@ -460,7 +460,7 @@ func (s *Server) handleNetworkScans(w http.ResponseWriter, r *http.Request) {
 	if branch == "" {
 		branch = dev.GroupName
 	}
-	if claims.Role == "kacab" && claims.Branch != "" && branch != claims.Branch {
+	if claims.Role == "adh" && claims.Branch != "" && branch != claims.Branch {
 		jsonError(w, "forbidden: perangkat milik cabang lain", 403)
 		return
 	}
@@ -507,7 +507,7 @@ func (s *Server) handleNetworkScan(w http.ResponseWriter, r *http.Request) {
 	if branch == "" {
 		branch = dev.GroupName
 	}
-	if claims.Role == "viewer" || (claims.Role == "kacab" && claims.Branch != "" && branch != claims.Branch) {
+	if claims.Role == "viewer" || (claims.Role == "adh" && claims.Branch != "" && branch != claims.Branch) {
 		jsonError(w, "forbidden", 403)
 		return
 	}
@@ -655,7 +655,7 @@ func (s *Server) handleLocationTypeRename(w http.ResponseWriter, r *http.Request
 func (s *Server) handleBranchStats(w http.ResponseWriter, r *http.Request) {
 	claims := getClaims(r)
 	branch := r.URL.Query().Get("branch")
-	if claims.Role == "kacab" && claims.Branch != "" {
+	if claims.Role == "adh" && claims.Branch != "" {
 		branch = claims.Branch
 	}
 	stats, err := s.db.GetBranchStats(branch)
@@ -673,7 +673,7 @@ func (s *Server) handleManualAssets(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
 		branch := r.URL.Query().Get("branch")
-		if claims.Role == "kacab" && claims.Branch != "" {
+		if claims.Role == "adh" && claims.Branch != "" {
 			branch = claims.Branch
 		}
 		category := r.URL.Query().Get("category")
@@ -701,7 +701,7 @@ func (s *Server) handleManualAssets(w http.ResponseWriter, r *http.Request) {
 			jsonError(w, "asset name and tag are required", 400)
 			return
 		}
-		if claims.Role == "kacab" && claims.Branch != "" {
+		if claims.Role == "adh" && claims.Branch != "" {
 			asset.Branch = claims.Branch
 		}
 		if asset.Branch == "" {
@@ -733,7 +733,7 @@ func (s *Server) handleManualAsset(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "asset not found", 404)
 		return
 	}
-	if claims.Role == "kacab" && claims.Branch != "" && existing.Branch != claims.Branch {
+	if claims.Role == "adh" && claims.Branch != "" && existing.Branch != claims.Branch {
 		jsonError(w, "forbidden: asset belongs to different branch", 403)
 		return
 	}
@@ -753,7 +753,7 @@ func (s *Server) handleManualAsset(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		upd.ID = id
-		if claims.Role == "kacab" && claims.Branch != "" {
+		if claims.Role == "adh" && claims.Branch != "" {
 			upd.Branch = claims.Branch
 		} else if upd.Branch == "" {
 			upd.Branch = existing.Branch
@@ -818,7 +818,7 @@ func (s *Server) handleVerifyAsset(w http.ResponseWriter, r *http.Request) {
 		req.Status = "verified"
 	}
 
-	if claims.Role == "kacab" && claims.Branch != "" {
+	if claims.Role == "adh" && claims.Branch != "" {
 		if req.AssetType == "manual" {
 			existing, err := s.db.GetManualAsset(req.AssetID)
 			if err != nil {
@@ -875,7 +875,7 @@ func (s *Server) handleAssetVerifications(w http.ResponseWriter, r *http.Request
 	claims := getClaims(r)
 	assetID := r.URL.Query().Get("asset_id")
 	branch := r.URL.Query().Get("branch")
-	if claims.Role == "kacab" && claims.Branch != "" {
+	if claims.Role == "adh" && claims.Branch != "" {
 		branch = claims.Branch
 	}
 	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
@@ -909,7 +909,7 @@ func (s *Server) handleUsers(w http.ResponseWriter, r *http.Request) {
 		var req struct {
 			Username string `json:"username"`
 			Password string `json:"password"`
-			Role     string `json:"role"`   // admin, kacab, viewer
+			Role     string `json:"role"`   // admin, adh, viewer
 			Branch   string `json:"branch"` // Cabang Surabaya, dll
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -921,7 +921,7 @@ func (s *Server) handleUsers(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if req.Role == "" {
-			req.Role = "kacab"
+			req.Role = "adh"
 		}
 		if err := s.db.CreateUser(req.Username, hashPassword(req.Password), req.Role, req.Branch); err != nil {
 			jsonError(w, fmt.Sprintf("failed to create user: %v", err), 500)
@@ -1848,7 +1848,7 @@ func (s *Server) handleAgentPackageDownload(w http.ResponseWriter, r *http.Reque
 	}
 
 	branch := strings.TrimSpace(r.URL.Query().Get("branch"))
-	if claims.Role == "kacab" && claims.Branch != "" {
+	if claims.Role == "adh" && claims.Branch != "" {
 		branch = claims.Branch
 	}
 	if branch == "" {

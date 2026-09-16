@@ -452,7 +452,7 @@ select.filter-select {
   margin-top: 4px;
 }
 .user-badge.admin { background: rgba(79,140,255,0.2); color: var(--accent); }
-.user-badge.kacab { background: rgba(52,211,153,0.2); color: var(--green); }
+.user-badge.adh { background: rgba(52,211,153,0.2); color: var(--green); }
 .user-badge.viewer { background: rgba(160,163,177,0.2); color: var(--fg2); }
 
 .badge-status {
@@ -551,3 +551,4 @@ select.filter-select {
 .timeline-item.verified { border-left-color: var(--green); }
 .timeline-item.discrepancy { border-left-color: var(--red); }
 .timeline-meta { color: var(--fg2); font-size: 11px; margin-bottom: 4px; }
+
