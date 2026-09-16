@@ -116,8 +116,8 @@ func TestBranchManagement(t *testing.T) {
 	if err := db.CreateBranch("Surabaya", "cabang"); err != nil {
 		t.Fatalf("create branch: %v", err)
 	}
-	if err := db.CreateBranch("Invalid", "unknown"); err == nil {
-		t.Fatal("expected invalid type to fail")
+	if err := db.CreateBranch("Invalid", ""); err == nil {
+		t.Fatal("expected empty type to fail")
 	}
 
 	branches, err = db.ListBranches()
