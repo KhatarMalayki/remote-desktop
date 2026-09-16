@@ -1386,7 +1386,7 @@ async function unblockIP(ip) {
 
 // ==================== LOCATION MANAGEMENT ====================
 
-var branchTypeLabels = { pusat:'Pusat', cabang:'Cabang', bisnis_unit:'Bisnis Unit', service_point:'Service Point', pool:'Pool', site:'Site' };
+var branchTypeLabels = {};
 var branchManagementRows = {};
 
 async function openBranchesModal() {
@@ -1443,7 +1443,7 @@ async function editBranch(id) {
   if (name === null) return;
   name = name.trim();
   if (!name) { alert('Nama lokasi wajib diisi.'); return; }
-  var type = prompt('Tipe lokasi (pusat, cabang, bisnis_unit, service_point, pool, site):', oldType);
+  var type = prompt('Tipe lokasi:', oldType);
   if (type === null) return;
   var res = await api('/api/branches/' + id, { method:'PUT', body:JSON.stringify({ name:name, type:type.trim() }) });
   if (!res || res.error) { alert('Gagal mengubah lokasi: ' + ((res && res.error) || 'Terjadi kesalahan')); return; }

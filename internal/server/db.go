@@ -891,6 +891,7 @@ func (d *DB) GetBranch(id int64) (*models.Branch, error) {
 
 func (d *DB) CreateBranch(name, branchType string) error {
 	name = strings.TrimSpace(name)
+	branchType = strings.TrimSpace(branchType)
 	if name == "" {
 		return fmt.Errorf("branch name is required")
 	}
@@ -903,6 +904,7 @@ func (d *DB) CreateBranch(name, branchType string) error {
 
 func (d *DB) UpdateBranch(id int64, name, branchType string) error {
 	name = strings.TrimSpace(name)
+	branchType = strings.TrimSpace(branchType)
 	if name == "" {
 		return fmt.Errorf("branch name is required")
 	}
@@ -959,10 +961,5 @@ func (d *DB) DeleteBranch(id int64) error {
 }
 
 func validBranchType(branchType string) bool {
-	switch branchType {
-	case "pusat", "cabang", "bisnis_unit", "service_point", "pool", "site":
-		return true
-	default:
-		return false
-	}
+	return len(strings.TrimSpace(branchType)) > 0 && len(strings.TrimSpace(branchType)) <= 60
 }
