@@ -87,10 +87,11 @@ type AuthLog struct {
 }
 
 type Branch struct {
-	ID        int64     `json:"id"`
-	Name      string    `json:"name"`
-	Type      string    `json:"type"` // pusat, cabang, bisnis_unit, service_point, pool, site
-	CreatedAt time.Time `json:"created_at"`
+	ID           int64     `json:"id"`
+	Name         string    `json:"name"`
+	Type         string    `json:"type"` // pusat, cabang, bisnis_unit, service_point, pool, site
+	BusinessUnit string    `json:"business_unit"`
+	CreatedAt    time.Time `json:"created_at"`
 }
 
 type SecuritySettings struct {

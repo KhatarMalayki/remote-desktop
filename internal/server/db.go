@@ -149,6 +149,7 @@ func migrate(db *sql.DB) error {
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		name TEXT UNIQUE NOT NULL,
 		type TEXT NOT NULL DEFAULT 'cabang',
+		business_unit TEXT NOT NULL DEFAULT '',
 		created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 	);
 	CREATE INDEX IF NOT EXISTS idx_branches_name ON branches(name);
@@ -163,6 +164,7 @@ func migrate(db *sql.DB) error {
 		`ALTER TABLE users ADD COLUMN branch TEXT NOT NULL DEFAULT ''`,
 		`ALTER TABLE users ADD COLUMN mfa_enabled INTEGER NOT NULL DEFAULT 0`,
 		`ALTER TABLE users ADD COLUMN mfa_secret TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE branches ADD COLUMN business_unit TEXT NOT NULL DEFAULT ''`,
 		`ALTER TABLE devices ADD COLUMN branch TEXT NOT NULL DEFAULT ''`,
 		`ALTER TABLE devices ADD COLUMN verification_status TEXT NOT NULL DEFAULT 'unverified'`,
 		`ALTER TABLE devices ADD COLUMN verified_at DATETIME`,
@@ -863,7 +865,7 @@ func (d *DB) SaveSecuritySettings(s models.SecuritySettings) error {
 }
 
 func (d *DB) ListBranches() ([]models.Branch, error) {
-	rows, err := d.db.Query(`SELECT id, name, type, created_at FROM branches ORDER BY type ASC, name ASC`)
+	rows, err := d.db.Query(`SELECT id, name, type, business_unit, created_at FROM branches ORDER BY type ASC, name ASC`)
 	if err != nil {
 		return nil, err
 	}
@@ -872,7 +874,7 @@ func (d *DB) ListBranches() ([]models.Branch, error) {
 	var list []models.Branch
 	for rows.Next() {
 		var b models.Branch
-		if err := rows.Scan(&b.ID, &b.Name, &b.Type, &b.CreatedAt); err != nil {
+		if err := rows.Scan(&b.ID, &b.Name, &b.Type, &b.BusinessUnit, &b.CreatedAt); err != nil {
 			return nil, err
 		}
 		list = append(list, b)
@@ -889,7 +891,7 @@ func (d *DB) GetBranch(id int64) (*models.Branch, error) {
 	return &b, nil
 }
 
-func (d *DB) CreateBranch(name, branchType string) error {
+func (d *DB) CreateBranch(name, branchType, businessUnit string) error {
 	name = strings.TrimSpace(name)
 	branchType = strings.TrimSpace(branchType)
 	if name == "" {
@@ -898,11 +900,11 @@ func (d *DB) CreateBranch(name, branchType string) error {
 	if !validBranchType(branchType) {
 		return fmt.Errorf("invalid branch type")
 	}
-	_, err := d.db.Exec(`INSERT INTO branches (name, type) VALUES (?, ?)`, name, branchType)
+	_, err := d.db.Exec(`INSERT INTO branches (name, type, business_unit) VALUES (?, ?, ?)`, name, branchType, strings.TrimSpace(businessUnit))
 	return err
 }
 
-func (d *DB) UpdateBranch(id int64, name, branchType string) error {
+func (d *DB) UpdateBranch(id int64, name, branchType, businessUnit string) error {
 	name = strings.TrimSpace(name)
 	branchType = strings.TrimSpace(branchType)
 	if name == "" {
@@ -920,7 +922,7 @@ func (d *DB) UpdateBranch(id int64, name, branchType string) error {
 	if err := tx.QueryRow(`SELECT name FROM branches WHERE id=?`, id).Scan(&oldName); err != nil {
 		return err
 	}
-	if _, err := tx.Exec(`UPDATE branches SET name=?, type=? WHERE id=?`, name, branchType, id); err != nil {
+	if _, err := tx.Exec(`UPDATE branches SET name=?, type=?, business_unit=? WHERE id=?`, name, branchType, strings.TrimSpace(businessUnit), id); err != nil {
 		return err
 	}
 	if oldName != name {

@@ -113,10 +113,10 @@ func TestBranchManagement(t *testing.T) {
 	if err != nil || len(branches) != 1 || branches[0].Name != "Pusat" {
 		t.Fatalf("expected seeded Pusat location, got %#v (err=%v)", branches, err)
 	}
-	if err := db.CreateBranch("Surabaya", "cabang"); err != nil {
+	if err := db.CreateBranch("Surabaya", "cabang", "Operasional"); err != nil {
 		t.Fatalf("create branch: %v", err)
 	}
-	if err := db.CreateBranch("Invalid", ""); err == nil {
+	if err := db.CreateBranch("Invalid", "", ""); err == nil {
 		t.Fatal("expected empty type to fail")
 	}
 
@@ -137,7 +137,7 @@ func TestBranchManagement(t *testing.T) {
 	if err := db.CreateUser("kacab_sby", hashPassword("password"), "kacab", "Surabaya"); err != nil {
 		t.Fatalf("create user: %v", err)
 	}
-	if err := db.UpdateBranch(surabaya.ID, "Surabaya Timur", "site"); err != nil {
+	if err := db.UpdateBranch(surabaya.ID, "Surabaya Timur", "site", "Operasional"); err != nil {
 		t.Fatalf("rename location: %v", err)
 	}
 	_, _, _, branch, err := db.GetUser("kacab_sby")

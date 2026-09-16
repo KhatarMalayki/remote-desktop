@@ -1431,9 +1431,9 @@ async function loadBranchesManagement() {
   }
   branchManagementRows = {};
   branches.forEach(function(b) { branchManagementRows[b.id] = b; });
-  container.innerHTML = '<table class="device-table"><thead><tr><th>Nama Lokasi</th><th>Tipe</th><th>Aksi</th></tr></thead><tbody>' + branches.map(function(b) {
+  container.innerHTML = '<table class="device-table"><thead><tr><th>Nama Lokasi</th><th>Tipe</th><th>Bisnis Unit</th><th>Aksi</th></tr></thead><tbody>' + branches.map(function(b) {
     var isPusat = b.name === 'Pusat';
-    return '<tr><td><strong>' + esc(b.name) + '</strong></td><td><span class="tag">' + esc(branchTypeLabels[b.type] || b.type) + '</span></td><td><button class="btn btn-ghost btn-sm" onclick="editBranch(' + b.id + ')">Ubah</button> ' + (isPusat ? '' : '<button class="btn btn-danger btn-sm" onclick="deleteBranch(' + b.id + ')">Hapus</button>') + '</td></tr>';
+    return '<tr><td><strong>' + esc(b.name) + '</strong></td><td><span class="tag">' + esc(branchTypeLabels[b.type] || b.type) + '</span></td><td>' + esc(b.business_unit || '-') + '</td><td><button class="btn btn-ghost btn-sm" onclick="editBranch(' + b.id + ')">Ubah</button> ' + (isPusat ? '' : '<button class="btn btn-danger btn-sm" onclick="deleteBranch(' + b.id + ')">Hapus</button>') + '</td></tr>';
   }).join('') + '</tbody></table>';
 }
 
@@ -1442,9 +1442,11 @@ async function createBranch() {
   var typeInput = document.getElementById('branchTypeInput');
   var name = (nameInput.value || '').trim();
   if (!name) { alert('Nama lokasi wajib diisi.'); nameInput.focus(); return; }
-  var res = await api('/api/branches', { method:'POST', body:JSON.stringify({ name:name, type:typeInput.value }) });
+  var businessUnit = ((document.getElementById('branchBusinessUnitInput')||{}).value || '').trim();
+  var res = await api('/api/branches', { method:'POST', body:JSON.stringify({ name:name, type:typeInput.value, business_unit:businessUnit }) });
   if (!res || res.error) { alert('Gagal menambahkan lokasi: ' + ((res && res.error) || 'Terjadi kesalahan')); return; }
   nameInput.value = '';
+  document.getElementById('branchBusinessUnitInput').value = '';
   showToast('Lokasi ' + name + ' berhasil ditambahkan.');
   await Promise.all([loadBranchesManagement(), loadBranches()]);
 }
@@ -1454,13 +1456,15 @@ async function editBranch(id) {
   if (!branch) return;
   var oldName = branch.name;
   var oldType = branch.type;
+  var businessUnit = prompt('Bisnis unit:', branch.business_unit || '');
+  if (businessUnit === null) return;
   var name = prompt('Nama lokasi:', oldName);
   if (name === null) return;
   name = name.trim();
   if (!name) { alert('Nama lokasi wajib diisi.'); return; }
   var type = prompt('Tipe lokasi:', oldType);
   if (type === null) return;
-  var res = await api('/api/branches/' + id, { method:'PUT', body:JSON.stringify({ name:name, type:type.trim() }) });
+  var res = await api('/api/branches/' + id, { method:'PUT', body:JSON.stringify({ name:name, type:type.trim(), business_unit:businessUnit.trim() }) });
   if (!res || res.error) { alert('Gagal mengubah lokasi: ' + ((res && res.error) || 'Terjadi kesalahan')); return; }
   showToast('Lokasi berhasil diperbarui.');
   await Promise.all([loadBranchesManagement(), loadBranches(), loadBranchAssets()]);

@@ -558,8 +558,9 @@ func (s *Server) handleBranches(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		var req struct {
-			Name string `json:"name"`
-			Type string `json:"type"`
+			Name         string `json:"name"`
+			Type         string `json:"type"`
+			BusinessUnit string `json:"business_unit"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			jsonError(w, "invalid request body", 400)
@@ -573,7 +574,7 @@ func (s *Server) handleBranches(w http.ResponseWriter, r *http.Request) {
 		if req.Type == "" {
 			req.Type = "cabang"
 		}
-		if err := s.db.CreateBranch(req.Name, req.Type); err != nil {
+		if err := s.db.CreateBranch(req.Name, req.Type, req.BusinessUnit); err != nil {
 			jsonError(w, err.Error(), 400)
 			return
 		}
@@ -2041,15 +2042,16 @@ func (s *Server) handleBranchSubroute(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodPut:
 		var req struct {
-			Name string `json:"name"`
-			Type string `json:"type"`
+			Name         string `json:"name"`
+			Type         string `json:"type"`
+			BusinessUnit string `json:"business_unit"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			jsonError(w, "invalid request body", 400)
 			return
 		}
 		req.Name = strings.TrimSpace(req.Name)
-		if err := s.db.UpdateBranch(id, req.Name, req.Type); err != nil {
+		if err := s.db.UpdateBranch(id, req.Name, req.Type, req.BusinessUnit); err != nil {
 			jsonError(w, err.Error(), 400)
 			return
 		}
