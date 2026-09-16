@@ -1393,8 +1393,17 @@ async function openBranchesModal() {
   var modal = document.getElementById('branchesModal');
   if (!modal) return;
   modal.style.display = 'flex';
+  await loadBusinessUnits();
   await loadBranchesManagement();
 }
+
+async function loadBusinessUnits(selected) {
+  var box = document.getElementById('branchBusinessUnitsInput'); if (!box) return;
+  var units = await api('/api/business-units') || []; selected = selected || [];
+  box.innerHTML = units.map(function(u){ return '<label style="display:flex;gap:4px;align-items:center;font-size:12px"><input type="checkbox" value="'+esc(u)+'" '+(selected.indexOf(u)>=0?'checked':'')+'>'+esc(u)+'</label>'; }).join('') || '<small style="color:var(--fg2)">Belum ada bisnis unit.</small>';
+}
+function selectedBusinessUnits() { return Array.prototype.slice.call(document.querySelectorAll('#branchBusinessUnitsInput input:checked')).map(function(x){return x.value;}); }
+async function addBusinessUnit() { var name=prompt('Nama bisnis unit baru:'); if(!name) return; var r=await api('/api/business-units',{method:'POST',body:JSON.stringify({name:name.trim()})}); if(!r||r.error){alert('Gagal: '+((r&&r.error)||'Terjadi kesalahan'));return;} await loadBusinessUnits(selectedBusinessUnits().concat([name.trim()])); }
 
 function closeBranchesModal() {
   var modal = document.getElementById('branchesModal');
@@ -1433,7 +1442,7 @@ async function loadBranchesManagement() {
   branches.forEach(function(b) { branchManagementRows[b.id] = b; });
   container.innerHTML = '<table class="device-table"><thead><tr><th>Nama Lokasi</th><th>Tipe</th><th>Bisnis Unit</th><th>Aksi</th></tr></thead><tbody>' + branches.map(function(b) {
     var isPusat = b.name === 'Pusat';
-    return '<tr><td><strong>' + esc(b.name) + '</strong></td><td><span class="tag">' + esc(branchTypeLabels[b.type] || b.type) + '</span></td><td>' + esc(b.business_unit || '-') + '</td><td><button class="btn btn-ghost btn-sm" onclick="editBranch(' + b.id + ')">Ubah</button> ' + (isPusat ? '' : '<button class="btn btn-danger btn-sm" onclick="deleteBranch(' + b.id + ')">Hapus</button>') + '</td></tr>';
+    return '<tr><td><strong>' + esc(b.name) + '</strong></td><td><span class="tag">' + esc(branchTypeLabels[b.type] || b.type) + '</span></td><td>' + esc((b.business_units || []).join(', ') || '-') + '</td><td><button class="btn btn-ghost btn-sm" onclick="editBranch(' + b.id + ')">Ubah</button> ' + (isPusat ? '' : '<button class="btn btn-danger btn-sm" onclick="deleteBranch(' + b.id + ')">Hapus</button>') + '</td></tr>';
   }).join('') + '</tbody></table>';
 }
 
@@ -1442,11 +1451,10 @@ async function createBranch() {
   var typeInput = document.getElementById('branchTypeInput');
   var name = (nameInput.value || '').trim();
   if (!name) { alert('Nama lokasi wajib diisi.'); nameInput.focus(); return; }
-  var businessUnit = ((document.getElementById('branchBusinessUnitInput')||{}).value || '').trim();
-  var res = await api('/api/branches', { method:'POST', body:JSON.stringify({ name:name, type:typeInput.value, business_unit:businessUnit }) });
+  var businessUnits = selectedBusinessUnits();
+  var res = await api('/api/branches', { method:'POST', body:JSON.stringify({ name:name, type:typeInput.value, business_units:businessUnits }) });
   if (!res || res.error) { alert('Gagal menambahkan lokasi: ' + ((res && res.error) || 'Terjadi kesalahan')); return; }
   nameInput.value = '';
-  document.getElementById('branchBusinessUnitInput').value = '';
   showToast('Lokasi ' + name + ' berhasil ditambahkan.');
   await Promise.all([loadBranchesManagement(), loadBranches()]);
 }
@@ -1456,15 +1464,14 @@ async function editBranch(id) {
   if (!branch) return;
   var oldName = branch.name;
   var oldType = branch.type;
-  var businessUnit = prompt('Bisnis unit:', branch.business_unit || '');
-  if (businessUnit === null) return;
+  await loadBusinessUnits(branch.business_units || []);
   var name = prompt('Nama lokasi:', oldName);
   if (name === null) return;
   name = name.trim();
   if (!name) { alert('Nama lokasi wajib diisi.'); return; }
   var type = prompt('Tipe lokasi:', oldType);
   if (type === null) return;
-  var res = await api('/api/branches/' + id, { method:'PUT', body:JSON.stringify({ name:name, type:type.trim(), business_unit:businessUnit.trim() }) });
+  var res = await api('/api/branches/' + id, { method:'PUT', body:JSON.stringify({ name:name, type:type.trim(), business_units:selectedBusinessUnits() }) });
   if (!res || res.error) { alert('Gagal mengubah lokasi: ' + ((res && res.error) || 'Terjadi kesalahan')); return; }
   showToast('Lokasi berhasil diperbarui.');
   await Promise.all([loadBranchesManagement(), loadBranches(), loadBranchAssets()]);

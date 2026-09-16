@@ -209,6 +209,7 @@ func (s *Server) ListenAndServe() error {
 	mux.HandleFunc("/api/branches", s.authMiddleware(s.handleBranches))
 	mux.HandleFunc("/api/branches/", s.authMiddleware(s.handleBranchSubroute))
 	mux.HandleFunc("/api/location-types/rename", s.authMiddleware(s.handleLocationTypeRename))
+	mux.HandleFunc("/api/business-units", s.authMiddleware(s.handleBusinessUnits))
 	mux.HandleFunc("/api/branches/stats", s.authMiddleware(s.handleBranchStats))
 	mux.HandleFunc("/api/network-scans", s.authMiddleware(s.handleNetworkScans))
 	mux.HandleFunc("/api/network-scans/", s.authMiddleware(s.handleNetworkScan))
@@ -558,9 +559,10 @@ func (s *Server) handleBranches(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		var req struct {
-			Name         string `json:"name"`
-			Type         string `json:"type"`
-			BusinessUnit string `json:"business_unit"`
+			Name          string   `json:"name"`
+			Type          string   `json:"type"`
+			BusinessUnit  string   `json:"business_unit"`
+			BusinessUnits []string `json:"business_units"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			jsonError(w, "invalid request body", 400)
@@ -578,11 +580,47 @@ func (s *Server) handleBranches(w http.ResponseWriter, r *http.Request) {
 			jsonError(w, err.Error(), 400)
 			return
 		}
+		if err := s.db.SetBranchBusinessUnitsByName(req.Name, req.BusinessUnits); err != nil {
+			jsonError(w, err.Error(), 500)
+			return
+		}
 		jsonResp(w, map[string]string{"status": "created"}, 201)
 
 	default:
 		http.Error(w, "method not allowed", 405)
 	}
+}
+
+func (s *Server) handleBusinessUnits(w http.ResponseWriter, r *http.Request) {
+	if getClaims(r).Role != "admin" {
+		jsonError(w, "only admin can manage business units", 403)
+		return
+	}
+	if r.Method == http.MethodGet {
+		units, err := s.db.ListBusinessUnits()
+		if err != nil {
+			jsonError(w, err.Error(), 500)
+			return
+		}
+		jsonResp(w, units, 200)
+		return
+	}
+	if r.Method == http.MethodPost {
+		var req struct {
+			Name string `json:"name"`
+		}
+		if json.NewDecoder(r.Body).Decode(&req) != nil {
+			jsonError(w, "invalid request body", 400)
+			return
+		}
+		if err := s.db.AddBusinessUnit(req.Name); err != nil {
+			jsonError(w, err.Error(), 400)
+			return
+		}
+		jsonResp(w, map[string]string{"status": "created"}, 201)
+		return
+	}
+	http.Error(w, "method not allowed", 405)
 }
 
 func (s *Server) handleLocationTypeRename(w http.ResponseWriter, r *http.Request) {
@@ -2042,9 +2080,10 @@ func (s *Server) handleBranchSubroute(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodPut:
 		var req struct {
-			Name         string `json:"name"`
-			Type         string `json:"type"`
-			BusinessUnit string `json:"business_unit"`
+			Name          string   `json:"name"`
+			Type          string   `json:"type"`
+			BusinessUnit  string   `json:"business_unit"`
+			BusinessUnits []string `json:"business_units"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			jsonError(w, "invalid request body", 400)
@@ -2053,6 +2092,10 @@ func (s *Server) handleBranchSubroute(w http.ResponseWriter, r *http.Request) {
 		req.Name = strings.TrimSpace(req.Name)
 		if err := s.db.UpdateBranch(id, req.Name, req.Type, req.BusinessUnit); err != nil {
 			jsonError(w, err.Error(), 400)
+			return
+		}
+		if err := s.db.SetBranchBusinessUnits(id, req.BusinessUnits); err != nil {
+			jsonError(w, err.Error(), 500)
 			return
 		}
 		jsonResp(w, map[string]string{"status": "updated"}, 200)

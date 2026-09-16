@@ -153,11 +153,15 @@ func migrate(db *sql.DB) error {
 		created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 	);
 	CREATE INDEX IF NOT EXISTS idx_branches_name ON branches(name);
+	CREATE TABLE IF NOT EXISTS business_units (name TEXT PRIMARY KEY);
+	CREATE TABLE IF NOT EXISTS branch_business_units (branch_id INTEGER NOT NULL, business_unit TEXT NOT NULL, PRIMARY KEY(branch_id, business_unit), FOREIGN KEY(branch_id) REFERENCES branches(id) ON DELETE CASCADE);
 	`
 	if _, err := db.Exec(schema); err != nil {
 		return err
 	}
 	_, _ = db.Exec(`INSERT OR IGNORE INTO branches (name, type) VALUES ('Pusat', 'pusat')`)
+	_, _ = db.Exec(`INSERT OR IGNORE INTO business_units(name) SELECT business_unit FROM branches WHERE TRIM(business_unit) != ''`)
+	_, _ = db.Exec(`INSERT OR IGNORE INTO branch_business_units(branch_id, business_unit) SELECT id, business_unit FROM branches WHERE TRIM(business_unit) != ''`)
 
 	// Dynamic column migrations for existing databases
 	alters := []string{
@@ -440,6 +444,64 @@ func (d *DB) IsTrustedDevice(username, tokenHash string) bool {
 
 func (d *DB) RevokeTrustedDevices(username string) {
 	_, _ = d.db.Exec(`DELETE FROM trusted_devices WHERE username=?`, username)
+}
+
+func (d *DB) ListBusinessUnits() ([]string, error) {
+	rows, err := d.db.Query(`SELECT name FROM business_units ORDER BY name`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var result []string
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			return nil, err
+		}
+		result = append(result, name)
+	}
+	return result, rows.Err()
+}
+
+func (d *DB) AddBusinessUnit(name string) error {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return fmt.Errorf("business unit name is required")
+	}
+	_, err := d.db.Exec(`INSERT INTO business_units(name) VALUES (?)`, name)
+	return err
+}
+
+func (d *DB) SetBranchBusinessUnits(id int64, units []string) error {
+	tx, err := d.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err = tx.Exec(`DELETE FROM branch_business_units WHERE branch_id=?`, id); err != nil {
+		return err
+	}
+	for _, unit := range units {
+		unit = strings.TrimSpace(unit)
+		if unit == "" {
+			continue
+		}
+		if _, err = tx.Exec(`INSERT OR IGNORE INTO business_units(name) VALUES (?)`, unit); err != nil {
+			return err
+		}
+		if _, err = tx.Exec(`INSERT INTO branch_business_units(branch_id, business_unit) VALUES (?, ?)`, id, unit); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+func (d *DB) SetBranchBusinessUnitsByName(name string, units []string) error {
+	var id int64
+	if err := d.db.QueryRow(`SELECT id FROM branches WHERE name=?`, name).Scan(&id); err != nil {
+		return err
+	}
+	return d.SetBranchBusinessUnits(id, units)
 }
 
 func (d *DB) GetUserMFA(username string) (bool, string, error) {
@@ -865,7 +927,7 @@ func (d *DB) SaveSecuritySettings(s models.SecuritySettings) error {
 }
 
 func (d *DB) ListBranches() ([]models.Branch, error) {
-	rows, err := d.db.Query(`SELECT id, name, type, business_unit, created_at FROM branches ORDER BY type ASC, name ASC`)
+	rows, err := d.db.Query(`SELECT b.id, b.name, b.type, COALESCE(GROUP_CONCAT(bbu.business_unit, '|'), ''), b.created_at FROM branches b LEFT JOIN branch_business_units bbu ON bbu.branch_id=b.id GROUP BY b.id ORDER BY b.type ASC, b.name ASC`)
 	if err != nil {
 		return nil, err
 	}
@@ -874,8 +936,12 @@ func (d *DB) ListBranches() ([]models.Branch, error) {
 	var list []models.Branch
 	for rows.Next() {
 		var b models.Branch
-		if err := rows.Scan(&b.ID, &b.Name, &b.Type, &b.BusinessUnit, &b.CreatedAt); err != nil {
+		var units string
+		if err := rows.Scan(&b.ID, &b.Name, &b.Type, &units, &b.CreatedAt); err != nil {
 			return nil, err
+		}
+		if units != "" {
+			b.BusinessUnits = strings.Split(units, "|")
 		}
 		list = append(list, b)
 	}
