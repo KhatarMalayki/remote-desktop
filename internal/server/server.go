@@ -208,6 +208,7 @@ func (s *Server) ListenAndServe() error {
 	mux.HandleFunc("/api/groups", s.authMiddleware(s.handleGroups))
 	mux.HandleFunc("/api/branches", s.authMiddleware(s.handleBranches))
 	mux.HandleFunc("/api/branches/", s.authMiddleware(s.handleBranchSubroute))
+	mux.HandleFunc("/api/location-types/rename", s.authMiddleware(s.handleLocationTypeRename))
 	mux.HandleFunc("/api/branches/stats", s.authMiddleware(s.handleBranchStats))
 	mux.HandleFunc("/api/network-scans", s.authMiddleware(s.handleNetworkScans))
 	mux.HandleFunc("/api/network-scans/", s.authMiddleware(s.handleNetworkScan))
@@ -581,6 +582,35 @@ func (s *Server) handleBranches(w http.ResponseWriter, r *http.Request) {
 	default:
 		http.Error(w, "method not allowed", 405)
 	}
+}
+
+func (s *Server) handleLocationTypeRename(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", 405)
+		return
+	}
+	if getClaims(r).Role != "admin" {
+		jsonError(w, "only admin can manage location types", 403)
+		return
+	}
+	var req struct {
+		OldType string `json:"old_type"`
+		NewType string `json:"new_type"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonError(w, "invalid request body", 400)
+		return
+	}
+	req.OldType, req.NewType = strings.TrimSpace(req.OldType), strings.TrimSpace(req.NewType)
+	if !validBranchType(req.NewType) || req.OldType == "" {
+		jsonError(w, "valid old_type and new_type are required", 400)
+		return
+	}
+	if _, err := s.db.db.Exec(`UPDATE branches SET type=? WHERE type=?`, req.NewType, req.OldType); err != nil {
+		jsonError(w, err.Error(), 500)
+		return
+	}
+	jsonResp(w, map[string]string{"status": "updated"}, 200)
 }
 
 func (s *Server) handleBranchStats(w http.ResponseWriter, r *http.Request) {

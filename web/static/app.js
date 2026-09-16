@@ -1401,6 +1401,21 @@ function closeBranchesModal() {
   if (modal) modal.style.display = 'none';
 }
 
+async function renameLocationType() {
+  var oldType = prompt('Nama tipe saat ini, contoh: Pusat');
+  if (oldType === null) return;
+  oldType = oldType.trim();
+  var newType = prompt('Nama tipe baru, contoh: HO', oldType);
+  if (newType === null) return;
+  newType = newType.trim();
+  if (!oldType || !newType) { alert('Nama tipe wajib diisi.'); return; }
+  if (!confirm('Ubah semua tipe lokasi "' + oldType + '" menjadi "' + newType + '"?')) return;
+  var res = await api('/api/location-types/rename', {method:'POST', body:JSON.stringify({old_type:oldType, new_type:newType})});
+  if (!res || res.error) { alert('Gagal mengubah tipe: ' + ((res&&res.error)||'Terjadi kesalahan')); return; }
+  showToast('Nama tipe lokasi berhasil diperbarui.');
+  await loadBranchesManagement();
+}
+
 async function loadBranchesManagement() {
   var container = document.getElementById('branchesTableContainer');
   if (!container) return;
