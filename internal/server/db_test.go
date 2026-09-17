@@ -658,7 +658,7 @@ func TestAgentPackageDownload(t *testing.T) {
 			data, _ := io.ReadAll(rc)
 			rc.Close()
 			bat := string(data)
-			if strings.Contains(bat, "chr(34)") || !strings.Contains(bat, `cscript //nologo "%~dp0install-startup.vbs"`) || !strings.Contains(bat, "if errorlevel 1") {
+			if strings.Contains(bat, "chr(34)") || !strings.Contains(bat, `cscript //nologo "%~dp0install-startup.vbs"`) || !strings.Contains(bat, "Unblock-File") || !strings.Contains(bat, "if errorlevel 1") {
 				t.Fatalf("installer batch still has unsafe shortcut generation: %s", bat)
 			}
 		}

@@ -2378,6 +2378,17 @@ if not exist "%%~dp0rd-agent.exe" (
     exit /b 1
 )
 
+:: Hapus Mark of the Web dari seluruh file hasil ekstraksi agar Windows tidak
+:: menampilkan Open File - Security Warning setiap kali Agent auto-start.
+set "RD_AGENT_DIR=%%~dp0"
+powershell.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "Get-ChildItem -LiteralPath $env:RD_AGENT_DIR -File | Unblock-File"
+if errorlevel 1 (
+    echo [ERROR] Status blokir file dari internet gagal dihapus.
+    echo Klik kanan rd-agent.exe, pilih Properties, lalu centang Unblock.
+    pause
+    exit /b 1
+)
+
 :: Matikan proses agent lama jika sedang berjalan
 taskkill /f /im rd-agent.exe >nul 2>&1
 

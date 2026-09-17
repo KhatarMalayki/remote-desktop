@@ -1,7 +1,9 @@
 package server
 
 import (
+	"crypto/rand"
 	"database/sql"
+	"encoding/hex"
 	"fmt"
 	"strconv"
 	"strings"
@@ -629,7 +631,11 @@ func (d *DB) ResetUserPassword(id int64, passwordHash string) error {
 
 func (d *DB) CreateManualAsset(a *models.ManualAsset) error {
 	if a.ID == "" {
-		a.ID = fmt.Sprintf("ast-%d", time.Now().UnixNano())
+		idBytes := make([]byte, 12)
+		if _, err := rand.Read(idBytes); err != nil {
+			return fmt.Errorf("generate asset id: %w", err)
+		}
+		a.ID = "ast-" + hex.EncodeToString(idBytes)
 	}
 	if a.VerificationStatus == "" {
 		a.VerificationStatus = "unverified"
