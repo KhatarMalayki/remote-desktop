@@ -2405,29 +2405,24 @@ WshShell.Run chr(34) & WshShell.CurrentDirectory & "\rd-agent.exe" & chr(34), 0,
 			_, _ = fVbs.Write([]byte(vbsContent))
 		}
 
-		// Keep shortcut creation in a real VBS file. Building VBS with CMD echo is
-		// fragile because '&' is a command separator even inside an echoed line.
-		installStartupVBS := `Option Explicit
-Dim shell, fso, agentDir, startupDir, shortcutPath, link
-Set shell = CreateObject("WScript.Shell")
-Set fso = CreateObject("Scripting.FileSystemObject")
-agentDir = fso.GetParentFolderName(WScript.ScriptFullName)
-startupDir = shell.SpecialFolders("Startup")
-shortcutPath = fso.BuildPath(startupDir, "RemoteDesk-Agent.lnk")
-Set link = shell.CreateShortcut(shortcutPath)
-link.TargetPath = shell.ExpandEnvironmentStrings("%SystemRoot%\System32\wscript.exe")
-link.Arguments = Chr(34) & fso.BuildPath(agentDir, "start-hidden.vbs") & Chr(34)
-link.WorkingDirectory = agentDir
-link.WindowStyle = 7
-link.Save
-If Not fso.FileExists(shortcutPath) Then WScript.Quit 1
-WScript.Quit 0
+		installTaskPS := `$ErrorActionPreference = "Stop"
+$agentDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$launcher = Join-Path $agentDir "start-hidden.vbs"
+$taskName = "RemoteDesk Agent"
+$currentUser = [Security.Principal.WindowsIdentity]::GetCurrent().Name
+$action = New-ScheduledTaskAction -Execute "$env:SystemRoot\System32\wscript.exe" -Argument ('"{0}"' -f $launcher) -WorkingDirectory $agentDir
+$trigger = New-ScheduledTaskTrigger -AtLogOn -User $currentUser
+$principal = New-ScheduledTaskPrincipal -UserId $currentUser -LogonType Interactive -RunLevel Highest
+$settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -RestartCount 99 -RestartInterval (New-TimeSpan -Minutes 1) -ExecutionTimeLimit ([TimeSpan]::Zero)
+Unregister-ScheduledTask -TaskName $taskName -Confirm:$false -ErrorAction SilentlyContinue
+Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Description "RemoteDesk unattended remote agent" | Out-Null
+if (-not (Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue)) { throw "Scheduled Task gagal dibuat" }
 `
-		if fStartup, err := zw.Create("install-startup.vbs"); err == nil {
-			_, _ = fStartup.Write([]byte(installStartupVBS))
+		if fTask, err := zw.Create("install-task.ps1"); err == nil {
+			_, _ = fTask.Write([]byte(installTaskPS))
 		}
 
-		// 2. pasang-otomatis.bat (auto-start via Startup folder without requiring Run As Administrator)
+		// 2. pasang-otomatis.bat (one-time elevation, then silent highest-privilege logon task)
 		installBat := fmt.Sprintf(`@echo off
 title Pasang RemoteDesk Agent - %s
 echo =========================================================
@@ -2439,6 +2434,16 @@ if not exist "%%~dp0rd-agent.exe" (
     echo Error: rd-agent.exe tidak ditemukan di folder ini!
     pause
     exit /b 1
+)
+
+:: Akses remote penuh membutuhkan satu kali persetujuan Administrator saat instalasi.
+:: Setelah itu agent selalu berjalan tersembunyi dengan hak tertinggi saat user login.
+fltmc >nul 2>&1
+if errorlevel 1 (
+    set "RD_INSTALLER=%%~f0"
+    set "RD_AGENT_DIR=%%~dp0"
+    powershell.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "Start-Process -FilePath $env:RD_INSTALLER -WorkingDirectory $env:RD_AGENT_DIR -Verb RunAs"
+    exit /b
 )
 
 :: Hapus Mark of the Web dari seluruh file hasil ekstraksi agar Windows tidak
@@ -2455,11 +2460,11 @@ if errorlevel 1 (
 :: Matikan proses agent lama jika sedang berjalan
 taskkill /f /im rd-agent.exe >nul 2>&1
 
-:: Daftarkan ke folder Startup Windows (Otomatis Jalan Tiap Komputer Nyala)
-cscript //nologo "%%~dp0install-startup.vbs"
+:: Migrasikan mekanisme Startup lama ke Scheduled Task interaktif hak tertinggi.
+del "%%APPDATA%%\Microsoft\Windows\Start Menu\Programs\Startup\RemoteDesk-Agent.lnk" >nul 2>&1
+powershell.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "%%~dp0install-task.ps1"
 if errorlevel 1 (
-    echo [ERROR] Shortcut Startup gagal dipasang.
-    echo Pastikan paket sudah diekstrak, lalu jalankan ulang installer.
+    echo [ERROR] Scheduled Task RemoteDesk gagal dipasang.
     pause
     exit /b 1
 )
@@ -2472,13 +2477,13 @@ if errorlevel 1 (
     exit /b 1
 )
 
-echo [OK] Shortcut Startup berhasil dipasang.
+echo [OK] Scheduled Task hak tertinggi berhasil dipasang.
 echo [OK] Agent RemoteDesk sudah aktif di background!
 echo.
 echo =========================================================
 echo   SUKSES!
 echo   Komputer ini sekarang sudah terhubung ke server dan
-echo   akan OTOMATIS JALAN setiap kali komputer dinyalakan.
+echo   akan OTOMATIS JALAN setiap kali user Windows login.
 echo =========================================================
 echo.
 timeout /t 5
@@ -2510,12 +2515,20 @@ if %%ERRORLEVEL%% NEQ 0 (
 			_, _ = fBat.Write([]byte(batContent))
 		}
 
-		// 4. hapus-otomatis.bat (uninstaller from Startup)
+		// 4. hapus-otomatis.bat (uninstaller for scheduled task and legacy Startup)
 		uninstallBat := `@echo off
 title Hapus RemoteDesk Auto-Start
+fltmc >nul 2>&1
+if errorlevel 1 (
+    set "RD_INSTALLER=%~f0"
+    set "RD_AGENT_DIR=%~dp0"
+    powershell.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "Start-Process -FilePath $env:RD_INSTALLER -WorkingDirectory $env:RD_AGENT_DIR -Verb RunAs"
+    exit /b
+)
 echo Mematikan dan mencopot auto-start RemoteDesk...
 taskkill /f /im rd-agent.exe >nul 2>&1
 del "%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup\RemoteDesk-Agent.lnk" >nul 2>&1
+powershell.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "Unregister-ScheduledTask -TaskName 'RemoteDesk Agent' -Confirm:$false -ErrorAction SilentlyContinue"
 echo Selesai! Auto-start telah dihapus.
 pause
 `
@@ -2532,10 +2545,10 @@ Server URL    : %s
 
 CARA PASANG PALING MUDAH:
 1. Ekstrak semua isi file ZIP ini ke salah satu folder (misal: C:\RemoteDesk\).
-2. Cukup KLIK DUA KALI file "pasang-otomatis.bat" (TIDAK PERLU Run as Administrator!).
+2. KLIK DUA KALI file "pasang-otomatis.bat", lalu klik Yes satu kali pada permintaan Administrator.
 3. SELESAI!
    - Agent akan langsung berjalan diam-diam di background (tanpa jendela hitam).
-   - Agent akan OTOMATIS JALAN SENDIRI setiap kali komputer dinyalakan / direstart.
+   - Agent akan OTOMATIS JALAN dengan hak tertinggi setiap kali user Windows login.
 
 KETERANGAN FILE:
 - pasang-otomatis.bat : Mengaktifkan auto-start dan menjalankan agent di background.

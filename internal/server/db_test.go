@@ -644,13 +644,14 @@ func TestAgentPackageDownload(t *testing.T) {
 		if f.Name == "run-agent.bat" {
 			foundBat = true
 		}
-		if f.Name == "install-startup.vbs" {
+		if f.Name == "install-task.ps1" {
 			foundInstaller = true
 			rc, _ := f.Open()
 			data, _ := io.ReadAll(rc)
 			rc.Close()
-			if !strings.Contains(string(data), `SpecialFolders("Startup")`) || !strings.Contains(string(data), `link.Save`) {
-				t.Fatalf("invalid startup installer: %s", string(data))
+			script := string(data)
+			if !strings.Contains(script, `New-ScheduledTaskTrigger -AtLogOn`) || !strings.Contains(script, `-RunLevel Highest`) || !strings.Contains(script, `Register-ScheduledTask`) {
+				t.Fatalf("invalid scheduled task installer: %s", script)
 			}
 		}
 		if f.Name == "pasang-otomatis.bat" {
@@ -658,8 +659,8 @@ func TestAgentPackageDownload(t *testing.T) {
 			data, _ := io.ReadAll(rc)
 			rc.Close()
 			bat := string(data)
-			if strings.Contains(bat, "chr(34)") || !strings.Contains(bat, `cscript //nologo "%~dp0install-startup.vbs"`) || !strings.Contains(bat, "Unblock-File") || !strings.Contains(bat, "if errorlevel 1") {
-				t.Fatalf("installer batch still has unsafe shortcut generation: %s", bat)
+			if !strings.Contains(bat, `-File "%~dp0install-task.ps1"`) || !strings.Contains(bat, "-Verb RunAs") || !strings.Contains(bat, "Unblock-File") || !strings.Contains(bat, "if errorlevel 1") {
+				t.Fatalf("installer batch is missing elevated scheduled-task setup: %s", bat)
 			}
 		}
 		if f.Name == "agent.json" {
