@@ -1436,6 +1436,12 @@ async function loadSecurityLogs() {
       if (l.status === 'success') {
         badgeClass = 'verified';
         label = '&#10004; BERHASIL';
+		} else if (l.status === 'remote_start') {
+			badgeClass = 'verified';
+			label = '&#128421; REMOTE MULAI';
+		} else if (l.status === 'remote_end') {
+			badgeClass = 'unverified';
+			label = '&#9209; REMOTE SELESAI';
       } else if (l.status === 'blocked') {
         badgeClass = 'discrepancy';
         label = '&#9888; BLOCKED (15m)';

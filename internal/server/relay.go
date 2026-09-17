@@ -10,12 +10,19 @@ import (
 )
 
 type relaySession struct {
-	mu       sync.Mutex
-	once     sync.Once
-	deviceID string
-	agent    *websocket.Conn
-	viewer   *websocket.Conn
-	started  bool
+	mu        sync.Mutex
+	once      sync.Once
+	deviceID  string
+	agent     *websocket.Conn
+	viewer    *websocket.Conn
+	started   bool
+	startedAt time.Time
+	audit     relayAudit
+}
+
+type relayAudit struct {
+	onStart func()
+	onEnd   func(time.Duration)
 }
 
 var (
@@ -23,13 +30,13 @@ var (
 	relaySessions = map[string]*relaySession{}
 )
 
-func createViewerRelay(sessionID, deviceID string, conn *websocket.Conn) error {
+func createViewerRelay(sessionID, deviceID string, conn *websocket.Conn, audit relayAudit) error {
 	relayMu.Lock()
 	if _, exists := relaySessions[sessionID]; exists {
 		relayMu.Unlock()
 		return fmt.Errorf("relay session already exists")
 	}
-	sess := &relaySession{deviceID: deviceID, viewer: conn}
+	sess := &relaySession{deviceID: deviceID, viewer: conn, audit: audit}
 	relaySessions[sessionID] = sess
 	relayMu.Unlock()
 
@@ -64,8 +71,13 @@ func attachAgentRelay(sessionID, deviceID string, conn *websocket.Conn) error {
 	}
 	sess.agent = conn
 	sess.started = true
+	sess.startedAt = time.Now()
 	viewer := sess.viewer
+	onStart := sess.audit.onStart
 	sess.mu.Unlock()
+	if onStart != nil {
+		onStart()
+	}
 
 	go pipeRelay(sessionID, sess, conn, viewer)
 	go pipeRelay(sessionID, sess, viewer, conn)
@@ -96,6 +108,8 @@ func closeRelaySession(sessionID string, sess *relaySession) {
 		}
 		relayMu.Unlock()
 		sess.mu.Lock()
+		startedAt := sess.startedAt
+		onEnd := sess.audit.onEnd
 		if sess.viewer != nil {
 			_ = sess.viewer.Close()
 		}
@@ -103,5 +117,8 @@ func closeRelaySession(sessionID string, sess *relaySession) {
 			_ = sess.agent.Close()
 		}
 		sess.mu.Unlock()
+		if !startedAt.IsZero() && onEnd != nil {
+			onEnd(time.Since(startedAt).Round(time.Second))
+		}
 	})
 }

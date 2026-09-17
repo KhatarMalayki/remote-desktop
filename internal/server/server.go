@@ -1414,6 +1414,7 @@ func (s *Server) handleRelayWS(w http.ResponseWriter, r *http.Request) {
 	sessionID := parts[0]
 	role := parts[1]
 	deviceID := strings.TrimSpace(r.URL.Query().Get("device_id"))
+	var audit relayAudit
 	if deviceID == "" {
 		http.Error(w, "device_id is required", http.StatusBadRequest)
 		return
@@ -1447,6 +1448,15 @@ func (s *Server) handleRelayWS(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "device is offline", http.StatusConflict)
 			return
 		}
+		username, ip, userAgent := claims.Username, r.RemoteAddr, r.UserAgent()
+		audit = relayAudit{
+			onStart: func() {
+				_ = s.db.RecordAuthLog(username, ip, "remote_start", "Remote desktop mulai: "+deviceID, userAgent)
+			},
+			onEnd: func(duration time.Duration) {
+				_ = s.db.RecordAuthLog(username, ip, "remote_end", fmt.Sprintf("Remote desktop selesai: %s (%s)", deviceID, duration), userAgent)
+			},
+		}
 	case "agent":
 		if r.URL.Query().Get("key") != s.cfg.APIKey {
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
@@ -1462,7 +1472,7 @@ func (s *Server) handleRelayWS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if role == "viewer" {
-		err = createViewerRelay(sessionID, deviceID, conn)
+		err = createViewerRelay(sessionID, deviceID, conn, audit)
 	} else {
 		err = attachAgentRelay(sessionID, deviceID, conn)
 	}

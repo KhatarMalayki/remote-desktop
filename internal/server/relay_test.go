@@ -56,3 +56,30 @@ func TestRelayRejectsUnauthorizedConnectionsBeforeUpgrade(t *testing.T) {
 		})
 	}
 }
+
+func TestCloseRelaySessionWritesEndAuditOnce(t *testing.T) {
+	startedAt := time.Now().Add(-3 * time.Second)
+	var endCount int
+	var duration time.Duration
+	sess := &relaySession{
+		deviceID:  "device-1",
+		started:   true,
+		startedAt: startedAt,
+		audit: relayAudit{onEnd: func(value time.Duration) {
+			endCount++
+			duration = value
+		}},
+	}
+	relayMu.Lock()
+	relaySessions["audit-session"] = sess
+	relayMu.Unlock()
+
+	closeRelaySession("audit-session", sess)
+	closeRelaySession("audit-session", sess)
+	if endCount != 1 {
+		t.Fatalf("end audit count = %d, want 1", endCount)
+	}
+	if duration < 2*time.Second || duration > 4*time.Second {
+		t.Fatalf("unexpected audited duration: %s", duration)
+	}
+}
