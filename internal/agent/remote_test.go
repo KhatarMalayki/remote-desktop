@@ -1,6 +1,11 @@
 package agent
 
-import "testing"
+import (
+	"bytes"
+	"image"
+	"image/jpeg"
+	"testing"
+)
 
 func TestValidRemoteSessionID(t *testing.T) {
 	tests := []struct {
@@ -20,5 +25,20 @@ func TestValidRemoteSessionID(t *testing.T) {
 				t.Fatalf("validRemoteSessionID(%q) = %v, want %v", test.value, got, test.valid)
 			}
 		})
+	}
+}
+
+func TestEncodeRemoteFrameProducesDecodableJPEG(t *testing.T) {
+	img := image.NewRGBA(image.Rect(0, 0, 320, 180))
+	encoded, err := encodeRemoteFrame(img)
+	if err != nil {
+		t.Fatal(err)
+	}
+	decoded, err := jpeg.Decode(bytes.NewReader(encoded))
+	if err != nil {
+		t.Fatalf("encoded frame is not a JPEG: %v", err)
+	}
+	if decoded.Bounds().Dx() != 320 || decoded.Bounds().Dy() != 180 {
+		t.Fatalf("decoded dimensions = %v, want 320x180", decoded.Bounds())
 	}
 }

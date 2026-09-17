@@ -4,29 +4,41 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"hash/crc32"
 	"image"
 	"image/jpeg"
 	"log"
 	"net/url"
+	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
 	"github.com/kbinani/screenshot"
 )
 
-const remoteFrameInterval = 250 * time.Millisecond
+const remoteFrameInterval = 50 * time.Millisecond
 
 type remoteCommand struct {
-	Type   string  `json:"type"`
-	X      float64 `json:"x"`
-	Y      float64 `json:"y"`
-	Button int     `json:"button"`
-	Key    string  `json:"key"`
-	Code   string  `json:"code"`
-	Ctrl   bool    `json:"ctrl"`
-	Alt    bool    `json:"alt"`
-	Shift  bool    `json:"shift"`
-	Meta   bool    `json:"meta"`
+	Type    string  `json:"type"`
+	X       float64 `json:"x"`
+	Y       float64 `json:"y"`
+	DeltaX  int     `json:"delta_x"`
+	DeltaY  int     `json:"delta_y"`
+	Button  int     `json:"button"`
+	Key     string  `json:"key"`
+	Code    string  `json:"code"`
+	Ctrl    bool    `json:"ctrl"`
+	Alt     bool    `json:"alt"`
+	Shift   bool    `json:"shift"`
+	Meta    bool    `json:"meta"`
+	Monitor int     `json:"monitor"`
+	Text    string  `json:"text"`
+}
+
+type remoteScreenState struct {
+	sync.RWMutex
+	monitor int
+	bounds  image.Rectangle
 }
 
 func validRemoteSessionID(value string) bool {
@@ -42,11 +54,11 @@ func validRemoteSessionID(value string) bool {
 }
 
 func (a *Agent) startRemoteRelay(sessionID string) {
-	if screenshot.NumActiveDisplays() == 0 {
+	monitorCount := screenshot.NumActiveDisplays()
+	if monitorCount == 0 {
 		log.Printf("[remote] no active display is available")
 		return
 	}
-
 	base, err := url.Parse(a.cfg.ServerURL)
 	if err != nil {
 		log.Printf("[remote] invalid server URL: %v", err)
@@ -73,6 +85,7 @@ func (a *Agent) startRemoteRelay(sessionID string) {
 	a.remoteConn = conn
 	a.remoteMu.Unlock()
 	defer func() {
+		releaseRemoteInputs()
 		_ = conn.Close()
 		a.remoteMu.Lock()
 		if a.remoteConn == conn {
@@ -81,11 +94,33 @@ func (a *Agent) startRemoteRelay(sessionID string) {
 		a.remoteMu.Unlock()
 	}()
 
-	bounds := screenshot.GetDisplayBounds(0)
-	ready, _ := json.Marshal(map[string]interface{}{
-		"type": "ready", "width": bounds.Dx(), "height": bounds.Dy(),
-	})
-	if err := conn.WriteMessage(websocket.TextMessage, ready); err != nil {
+	state := &remoteScreenState{monitor: 0, bounds: screenshot.GetDisplayBounds(0)}
+	var writeMu sync.Mutex
+	writeMessage := func(messageType int, payload []byte) error {
+		writeMu.Lock()
+		defer writeMu.Unlock()
+		_ = conn.SetWriteDeadline(time.Now().Add(3 * time.Second))
+		return conn.WriteMessage(messageType, payload)
+	}
+	sendJSON := func(payload interface{}) error {
+		data, marshalErr := json.Marshal(payload)
+		if marshalErr != nil {
+			return marshalErr
+		}
+		return writeMessage(websocket.TextMessage, data)
+	}
+	sendScreenInfo := func() error {
+		state.RLock()
+		monitor, bounds := state.monitor, state.bounds
+		state.RUnlock()
+		monitors := make([]map[string]int, 0, monitorCount)
+		for i := 0; i < monitorCount; i++ {
+			item := screenshot.GetDisplayBounds(i)
+			monitors = append(monitors, map[string]int{"index": i, "width": item.Dx(), "height": item.Dy()})
+		}
+		return sendJSON(map[string]interface{}{"type": "ready", "width": bounds.Dx(), "height": bounds.Dy(), "monitor": monitor, "monitors": monitors})
+	}
+	if err := sendScreenInfo(); err != nil {
 		return
 	}
 
@@ -101,7 +136,33 @@ func (a *Agent) startRemoteRelay(sessionID string) {
 				continue
 			}
 			var command remoteCommand
-			if json.Unmarshal(payload, &command) == nil {
+			if json.Unmarshal(payload, &command) != nil {
+				continue
+			}
+			switch command.Type {
+			case "set_monitor":
+				if command.Monitor >= 0 && command.Monitor < monitorCount {
+					state.Lock()
+					state.monitor = command.Monitor
+					state.bounds = screenshot.GetDisplayBounds(command.Monitor)
+					state.Unlock()
+					_ = sendScreenInfo()
+				}
+			case "clipboard_set":
+				if err := setRemoteClipboard(command.Text); err != nil {
+					_ = sendJSON(map[string]string{"type": "clipboard_error", "message": err.Error()})
+				}
+			case "clipboard_get":
+				text, clipboardErr := getRemoteClipboard()
+				if clipboardErr != nil {
+					_ = sendJSON(map[string]string{"type": "clipboard_error", "message": clipboardErr.Error()})
+				} else {
+					_ = sendJSON(map[string]string{"type": "clipboard", "text": text})
+				}
+			default:
+				state.RLock()
+				bounds := state.bounds
+				state.RUnlock()
 				if inputErr := handleRemoteInput(command, bounds); inputErr != nil {
 					log.Printf("[remote] input ignored: %v", inputErr)
 				}
@@ -111,20 +172,36 @@ func (a *Agent) startRemoteRelay(sessionID string) {
 
 	ticker := time.NewTicker(remoteFrameInterval)
 	defer ticker.Stop()
+	var lastChecksum uint32
+	hasChecksum := false
+	lastSent := time.Time{}
 	for {
 		select {
 		case <-readDone:
 			return
 		case <-ticker.C:
-			frame, captureErr := captureRemoteFrame(bounds)
+			state.RLock()
+			bounds := state.bounds
+			state.RUnlock()
+			img, captureErr := screenshot.CaptureRect(bounds)
 			if captureErr != nil {
 				log.Printf("[remote] screen capture failed: %v", captureErr)
 				return
 			}
-			_ = conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
-			if err := conn.WriteMessage(websocket.BinaryMessage, frame); err != nil {
+			checksum := crc32.ChecksumIEEE(img.Pix)
+			if hasChecksum && checksum == lastChecksum && time.Since(lastSent) < 2*time.Second {
+				continue
+			}
+			frame, encodeErr := encodeRemoteFrame(img)
+			if encodeErr != nil {
+				log.Printf("[remote] frame encoding failed: %v", encodeErr)
 				return
 			}
+			if err := writeMessage(websocket.BinaryMessage, frame); err != nil {
+				return
+			}
+			lastChecksum, hasChecksum = checksum, true
+			lastSent = time.Now()
 		}
 	}
 }
@@ -134,8 +211,12 @@ func captureRemoteFrame(bounds image.Rectangle) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	return encodeRemoteFrame(img)
+}
+
+func encodeRemoteFrame(img image.Image) ([]byte, error) {
 	var frame bytes.Buffer
-	if err := jpeg.Encode(&frame, img, &jpeg.Options{Quality: 55}); err != nil {
+	if err := jpeg.Encode(&frame, img, &jpeg.Options{Quality: 52}); err != nil {
 		return nil, err
 	}
 	return frame.Bytes(), nil

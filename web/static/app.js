@@ -837,99 +837,170 @@ function quickRemote(id) { showPage('remote'); document.getElementById('remoteDe
 function startRemote() {
   var deviceId = document.getElementById('remoteDeviceSelect').value;
   if (!deviceId) { showToast('Select a device first'); return; }
-	if (remoteWS) remoteWS.close();
+  if (remoteWS) remoteWS.close();
   setRemoteStatus('connecting');
 
   var sessionId = 'sess-' + (window.crypto && crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2));
   var proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
   var relayQuery = new URLSearchParams({ token: token, device_id: deviceId });
-  remoteWS = new WebSocket(proto + '//' + location.host + '/ws/relay/' + encodeURIComponent(sessionId) + '/viewer?' + relayQuery.toString());
+  var sessionSocket = new WebSocket(proto + '//' + location.host + '/ws/relay/' + encodeURIComponent(sessionId) + '/viewer?' + relayQuery.toString());
+  remoteWS = sessionSocket;
 
   var container = document.getElementById('remoteContainer');
   container.innerHTML = '<canvas id="remoteCanvas" aria-label="Remote desktop screen"></canvas>';
   var canvas = document.getElementById('remoteCanvas');
-  remoteWS.binaryType = 'arraybuffer';
-	var receivedFrame = false;
-	var connectTimer = setTimeout(function() {
-		if (!receivedFrame && remoteWS) {
-			showToast('Layar device belum merespons. Pastikan agent terbaru aktif pada sesi Windows yang sedang login.');
-			remoteWS.close();
-		}
-	}, 20000);
+  sessionSocket.binaryType = 'arraybuffer';
+  var receivedFrame = false;
+  var decodingFrame = false;
+  var pendingFrame = null;
+  var frameCount = 0;
+  var fpsStarted = performance.now();
+  var pressedKeys = {};
+  var pendingMove = null;
+  var moveScheduled = false;
+  var connectTimer = setTimeout(function() {
+    if (!receivedFrame && remoteWS === sessionSocket) {
+      showToast('Layar device belum merespons. Pastikan agent terbaru aktif pada sesi Windows yang sedang login.');
+      sessionSocket.close();
+    }
+  }, 20000);
 
-  remoteWS.onopen = function() {
+  function sendRemote(payload) {
+    if (sessionSocket.readyState === WebSocket.OPEN) sessionSocket.send(JSON.stringify(payload));
+  }
+
+  function position(e) {
+    var rect = canvas.getBoundingClientRect();
+    return { x: Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width)), y: Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height)) };
+  }
+
+  function renderLatestFrame(buffer) {
+    if (decodingFrame) { pendingFrame = buffer; return; }
+    decodingFrame = true;
+    var blob = new Blob([buffer], { type: 'image/jpeg' });
+    var imageURL = URL.createObjectURL(blob);
+    var img = new Image();
+    img.onload = function() {
+      if (canvas.width !== img.width || canvas.height !== img.height) { canvas.width = img.width; canvas.height = img.height; }
+      canvas.getContext('2d', { alpha: false }).drawImage(img, 0, 0);
+      URL.revokeObjectURL(imageURL);
+      decodingFrame = false;
+      frameCount++;
+      var elapsed = performance.now() - fpsStarted;
+      if (elapsed >= 1000) {
+        document.getElementById('remoteStats').textContent = Math.round(frameCount * 1000 / elapsed) + ' FPS • ' + img.width + '×' + img.height;
+        frameCount = 0; fpsStarted = performance.now();
+      }
+      if (pendingFrame) { var newest = pendingFrame; pendingFrame = null; renderLatestFrame(newest); }
+    };
+    img.onerror = function() { URL.revokeObjectURL(imageURL); decodingFrame = false; };
+    img.src = imageURL;
+  }
+
+  sessionSocket.onopen = function() {
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify({ action: 'signal', data: { type: 'start_relay', to: deviceId, payload: sessionId } }));
-		} else {
-			showToast('Koneksi utama terputus. Muat ulang halaman lalu coba lagi.');
-			remoteWS.close();
+    } else {
+      showToast('Koneksi utama terputus. Muat ulang halaman lalu coba lagi.');
+      sessionSocket.close();
     }
   };
 
-  remoteWS.onmessage = function(e) {
+  sessionSocket.onmessage = function(e) {
     if (e.data instanceof ArrayBuffer) {
-		receivedFrame = true;
-		clearTimeout(connectTimer);
-		setRemoteStatus('connected');
-      var blob = new Blob([e.data], { type: 'image/jpeg' });
-      var url = URL.createObjectURL(blob);
-      var img = new Image();
-      img.onload = function() {
-        canvas.width = img.width; canvas.height = img.height;
-        var ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0);
-        URL.revokeObjectURL(url);
-      };
-      img.src = url;
-	} else {
-		try {
-			var relayMessage = JSON.parse(e.data);
-			if (relayMessage.type === 'ready') setRemoteStatus('connecting');
-			if (relayMessage.type === 'error') showToast(relayMessage.message || 'Remote session gagal dibuat');
-		} catch (_) {}
+      receivedFrame = true;
+      clearTimeout(connectTimer);
+      setRemoteStatus('connected');
+      renderLatestFrame(e.data);
+    } else {
+      try {
+        var relayMessage = JSON.parse(e.data);
+        if (relayMessage.type === 'ready') {
+          var monitorSelect = document.getElementById('remoteMonitorSelect');
+          monitorSelect.innerHTML = '';
+          (relayMessage.monitors || [{ index: 0, width: relayMessage.width, height: relayMessage.height }]).forEach(function(m) {
+            monitorSelect.innerHTML += '<option value="' + m.index + '">Monitor ' + (m.index + 1) + ' (' + m.width + '×' + m.height + ')</option>';
+          });
+          monitorSelect.value = String(relayMessage.monitor || 0);
+        }
+        if (relayMessage.type === 'clipboard') {
+          navigator.clipboard.writeText(relayMessage.text || '').then(function(){ showToast('Clipboard komputer remote sudah disalin ke perangkat ini'); }).catch(function(){ showToast('Browser menolak akses clipboard'); });
+        }
+        if (relayMessage.type === 'clipboard_error' || relayMessage.type === 'error') showToast(relayMessage.message || 'Remote session mengalami masalah');
+      } catch (_) {}
     }
   };
 
-  remoteWS.onerror = function() { showToast('Koneksi remote gagal. Periksa hak akses dan status agent.'); };
-  remoteWS.onclose = function() {
-	clearTimeout(connectTimer);
-	setRemoteStatus('disconnected');
-	document.getElementById('btnConnect').style.display = '';
-	document.getElementById('btnDisconnect').style.display = 'none';
-	};
+  sessionSocket.onerror = function() { if (remoteWS === sessionSocket) showToast('Koneksi remote gagal. Periksa hak akses dan status agent.'); };
+  sessionSocket.onclose = function() {
+    if (remoteWS !== sessionSocket) return;
+    remoteWS = null;
+    clearTimeout(connectTimer);
+    setRemoteStatus('disconnected');
+    setRemoteControls(false);
+  };
 
   canvas.addEventListener('mousemove', function(e) {
-    if (remoteWS && remoteWS.readyState === WebSocket.OPEN) {
-      var rect = canvas.getBoundingClientRect();
-      remoteWS.send(JSON.stringify({ type: 'mouse_move', x: (e.clientX - rect.left)/rect.width, y: (e.clientY - rect.top)/rect.height }));
-    }
+    pendingMove = position(e);
+    if (!moveScheduled) requestAnimationFrame(function() {
+      moveScheduled = false;
+      if (pendingMove) { sendRemote({ type: 'mouse_move', x: pendingMove.x, y: pendingMove.y }); pendingMove = null; }
+    });
+    moveScheduled = true;
   });
 
   canvas.addEventListener('mousedown', function(e) {
-    if (remoteWS && remoteWS.readyState === WebSocket.OPEN) {
-      var rect = canvas.getBoundingClientRect();
-      remoteWS.send(JSON.stringify({ type: 'mouse_click', x: (e.clientX - rect.left)/rect.width, y: (e.clientY - rect.top)/rect.height, button: e.button }));
-    }
+    var p = position(e); sendRemote({ type: 'mouse_down', x: p.x, y: p.y, button: e.button }); canvas.focus(); e.preventDefault();
   });
-	canvas.addEventListener('contextmenu', function(e) { e.preventDefault(); });
+  canvas.addEventListener('mouseup', function(e) { var p = position(e); sendRemote({ type: 'mouse_up', x: p.x, y: p.y, button: e.button }); e.preventDefault(); });
+  canvas.addEventListener('mouseleave', function(e) { if (e.buttons) { var p = position(e); [0,1,2].forEach(function(button){ if (e.buttons & (button === 0 ? 1 : button === 1 ? 4 : 2)) sendRemote({ type: 'mouse_up', x: p.x, y: p.y, button: button }); }); } });
+  canvas.addEventListener('wheel', function(e) { var p = position(e); sendRemote({ type: 'mouse_wheel', x: p.x, y: p.y, delta_x: Math.round(e.deltaX), delta_y: Math.round(e.deltaY) }); e.preventDefault(); }, { passive: false });
+  canvas.addEventListener('contextmenu', function(e) { e.preventDefault(); });
 
   canvas.addEventListener('keydown', function(e) {
-    if (remoteWS && remoteWS.readyState === WebSocket.OPEN) {
-		remoteWS.send(JSON.stringify({ type: 'key_down', key: e.key, code: e.code, ctrl: e.ctrlKey, alt: e.altKey, shift: e.shiftKey, meta: e.metaKey }));
-      e.preventDefault();
-    }
+    if (!pressedKeys[e.code] || e.repeat) { pressedKeys[e.code] = true; sendRemote({ type: 'key_down', key: e.key, code: e.code }); }
+    e.preventDefault();
   });
+  canvas.addEventListener('keyup', function(e) { delete pressedKeys[e.code]; sendRemote({ type: 'key_up', key: e.key, code: e.code }); e.preventDefault(); });
+  canvas.addEventListener('blur', function() { Object.keys(pressedKeys).forEach(function(code){ sendRemote({ type: 'key_up', key: '', code: code }); }); pressedKeys = {}; });
 
   canvas.tabIndex = 1; canvas.focus();
-  document.getElementById('btnConnect').style.display = 'none';
-  document.getElementById('btnDisconnect').style.display = '';
+  setRemoteControls(true);
+}
+
+function setRemoteControls(active) {
+  document.getElementById('btnConnect').style.display = active ? 'none' : '';
+  document.getElementById('btnDisconnect').style.display = active ? '' : 'none';
+  ['remoteMonitorSelect','btnClipboardSend','btnClipboardGet','btnRemoteFullscreen'].forEach(function(id){ document.getElementById(id).style.display = active ? '' : 'none'; });
+  if (!active) document.getElementById('remoteStats').textContent = '';
+}
+
+function changeRemoteMonitor() {
+  var select = document.getElementById('remoteMonitorSelect');
+  if (remoteWS && remoteWS.readyState === WebSocket.OPEN) remoteWS.send(JSON.stringify({ type: 'set_monitor', monitor: Number(select.value) }));
+}
+
+async function sendLocalClipboard() {
+  try {
+    var text = await navigator.clipboard.readText();
+    if (remoteWS && remoteWS.readyState === WebSocket.OPEN) remoteWS.send(JSON.stringify({ type: 'clipboard_set', text: text }));
+    showToast('Clipboard dikirim ke komputer remote');
+  } catch (_) { showToast('Izinkan akses clipboard pada browser terlebih dahulu'); }
+}
+
+function getRemoteClipboardText() {
+  if (remoteWS && remoteWS.readyState === WebSocket.OPEN) remoteWS.send(JSON.stringify({ type: 'clipboard_get' }));
+}
+
+function toggleRemoteFullscreen() {
+  var container = document.getElementById('remoteContainer');
+  if (document.fullscreenElement) document.exitFullscreen(); else container.requestFullscreen().catch(function(){ showToast('Fullscreen tidak diizinkan browser'); });
 }
 
 function stopRemote() {
   if (remoteWS) { remoteWS.close(); remoteWS = null; }
   setRemoteStatus('disconnected');
-  document.getElementById('btnConnect').style.display = '';
-  document.getElementById('btnDisconnect').style.display = 'none';
+  setRemoteControls(false);
   document.getElementById('remoteContainer').innerHTML = '<div class="empty-state"><p>Disconnected</p></div>';
 }
 

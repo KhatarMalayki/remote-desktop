@@ -9,7 +9,7 @@ import (
 	"github.com/user/remote-desktop/internal/server"
 )
 
-var version = "0.1.7"
+var version = "0.1.8"
 
 func main() {
 	addr := flag.String("addr", ":8080", "listen address")
