@@ -35,6 +35,8 @@ type Agent struct {
 	done       chan struct{}
 	updatingMu sync.Mutex
 	isUpdating bool
+	remoteMu   sync.Mutex
+	remoteConn *websocket.Conn
 }
 
 func NewAgent(cfg AgentConfig, version, cfgPath string) *Agent {
@@ -294,7 +296,15 @@ func (a *Agent) handleMessage(raw []byte) {
 		}
 
 	case "signal":
-		log.Printf("[agent] received signal message")
+		var signal struct {
+			Type    string `json:"type"`
+			Payload string `json:"payload"`
+		}
+		if err := json.Unmarshal(msg.Data, &signal); err == nil && signal.Type == "start_relay" && validRemoteSessionID(signal.Payload) {
+			go a.startRemoteRelay(signal.Payload)
+		} else {
+			log.Printf("[agent] ignored invalid signal message")
+		}
 	case "network_scan":
 		var req struct {
 			ScanID string `json:"scan_id"`

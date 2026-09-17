@@ -1,0 +1,58 @@
+package server
+
+import (
+	"net/http"
+	"net/http/httptest"
+	"path/filepath"
+	"testing"
+	"time"
+
+	"github.com/user/remote-desktop/internal/models"
+)
+
+func TestValidRelayID(t *testing.T) {
+	for value, want := range map[string]bool{
+		"sess-123_ABC":    true,
+		"":                false,
+		"../admin":        false,
+		"session?token=x": false,
+	} {
+		if got := validRelayID(value); got != want {
+			t.Fatalf("validRelayID(%q) = %v, want %v", value, got, want)
+		}
+	}
+}
+
+func TestRelayRejectsUnauthorizedConnectionsBeforeUpgrade(t *testing.T) {
+	db, err := NewDB(filepath.Join(t.TempDir(), "relay.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	dev := &models.Device{ID: "device-1", Hostname: "PC Bandung", Branch: "Bandung", GroupName: "Bandung", LastSeen: time.Now(), RegisteredAt: time.Now()}
+	if err := db.UpsertDevice(dev); err != nil {
+		t.Fatal(err)
+	}
+	s := &Server{db: db, hub: NewHub(db), cfg: Config{APIKey: "agent-key", JWTSecret: "jwt-secret"}}
+
+	tests := []struct {
+		name string
+		url  string
+		code int
+	}{
+		{name: "viewer without token", url: "/ws/relay/sess-1/viewer?device_id=device-1", code: http.StatusUnauthorized},
+		{name: "holder cannot remote", url: "/ws/relay/sess-1/viewer?device_id=device-1&token=" + generateToken("holder", "user", "Bandung", "jwt-secret"), code: http.StatusForbidden},
+		{name: "adh other branch", url: "/ws/relay/sess-1/viewer?device_id=device-1&token=" + generateToken("adh-medan", "adh", "Medan", "jwt-secret"), code: http.StatusForbidden},
+		{name: "agent wrong key", url: "/ws/relay/sess-1/agent?device_id=device-1&key=wrong", code: http.StatusUnauthorized},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			recorder := httptest.NewRecorder()
+			s.handleRelayWS(recorder, httptest.NewRequest(http.MethodGet, test.url, nil))
+			if recorder.Code != test.code {
+				t.Fatalf("got status %d, want %d", recorder.Code, test.code)
+			}
+		})
+	}
+}

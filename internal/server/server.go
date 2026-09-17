@@ -1407,19 +1407,82 @@ func (s *Server) handleViewerWS(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleRelayWS(w http.ResponseWriter, r *http.Request) {
 	parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/ws/relay/"), "/")
-	if len(parts) < 2 {
+	if len(parts) != 2 || !validRelayID(parts[0]) {
 		http.Error(w, "bad relay path, use /ws/relay/{session}/{role}", 400)
 		return
 	}
 	sessionID := parts[0]
 	role := parts[1]
+	deviceID := strings.TrimSpace(r.URL.Query().Get("device_id"))
+	if deviceID == "" {
+		http.Error(w, "device_id is required", http.StatusBadRequest)
+		return
+	}
+
+	switch role {
+	case "viewer":
+		claims, ok := parseToken(r.URL.Query().Get("token"), s.cfg.JWTSecret)
+		if !ok {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+		if claims.Role == "viewer" || claims.Role == "user" {
+			http.Error(w, "remote access is not permitted for this role", http.StatusForbidden)
+			return
+		}
+		dev, err := s.db.GetDevice(deviceID)
+		if err != nil {
+			http.Error(w, "device not found", http.StatusNotFound)
+			return
+		}
+		deviceBranch := dev.Branch
+		if deviceBranch == "" {
+			deviceBranch = dev.GroupName
+		}
+		if claims.Role == "adh" && claims.Branch != "" && deviceBranch != claims.Branch {
+			http.Error(w, "device is outside your location", http.StatusForbidden)
+			return
+		}
+		if !s.hub.IsOnline(deviceID) {
+			http.Error(w, "device is offline", http.StatusConflict)
+			return
+		}
+	case "agent":
+		if r.URL.Query().Get("key") != s.cfg.APIKey {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+	default:
+		http.Error(w, "invalid relay role", http.StatusBadRequest)
+		return
+	}
 
 	conn, err := s.upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		return
 	}
+	if role == "viewer" {
+		err = createViewerRelay(sessionID, deviceID, conn)
+	} else {
+		err = attachAgentRelay(sessionID, deviceID, conn)
+	}
+	if err != nil {
+		log.Printf("[relay] rejected %s for %s: %v", role, sessionID, err)
+		_ = conn.WriteMessage(websocket.TextMessage, []byte(`{"type":"error","message":"relay connection rejected"}`))
+		_ = conn.Close()
+	}
+}
 
-	s.hub.HandleRelay(sessionID, role, conn)
+func validRelayID(value string) bool {
+	if value == "" || len(value) > 128 {
+		return false
+	}
+	for _, ch := range value {
+		if (ch < 'a' || ch > 'z') && (ch < 'A' || ch > 'Z') && (ch < '0' || ch > '9') && ch != '-' && ch != '_' {
+			return false
+		}
+	}
+	return true
 }
 
 func (s *Server) handleAgentMessage(c *Client, raw []byte) {

@@ -1,6 +1,7 @@
 package server
 
 import (
+	"fmt"
 	"log"
 	"sync"
 	"time"
@@ -9,9 +10,12 @@ import (
 )
 
 type relaySession struct {
-	mu     sync.Mutex
-	agent  *websocket.Conn
-	viewer *websocket.Conn
+	mu       sync.Mutex
+	once     sync.Once
+	deviceID string
+	agent    *websocket.Conn
+	viewer   *websocket.Conn
+	started  bool
 }
 
 var (
@@ -19,67 +23,85 @@ var (
 	relaySessions = map[string]*relaySession{}
 )
 
-func (h *Hub) HandleRelay(sessionID, role string, conn *websocket.Conn) {
+func createViewerRelay(sessionID, deviceID string, conn *websocket.Conn) error {
 	relayMu.Lock()
-	sess, ok := relaySessions[sessionID]
-	if !ok {
-		sess = &relaySession{}
-		relaySessions[sessionID] = sess
+	if _, exists := relaySessions[sessionID]; exists {
+		relayMu.Unlock()
+		return fmt.Errorf("relay session already exists")
 	}
+	sess := &relaySession{deviceID: deviceID, viewer: conn}
+	relaySessions[sessionID] = sess
 	relayMu.Unlock()
 
-	sess.mu.Lock()
-	switch role {
-	case "agent":
-		sess.agent = conn
-	case "viewer":
-		sess.viewer = conn
+	go func() {
+		time.Sleep(30 * time.Second)
+		sess.mu.Lock()
+		started := sess.started
+		sess.mu.Unlock()
+		if !started {
+			closeRelaySession(sessionID, sess)
+		}
+	}()
+	return nil
+}
+
+func attachAgentRelay(sessionID, deviceID string, conn *websocket.Conn) error {
+	relayMu.Lock()
+	sess := relaySessions[sessionID]
+	relayMu.Unlock()
+	if sess == nil {
+		return fmt.Errorf("relay session not found or expired")
 	}
-	agent := sess.agent
+
+	sess.mu.Lock()
+	if sess.deviceID != deviceID {
+		sess.mu.Unlock()
+		return fmt.Errorf("relay session belongs to another device")
+	}
+	if sess.agent != nil || sess.started {
+		sess.mu.Unlock()
+		return fmt.Errorf("relay agent already connected")
+	}
+	sess.agent = conn
+	sess.started = true
 	viewer := sess.viewer
 	sess.mu.Unlock()
 
-	if agent != nil && viewer != nil {
-		go pipeRelay(sessionID, agent, viewer)
-		go pipeRelay(sessionID, viewer, agent)
-	} else {
-		conn.SetReadDeadline(time.Now().Add(30 * time.Second))
-		for {
-			sess.mu.Lock()
-			agent = sess.agent
-			viewer = sess.viewer
-			sess.mu.Unlock()
-			if agent != nil && viewer != nil {
-				go pipeRelay(sessionID, agent, viewer)
-				go pipeRelay(sessionID, viewer, agent)
-				return
-			}
-			time.Sleep(200 * time.Millisecond)
-			if time.Now().After(time.Now().Add(-30 * time.Second)) {
-				break
-			}
+	go pipeRelay(sessionID, sess, conn, viewer)
+	go pipeRelay(sessionID, sess, viewer, conn)
+	return nil
+}
+
+func pipeRelay(sessionID string, sess *relaySession, src, dst *websocket.Conn) {
+	for {
+		msgType, data, err := src.ReadMessage()
+		if err != nil {
+			log.Printf("[relay] %s read ended: %v", sessionID, err)
+			closeRelaySession(sessionID, sess)
+			return
+		}
+		if err := dst.WriteMessage(msgType, data); err != nil {
+			log.Printf("[relay] %s write ended: %v", sessionID, err)
+			closeRelaySession(sessionID, sess)
+			return
 		}
 	}
 }
 
-func pipeRelay(sessionID string, src, dst *websocket.Conn) {
-	defer func() {
+func closeRelaySession(sessionID string, sess *relaySession) {
+	sess.once.Do(func() {
 		relayMu.Lock()
-		delete(relaySessions, sessionID)
+		if relaySessions[sessionID] == sess {
+			delete(relaySessions, sessionID)
+		}
 		relayMu.Unlock()
-		src.Close()
-		dst.Close()
-	}()
-
-	for {
-		msgType, data, err := src.ReadMessage()
-		if err != nil {
-			log.Printf("[relay] %s read error: %v", sessionID, err)
-			return
+		sess.mu.Lock()
+		if sess.viewer != nil {
+			_ = sess.viewer.Close()
 		}
-		if err := dst.WriteMessage(msgType, data); err != nil {
-			log.Printf("[relay] %s write error: %v", sessionID, err)
-			return
+		if sess.agent != nil {
+			_ = sess.agent.Close()
 		}
-	}
+		sess.mu.Unlock()
+	})
 }

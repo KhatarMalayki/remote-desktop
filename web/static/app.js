@@ -837,26 +837,40 @@ function quickRemote(id) { showPage('remote'); document.getElementById('remoteDe
 function startRemote() {
   var deviceId = document.getElementById('remoteDeviceSelect').value;
   if (!deviceId) { showToast('Select a device first'); return; }
+	if (remoteWS) remoteWS.close();
   setRemoteStatus('connecting');
 
-  var sessionId = 'sess-' + Date.now().toString(36);
+  var sessionId = 'sess-' + (window.crypto && crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2));
   var proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-  remoteWS = new WebSocket(proto + '//' + location.host + '/ws/relay/' + sessionId + '/viewer');
+  var relayQuery = new URLSearchParams({ token: token, device_id: deviceId });
+  remoteWS = new WebSocket(proto + '//' + location.host + '/ws/relay/' + encodeURIComponent(sessionId) + '/viewer?' + relayQuery.toString());
 
   var container = document.getElementById('remoteContainer');
-  container.innerHTML = '<canvas id="remoteCanvas"></canvas>';
+  container.innerHTML = '<canvas id="remoteCanvas" aria-label="Remote desktop screen"></canvas>';
   var canvas = document.getElementById('remoteCanvas');
   remoteWS.binaryType = 'arraybuffer';
+	var receivedFrame = false;
+	var connectTimer = setTimeout(function() {
+		if (!receivedFrame && remoteWS) {
+			showToast('Layar device belum merespons. Pastikan agent terbaru aktif pada sesi Windows yang sedang login.');
+			remoteWS.close();
+		}
+	}, 20000);
 
   remoteWS.onopen = function() {
-    setRemoteStatus('connected');
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify({ action: 'signal', data: { type: 'start_relay', to: deviceId, payload: sessionId } }));
+		} else {
+			showToast('Koneksi utama terputus. Muat ulang halaman lalu coba lagi.');
+			remoteWS.close();
     }
   };
 
   remoteWS.onmessage = function(e) {
     if (e.data instanceof ArrayBuffer) {
+		receivedFrame = true;
+		clearTimeout(connectTimer);
+		setRemoteStatus('connected');
       var blob = new Blob([e.data], { type: 'image/jpeg' });
       var url = URL.createObjectURL(blob);
       var img = new Image();
@@ -867,10 +881,22 @@ function startRemote() {
         URL.revokeObjectURL(url);
       };
       img.src = url;
+	} else {
+		try {
+			var relayMessage = JSON.parse(e.data);
+			if (relayMessage.type === 'ready') setRemoteStatus('connecting');
+			if (relayMessage.type === 'error') showToast(relayMessage.message || 'Remote session gagal dibuat');
+		} catch (_) {}
     }
   };
 
-  remoteWS.onclose = function() { setRemoteStatus('disconnected'); };
+  remoteWS.onerror = function() { showToast('Koneksi remote gagal. Periksa hak akses dan status agent.'); };
+  remoteWS.onclose = function() {
+	clearTimeout(connectTimer);
+	setRemoteStatus('disconnected');
+	document.getElementById('btnConnect').style.display = '';
+	document.getElementById('btnDisconnect').style.display = 'none';
+	};
 
   canvas.addEventListener('mousemove', function(e) {
     if (remoteWS && remoteWS.readyState === WebSocket.OPEN) {
@@ -885,10 +911,11 @@ function startRemote() {
       remoteWS.send(JSON.stringify({ type: 'mouse_click', x: (e.clientX - rect.left)/rect.width, y: (e.clientY - rect.top)/rect.height, button: e.button }));
     }
   });
+	canvas.addEventListener('contextmenu', function(e) { e.preventDefault(); });
 
   canvas.addEventListener('keydown', function(e) {
     if (remoteWS && remoteWS.readyState === WebSocket.OPEN) {
-      remoteWS.send(JSON.stringify({ type: 'key_down', key: e.key, code: e.code }));
+		remoteWS.send(JSON.stringify({ type: 'key_down', key: e.key, code: e.code, ctrl: e.ctrlKey, alt: e.altKey, shift: e.shiftKey, meta: e.metaKey }));
       e.preventDefault();
     }
   });
