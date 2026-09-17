@@ -1,0 +1,133 @@
+//go:build windows
+
+package main
+
+// This service is intentionally only a supervisor.  Windows services run in
+// session 0, which cannot see or control a user's desktop.  The supervisor
+// duplicates its LocalSystem token into the active console session and starts
+// the normal agent there.  Unlike a per-user scheduled task, that worker keeps
+// SYSTEM's access when the console switches to the Winlogon desktop.
+
+import (
+	"fmt"
+	"log"
+	"os"
+	"path/filepath"
+	"sync"
+	"time"
+	"unsafe"
+
+	"golang.org/x/sys/windows"
+	"golang.org/x/sys/windows/svc"
+)
+
+const remoteDeskServiceName = "RemoteDeskAgent"
+
+func runSystemService(configPath string) {
+	isService, err := svc.IsWindowsService()
+	if err != nil {
+		log.Fatalf("cannot detect Windows service context: %v", err)
+	}
+	if !isService {
+		log.Printf("[service] %s must be started by Windows Service Control Manager", remoteDeskServiceName)
+		return
+	}
+	if err := svc.Run(remoteDeskServiceName, &remoteDeskService{configPath: configPath}); err != nil {
+		log.Fatalf("service failed: %v", err)
+	}
+}
+
+type remoteDeskService struct{ configPath string }
+
+func (s *remoteDeskService) Execute(_ []string, requests <-chan svc.ChangeRequest, changes chan<- svc.Status) (bool, uint32) {
+	changes <- svc.Status{State: svc.StartPending}
+	stop := make(chan struct{})
+	var once sync.Once
+	go superviseConsoleWorker(s.configPath, stop)
+	changes <- svc.Status{State: svc.Running, Accepts: svc.AcceptStop | svc.AcceptShutdown}
+	for request := range requests {
+		switch request.Cmd {
+		case svc.Stop, svc.Shutdown:
+			once.Do(func() { close(stop) })
+			changes <- svc.Status{State: svc.StopPending}
+			return false, 0
+		}
+	}
+	return false, 0
+}
+
+func superviseConsoleWorker(configPath string, stop <-chan struct{}) {
+	// A worker is intentionally restarted only after it exits.  It prevents the
+	// service from creating duplicate agents after lock/unlock transitions.
+	for {
+		select {
+		case <-stop:
+			return
+		default:
+		}
+		if err := startConsoleSystemWorker(configPath); err != nil {
+			log.Printf("[service] console worker not started: %v", err)
+		}
+		select {
+		case <-stop:
+			return
+		case <-time.After(10 * time.Second):
+		}
+	}
+}
+
+func startConsoleSystemWorker(configPath string) error {
+	sessionID := windows.WTSGetActiveConsoleSessionId()
+	if sessionID == 0xFFFFFFFF {
+		return fmt.Errorf("no active console session")
+	}
+	exe, err := os.Executable()
+	if err != nil {
+		return err
+	}
+	exe, err = filepath.EvalSymlinks(exe)
+	if err != nil {
+		return err
+	}
+	if configPath == "" {
+		configPath = filepath.Join(filepath.Dir(exe), "agent.json")
+	}
+	if _, err := os.Stat(configPath); err != nil {
+		return fmt.Errorf("agent config unavailable: %w", err)
+	}
+
+	current := windows.GetCurrentProcessToken()
+	var token windows.Token
+	if err := windows.DuplicateTokenEx(current, windows.TOKEN_ALL_ACCESS, nil, windows.SecurityImpersonation, windows.TokenPrimary, &token); err != nil {
+		return err
+	}
+	defer token.Close()
+	if err := windows.SetTokenInformation(token, windows.TokenSessionId, (*byte)(unsafe.Pointer(&sessionID)), uint32(unsafe.Sizeof(sessionID))); err != nil {
+		return err
+	}
+
+	desktop, err := windows.UTF16PtrFromString("winsta0\\Default")
+	if err != nil {
+		return err
+	}
+	command, err := windows.UTF16PtrFromString(fmt.Sprintf("\"%s\" --system-worker --config \"%s\"", exe, configPath))
+	if err != nil {
+		return err
+	}
+	workingDir, err := windows.UTF16PtrFromString(filepath.Dir(exe))
+	if err != nil {
+		return err
+	}
+	startup := &windows.StartupInfo{Cb: uint32(unsafe.Sizeof(windows.StartupInfo{})), Desktop: desktop}
+	var process windows.ProcessInformation
+	if err := windows.CreateProcessAsUser(token, nil, command, nil, nil, false, windows.CREATE_NO_WINDOW|windows.CREATE_UNICODE_ENVIRONMENT, nil, workingDir, startup, &process); err != nil {
+		return err
+	}
+	defer windows.CloseHandle(process.Thread)
+	defer windows.CloseHandle(process.Process)
+	log.Printf("[service] SYSTEM worker started in console session %d (pid %d)", sessionID, process.ProcessId)
+
+	// Wait for the worker to end before the supervisor considers a replacement.
+	_, _ = windows.WaitForSingleObject(process.Process, windows.INFINITE)
+	return nil
+}

@@ -644,14 +644,14 @@ func TestAgentPackageDownload(t *testing.T) {
 		if f.Name == "run-agent.bat" {
 			foundBat = true
 		}
-		if f.Name == "install-task.ps1" {
+		if f.Name == "install-service.ps1" {
 			foundInstaller = true
 			rc, _ := f.Open()
 			data, _ := io.ReadAll(rc)
 			rc.Close()
 			script := string(data)
-			if !strings.Contains(script, `New-ScheduledTaskTrigger -AtLogOn`) || !strings.Contains(script, `-RunLevel Highest`) || !strings.Contains(script, `Register-ScheduledTask`) {
-				t.Fatalf("invalid scheduled task installer: %s", script)
+			if !strings.Contains(script, `sc.exe create`) || !strings.Contains(script, `RemoteDeskAgent`) || !strings.Contains(script, `LocalSystem`) || !strings.Contains(script, `Start-Service`) {
+				t.Fatalf("invalid system service installer: %s", script)
 			}
 		}
 		if f.Name == "pasang-otomatis.bat" {
@@ -659,8 +659,8 @@ func TestAgentPackageDownload(t *testing.T) {
 			data, _ := io.ReadAll(rc)
 			rc.Close()
 			bat := string(data)
-			if !strings.Contains(bat, `-File "%~dp0install-task.ps1"`) || !strings.Contains(bat, "-Verb RunAs") || !strings.Contains(bat, "Unblock-File") || !strings.Contains(bat, "if errorlevel 1") {
-				t.Fatalf("installer batch is missing elevated scheduled-task setup: %s", bat)
+			if !strings.Contains(bat, `-File "%~dp0install-service.ps1"`) || !strings.Contains(bat, "-Verb RunAs") || !strings.Contains(bat, "Unblock-File") || !strings.Contains(bat, "if errorlevel 1") {
+				t.Fatalf("installer batch is missing elevated system-service setup: %s", bat)
 			}
 		}
 		if f.Name == "agent.json" {
@@ -678,6 +678,6 @@ func TestAgentPackageDownload(t *testing.T) {
 	}
 
 	if !foundExe || !foundCfg || !foundBat || !foundInstaller {
-		t.Fatalf("zip archive missing expected files: exe=%v cfg=%v bat=%v startupInstaller=%v", foundExe, foundCfg, foundBat, foundInstaller)
+		t.Fatalf("zip archive missing expected files: exe=%v cfg=%v bat=%v serviceInstaller=%v", foundExe, foundCfg, foundBat, foundInstaller)
 	}
 }

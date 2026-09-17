@@ -202,6 +202,13 @@ func (a *Agent) startRemoteRelay(sessionID string) {
 		case <-readDone:
 			return
 		case <-ticker.C:
+			// On Windows this re-attaches the current OS thread to the desktop
+			// that is actually receiving input. A SYSTEM console worker can then
+			// follow Default <-> Winlogon transitions without dropping the relay.
+			if desktopErr := prepareRemoteDesktop(); desktopErr != nil {
+				log.Printf("[remote] input desktop unavailable: %v", desktopErr)
+				continue
+			}
 			state.RLock()
 			bounds, quality, maxWidth, frameInterval := state.bounds, state.quality, state.maxWidth, state.frameInterval
 			state.RUnlock()

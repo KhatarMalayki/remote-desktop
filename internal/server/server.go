@@ -2415,21 +2415,30 @@ WshShell.Run chr(34) & WshShell.CurrentDirectory & "\rd-agent.exe" & chr(34), 0,
 			_, _ = fVbs.Write([]byte(vbsContent))
 		}
 
-		installTaskPS := `$ErrorActionPreference = "Stop"
-$agentDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$launcher = Join-Path $agentDir "start-hidden.vbs"
-$taskName = "RemoteDesk Agent"
-$currentUser = [Security.Principal.WindowsIdentity]::GetCurrent().Name
-$action = New-ScheduledTaskAction -Execute "$env:SystemRoot\System32\wscript.exe" -Argument ('"{0}"' -f $launcher) -WorkingDirectory $agentDir
-$trigger = New-ScheduledTaskTrigger -AtLogOn -User $currentUser
-$principal = New-ScheduledTaskPrincipal -UserId $currentUser -LogonType Interactive -RunLevel Highest
-$settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -RestartCount 99 -RestartInterval (New-TimeSpan -Minutes 1) -ExecutionTimeLimit ([TimeSpan]::Zero)
-Unregister-ScheduledTask -TaskName $taskName -Confirm:$false -ErrorAction SilentlyContinue
-Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Description "RemoteDesk unattended remote agent" | Out-Null
-if (-not (Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue)) { throw "Scheduled Task gagal dibuat" }
+		installServicePS := `$ErrorActionPreference = "Stop"
+$packageDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$installDir = Join-Path $env:ProgramData "RemoteDesk\Agent"
+$serviceName = "RemoteDeskAgent"
+New-Item -ItemType Directory -Path $installDir -Force | Out-Null
+Copy-Item -LiteralPath (Join-Path $packageDir "rd-agent.exe") -Destination (Join-Path $installDir "rd-agent.exe") -Force
+Copy-Item -LiteralPath (Join-Path $packageDir "agent.json") -Destination (Join-Path $installDir "agent.json") -Force
+$exe = Join-Path $installDir "rd-agent.exe"
+$config = Join-Path $installDir "agent.json"
+$binPath = '"' + $exe + '" --system-service --config "' + $config + '"'
+if (Get-Service -Name $serviceName -ErrorAction SilentlyContinue) {
+    Stop-Service -Name $serviceName -Force -ErrorAction SilentlyContinue
+    & sc.exe delete $serviceName | Out-Null
+    Start-Sleep -Seconds 1
+}
+& sc.exe create $serviceName binPath= $binPath start= auto obj= LocalSystem | Out-Null
+if ($LASTEXITCODE -ne 0) { throw "Windows service gagal dibuat" }
+& sc.exe description $serviceName "RemoteDesk secure desktop remote service" | Out-Null
+& sc.exe failure $serviceName reset= 86400 actions= restart/5000/restart/15000/restart/60000 | Out-Null
+Start-Service -Name $serviceName
+if ((Get-Service -Name $serviceName).Status -ne 'Running') { throw "Windows service gagal dijalankan" }
 `
-		if fTask, err := zw.Create("install-task.ps1"); err == nil {
-			_, _ = fTask.Write([]byte(installTaskPS))
+		if fService, err := zw.Create("install-service.ps1"); err == nil {
+			_, _ = fService.Write([]byte(installServicePS))
 		}
 
 		// 2. pasang-otomatis.bat (one-time elevation, then silent highest-privilege logon task)
@@ -2446,8 +2455,8 @@ if not exist "%%~dp0rd-agent.exe" (
     exit /b 1
 )
 
-:: Akses remote penuh membutuhkan satu kali persetujuan Administrator saat instalasi.
-:: Setelah itu agent selalu berjalan tersembunyi dengan hak tertinggi saat user login.
+:: Remote melalui lock screen membutuhkan Windows service SYSTEM.
+:: Satu kali persetujuan Administrator memasang service ini secara permanen.
 fltmc >nul 2>&1
 if errorlevel 1 (
     set "RD_INSTALLER=%%~f0"
@@ -2470,30 +2479,23 @@ if errorlevel 1 (
 :: Matikan proses agent lama jika sedang berjalan
 taskkill /f /im rd-agent.exe >nul 2>&1
 
-:: Migrasikan mekanisme Startup lama ke Scheduled Task interaktif hak tertinggi.
+:: Hapus mekanisme lama agar tidak ada dua agent untuk device yang sama.
 del "%%APPDATA%%\Microsoft\Windows\Start Menu\Programs\Startup\RemoteDesk-Agent.lnk" >nul 2>&1
-powershell.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "%%~dp0install-task.ps1"
+powershell.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "Unregister-ScheduledTask -TaskName 'RemoteDesk Agent' -Confirm:$false -ErrorAction SilentlyContinue"
+powershell.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "%%~dp0install-service.ps1"
 if errorlevel 1 (
-    echo [ERROR] Scheduled Task RemoteDesk gagal dipasang.
+    echo [ERROR] Windows service RemoteDesk gagal dipasang.
     pause
     exit /b 1
 )
 
-:: Jalankan agent sekarang di background secara silent (tanpa jendela hitam)
-wscript.exe "%%~dp0start-hidden.vbs"
-if errorlevel 1 (
-    echo [ERROR] Agent gagal dijalankan.
-    pause
-    exit /b 1
-)
-
-echo [OK] Scheduled Task hak tertinggi berhasil dipasang.
-echo [OK] Agent RemoteDesk sudah aktif di background!
+echo [OK] Windows service SYSTEM berhasil dipasang.
+echo [OK] Agent RemoteDesk sudah aktif di background, termasuk lock screen.
 echo.
 echo =========================================================
 echo   SUKSES!
 echo   Komputer ini sekarang sudah terhubung ke server dan
-echo   akan OTOMATIS JALAN setiap kali user Windows login.
+echo   tetap dapat diremote saat layar Windows terkunci.
 echo =========================================================
 echo.
 timeout /t 5

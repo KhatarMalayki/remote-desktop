@@ -11,10 +11,13 @@ import (
 )
 
 var (
-	user32DLL      = syscall.NewLazyDLL("user32.dll")
-	setCursorPos   = user32DLL.NewProc("SetCursorPos")
-	mouseEventProc = user32DLL.NewProc("mouse_event")
-	keybdEventProc = user32DLL.NewProc("keybd_event")
+	user32DLL            = syscall.NewLazyDLL("user32.dll")
+	setCursorPos         = user32DLL.NewProc("SetCursorPos")
+	mouseEventProc       = user32DLL.NewProc("mouse_event")
+	keybdEventProc       = user32DLL.NewProc("keybd_event")
+	openInputDesktopProc = user32DLL.NewProc("OpenInputDesktop")
+	setThreadDesktopProc = user32DLL.NewProc("SetThreadDesktop")
+	closeDesktopProc     = user32DLL.NewProc("CloseDesktop")
 )
 
 const (
@@ -22,6 +25,9 @@ const (
 )
 
 func handleRemoteInput(command remoteCommand, bounds image.Rectangle) error {
+	if err := prepareRemoteDesktop(); err != nil {
+		return err
+	}
 	switch command.Type {
 	case "mouse_move":
 		setRemoteCursor(command.X, command.Y, bounds)
@@ -58,6 +64,26 @@ func handleRemoteInput(command remoteCommand, bounds image.Rectangle) error {
 	default:
 		return fmt.Errorf("unsupported command %q", command.Type)
 	}
+}
+
+// prepareRemoteDesktop binds the calling thread to whichever desktop Windows
+// currently exposes for keyboard/mouse input.  A normal user process cannot
+// open Winlogon; the system-worker installed by the service can.  Keeping this
+// here (rather than faking a password field in the web UI) preserves Windows'
+// own credential provider and never sends credentials to our server.
+func prepareRemoteDesktop() error {
+	const desktopReadObjects = 0x0001
+	const desktopWriteObjects = 0x0080
+	const desktopSwitchDesktop = 0x0100
+	desktop, _, openErr := openInputDesktopProc.Call(0, 0, desktopReadObjects|desktopWriteObjects|desktopSwitchDesktop)
+	if desktop == 0 {
+		return fmt.Errorf("cannot access active Windows desktop: %v", openErr)
+	}
+	defer closeDesktopProc.Call(desktop)
+	if ok, _, setErr := setThreadDesktopProc.Call(desktop); ok == 0 {
+		return fmt.Errorf("cannot attach active Windows desktop: %v", setErr)
+	}
+	return nil
 }
 
 func mouseFlags(button int) (uintptr, uintptr) {

@@ -10,7 +10,7 @@ import (
 	"github.com/user/remote-desktop/internal/agent"
 )
 
-var version = "0.2.1"
+var version = "0.2.2"
 
 func main() {
 	serverURL := flag.String("server", envOr("RD_SERVER_URL", ""), "server URL")
@@ -19,7 +19,18 @@ func main() {
 	branch := flag.String("branch", envOr("RD_BRANCH", ""), "branch name (e.g. Medan, Surabaya)")
 	heartbeat := flag.Int("heartbeat", 30, "heartbeat interval in seconds")
 	configFile := flag.String("config", "", "config file path (JSON)")
+	systemService := flag.Bool("system-service", false, "run as the RemoteDesk Windows system service")
+	systemWorker := flag.Bool("system-worker", false, "run as a SYSTEM helper in the active console session")
 	flag.Parse()
+
+	// The service deliberately has no network/relay role of its own.  It only
+	// creates a LocalSystem worker inside the currently active console session.
+	// That is what keeps the capture/input process alive when Windows swaps the
+	// user desktop for the lock / Winlogon desktop.
+	if *systemService {
+		runSystemService(*configFile)
+		return
+	}
 
 	var cfg agent.AgentConfig
 	configPath := *configFile
@@ -73,7 +84,11 @@ func main() {
 		log.Fatal("API key is required (use -key, RD_API_KEY, or agent.json)")
 	}
 
-	log.Printf("[agent] version %s starting...", version)
+	if *systemWorker {
+		log.Printf("[agent] SYSTEM console worker v%s starting...", version)
+	} else {
+		log.Printf("[agent] version %s starting...", version)
+	}
 	a := agent.NewAgent(cfg, version, configPath)
 	a.Run()
 }
