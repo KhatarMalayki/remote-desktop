@@ -28,6 +28,9 @@ type Device struct {
 	VerifiedBy         string     `json:"verified_by"`
 	VerificationNote   string     `json:"verification_note"`
 	Note               string     `json:"note"`
+	AcquisitionYear    int        `json:"acquisition_year"`
+	OwnerUsername      string     `json:"owner_username"`
+	Recommendation     string     `json:"recommendation"`
 	LastSeen           time.Time  `json:"last_seen"`
 	RegisteredAt       time.Time  `json:"registered_at"`
 	Online             bool       `json:"online"`
@@ -49,6 +52,9 @@ type ManualAsset struct {
 	VerifiedAt         *time.Time `json:"verified_at,omitempty"`
 	VerifiedBy         string     `json:"verified_by"`
 	VerificationNote   string     `json:"verification_note"`
+	AcquisitionYear    int        `json:"acquisition_year"`
+	OwnerUsername      string     `json:"owner_username"`
+	Recommendation     string     `json:"recommendation"`
 	CreatedBy          string     `json:"created_by"`
 	CreatedAt          time.Time  `json:"created_at"`
 	UpdatedAt          time.Time  `json:"updated_at"`
@@ -74,6 +80,27 @@ type User struct {
 	Branch     string    `json:"branch"`
 	MFAEnabled bool      `json:"mfa_enabled"`
 	CreatedAt  time.Time `json:"created_at"`
+}
+
+type AssetSwitchRequest struct {
+	SwapAssetID    string     `json:"swap_asset_id"`
+	SwapAssetType  string     `json:"swap_asset_type"`
+	ID             int64      `json:"id"`
+	AssetID        string     `json:"asset_id"`
+	AssetType      string     `json:"asset_type"`
+	AssetName      string     `json:"asset_name"`
+	Branch         string     `json:"branch"`
+	FromOwner      string     `json:"from_owner"`
+	ToOwner        string     `json:"to_owner"`
+	RequestedBy    string     `json:"requested_by"`
+	Reason         string     `json:"reason"`
+	Status         string     `json:"status"`
+	ReviewedBy     string     `json:"reviewed_by"`
+	ReviewedAt     *time.Time `json:"reviewed_at,omitempty"`
+	ReviewNote     string     `json:"review_note"`
+	Responsibility string     `json:"responsibility"`
+	Recommendation string     `json:"recommendation"`
+	CreatedAt      time.Time  `json:"created_at"`
 }
 
 type AuthLog struct {

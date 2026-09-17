@@ -552,3 +552,7 @@ select.filter-select {
 .timeline-item.discrepancy { border-left-color: var(--red); }
 .timeline-meta { color: var(--fg2); font-size: 11px; margin-bottom: 4px; }
 
+/* Ownership and handover notices */
+.asset-advice { margin:10px 0; padding:10px; border-left:3px solid #e6a23c; background:rgba(230,162,60,.08); color:var(--fg2); font-size:12px; line-height:1.6; }
+.switch-entry { padding:14px 0; border-bottom:1px solid var(--border); }
+.switch-entry p { margin:6px 0; font-size:12px; }

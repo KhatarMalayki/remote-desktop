@@ -131,12 +131,13 @@ function updateUserUI() {
 // ==================== INIT ====================
 
 function init() {
+  ownershipUI();
   loadStats();
   loadDevices();
   loadGroups();
   loadBranches();
   loadBranchAssets();
-  connectWS();
+  if (!isAssetUser()) connectWS();
   setInterval(loadStats, 30000);
   setInterval(loadDevices, 30000);
   setInterval(loadBranchAssets, 30000);
@@ -325,6 +326,7 @@ async function loadGroups() {
 // ==================== BRANCH ASSETS & VERIFICATION ====================
 
 async function loadBranches() {
+  if (isAssetUser()) { document.getElementById('branchSelectFilter').innerHTML = '<option value="">Aset Saya</option>'; return; }
   var branches = await api('/api/branches');
   var sel = document.getElementById('branchSelectFilter');
   if (!sel) return;
@@ -361,6 +363,11 @@ async function loadBranchAssets() {
   manualAssets = results[0] || [];
   var stats = results[1];
   if (results[2] && results[2].devices) devices = results[2].devices;
+  if (isAssetUser()) {
+    var owned = manualAssets.concat(devices);
+    stats = {total_assets:owned.length, verified:0, unverified:0, discrepancy:0};
+    owned.forEach(function(a) { var key = a.verification_status || 'unverified'; if (key in stats) stats[key]++; });
+  }
 
   if (stats) {
     document.getElementById('branchStatTotal').textContent = stats.total_assets || 0;
@@ -424,6 +431,22 @@ function renderBranchAssets() {
         (it.isManual ? '<button class="btn-sm-action" onclick="openEditAssetModal(\''+it.id+'\')">&#9998;</button><button class="btn-sm-action" style="color:var(--red)" onclick="deleteManualAsset(\''+it.id+'\')">&#128465;</button>' : '') +
         '</div></td></tr>';
     }).join('') + '</tbody></table>';
+  container.querySelectorAll('tbody tr').forEach(function(row, index) {
+    var item = items[index];
+    var asset = (item.isManual ? manualAssets : devices).find(function(a) { return a.id === item.id; });
+    var actions = row.lastElementChild.firstElementChild;
+    if (isAssetUser() || currentUser.role === 'viewer') actions.innerHTML = '';
+    if (currentUser.role !== 'viewer') {
+      if (isAssetUser() || !item.isManual) {
+        var edit = document.createElement('button'); edit.className = 'btn-sm-action'; edit.textContent = 'Edit';
+        edit.onclick = function() { if (item.isManual) openEditAssetModal(item.id); else openDeviceModal(item.id); }; actions.appendChild(edit);
+      }
+      var button = document.createElement('button'); button.className = 'btn-sm-action'; button.textContent = isAssetUser() ? 'Ajukan Switch' : 'Switch / Tugaskan';
+      button.onclick = function() { requestAssetSwitch(item.isManual ? 'manual' : 'device', item.id); }; actions.appendChild(button);
+    }
+    var holder = document.createElement('div'); holder.textContent = 'Akun pemegang: ' + (asset.owner_username || 'Belum ditugaskan'); row.children[4].appendChild(holder);
+    if (asset.recommendation) { var advice = document.createElement('p'); advice.className = 'asset-advice'; advice.textContent = asset.recommendation; row.children[1].appendChild(advice); }
+  });
 }
 
 // ==================== MANUAL ASSET MODAL ====================
@@ -431,6 +454,8 @@ function renderBranchAssets() {
 function openAddAssetModal() {
   document.getElementById('manualAssetModalTitle').textContent = 'Input Aset Manual Cabang';
   document.getElementById('assetEditId').value = '';
+  document.getElementById('assetAcquisitionYear').value = '';
+  document.getElementById('assetAcquisitionYear').disabled = false;
   document.getElementById('assetTagInput').value = '';
   document.getElementById('assetNameInput').value = '';
   document.getElementById('assetCategoryInput').value = 'pc';
@@ -450,6 +475,9 @@ function openEditAssetModal(id) {
   if (!asset) return;
   document.getElementById('manualAssetModalTitle').textContent = 'Edit Aset Manual';
   document.getElementById('assetEditId').value = asset.id;
+  document.getElementById('assetAcquisitionYear').value = asset.acquisition_year || '';
+  document.getElementById('assetAcquisitionYear').disabled = isAssetUser();
+  ['assetTagInput','assetNameInput','assetCategoryInput','assetBranchInput','assetAssignedInput'].forEach(function(key) { document.getElementById(key).disabled = isAssetUser(); });
   document.getElementById('assetTagInput').value = asset.asset_tag;
   document.getElementById('assetNameInput').value = asset.name;
   document.getElementById('assetCategoryInput').value = asset.category || 'other';
@@ -484,12 +512,15 @@ async function saveManualAsset() {
   if (!assetTag || !name) { alert('Nomor tag dan Nama perangkat wajib diisi!'); return; }
 
   var payload = { asset_tag: assetTag, name: name, category: category, branch: branch || 'Pusat', location: location, assigned_to: assignedTo, serial_number: sn, condition: condition, specs: specs };
+  payload.acquisition_year = Number(document.getElementById('assetAcquisitionYear').value) || 0;
 
   if (id) {
-    await api('/api/assets/manual/' + id, { method: 'PUT', body: JSON.stringify(payload) });
+    var saved = await api('/api/assets/manual/' + id, { method: 'PUT', body: JSON.stringify(payload) });
+    if (!saved || saved.error) { alert(saved && saved.error || 'Gagal menyimpan aset'); return; }
     showToast('Aset diperbarui');
   } else {
-    await api('/api/assets/manual', { method: 'POST', body: JSON.stringify(payload) });
+    var created = await api('/api/assets/manual', { method: 'POST', body: JSON.stringify(payload) });
+    if (!created || created.error) { alert(created && created.error || 'Gagal menyimpan aset'); return; }
     showToast('Aset ditambahkan');
   }
 
@@ -611,7 +642,7 @@ async function createUser() {
   var role = document.getElementById('newUserRole').value;
   var branch = document.getElementById('newUserBranch').value.trim();
   if (!username || !password) { alert('Username dan Password wajib diisi'); return; }
-  if (role === 'adh' && !branch) { alert('Nama cabang wajib diisi untuk ADH'); return; }
+  if ((role === 'adh' || role === 'user') && !branch) { alert('Nama lokasi wajib diisi untuk ADH/User'); return; }
 
   var res = await api('/api/users', { method:'POST', body:JSON.stringify({ username:username, password:password, role:role, branch:branch }) });
   if (res && res.status === 'created') {
@@ -675,6 +706,12 @@ async function openDeviceModal(id) {
   document.getElementById('modalTags').value = dev.tags || '';
   document.getElementById('modalGroup').value = dev.group || 'default';
   document.getElementById('modalNote').value = dev.note || '';
+  document.getElementById('modalAcquisitionYear').value = dev.acquisition_year || '';
+  document.getElementById('modalAcquisitionYear').disabled = isAssetUser();
+  document.getElementById('modalOwnership').textContent = 'Pemegang: ' + (dev.owner_username || 'Belum ditugaskan') + '. ' + (dev.recommendation || '') + ' ' + responsibilityNotice;
+  document.getElementById('modalTags').disabled = isAssetUser();
+  document.getElementById('modalGroup').disabled = isAssetUser();
+  document.querySelectorAll('#deviceModal [onclick="deleteDevice()"], #deviceModal [onclick="startNetworkScan()"]').forEach(function(el) { el.style.display = isAssetUser() ? 'none' : ''; });
   document.getElementById('deviceModal').style.display = 'flex';
 }
 
@@ -711,14 +748,16 @@ function resetIdleTimer() {
 
 async function saveDeviceMeta() {
   if (!currentDevice) return;
-  await api('/api/devices/' + currentDevice.id, {
+  var saved = await api('/api/devices/' + currentDevice.id, {
     method: 'PUT',
     body: JSON.stringify({
       tags: document.getElementById('modalTags').value,
       group: document.getElementById('modalGroup').value,
-      note: document.getElementById('modalNote').value
+      note: document.getElementById('modalNote').value,
+      acquisition_year: Number(document.getElementById('modalAcquisitionYear').value) || 0
     })
   });
+  if (!saved || saved.error) { alert(saved && saved.error || 'Gagal menyimpan perangkat'); return; }
   closeDeviceModal();
   loadDevices();
   loadGroups();

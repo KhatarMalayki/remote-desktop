@@ -53,6 +53,7 @@ func migrate(db *sql.DB) error {
 		verified_by TEXT NOT NULL DEFAULT '',
 		verification_note TEXT NOT NULL DEFAULT '',
 		note TEXT NOT NULL DEFAULT '',
+		owner_username TEXT NOT NULL DEFAULT '',
 		last_seen DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 		registered_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 	);
@@ -105,6 +106,7 @@ func migrate(db *sql.DB) error {
 		verified_at DATETIME,
 		verified_by TEXT NOT NULL DEFAULT '',
 		verification_note TEXT NOT NULL DEFAULT '',
+		owner_username TEXT NOT NULL DEFAULT '',
 		created_by TEXT NOT NULL DEFAULT '',
 		created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 		updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -156,6 +158,26 @@ func migrate(db *sql.DB) error {
 	CREATE TABLE IF NOT EXISTS business_units (name TEXT PRIMARY KEY);
 	CREATE TABLE IF NOT EXISTS branch_business_units (branch_id INTEGER NOT NULL, business_unit TEXT NOT NULL, PRIMARY KEY(branch_id, business_unit), FOREIGN KEY(branch_id) REFERENCES branches(id) ON DELETE CASCADE);
 	CREATE TABLE IF NOT EXISTS asset_deletion_logs (id INTEGER PRIMARY KEY AUTOINCREMENT, asset_id TEXT NOT NULL, asset_type TEXT NOT NULL, asset_name TEXT NOT NULL, branch TEXT NOT NULL, deleted_by TEXT NOT NULL, reason TEXT NOT NULL, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP);
+	CREATE TABLE IF NOT EXISTS asset_switch_requests (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		asset_id TEXT NOT NULL,
+		asset_type TEXT NOT NULL,
+		asset_name TEXT NOT NULL DEFAULT '',
+		branch TEXT NOT NULL DEFAULT '',
+		from_owner TEXT NOT NULL DEFAULT '',
+		to_owner TEXT NOT NULL,
+		requested_by TEXT NOT NULL,
+		reason TEXT NOT NULL DEFAULT '',
+		status TEXT NOT NULL DEFAULT 'pending',
+		reviewed_by TEXT NOT NULL DEFAULT '',
+		reviewed_at DATETIME,
+		review_note TEXT NOT NULL DEFAULT '',
+		responsibility TEXT NOT NULL DEFAULT '',
+		recommendation TEXT NOT NULL DEFAULT '',
+		created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+	);
+	CREATE INDEX IF NOT EXISTS idx_switch_requests_status ON asset_switch_requests(status);
+	CREATE INDEX IF NOT EXISTS idx_switch_requests_branch ON asset_switch_requests(branch);
 	`
 	if _, err := db.Exec(schema); err != nil {
 		return err
@@ -177,6 +199,12 @@ func migrate(db *sql.DB) error {
 		`ALTER TABLE devices ADD COLUMN verified_at DATETIME`,
 		`ALTER TABLE devices ADD COLUMN verified_by TEXT NOT NULL DEFAULT ''`,
 		`ALTER TABLE devices ADD COLUMN verification_note TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE devices ADD COLUMN acquisition_year INTEGER NOT NULL DEFAULT 0`,
+		`ALTER TABLE asset_switch_requests ADD COLUMN swap_asset_id TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE asset_switch_requests ADD COLUMN swap_asset_type TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE manual_assets ADD COLUMN acquisition_year INTEGER NOT NULL DEFAULT 0`,
+		`ALTER TABLE devices ADD COLUMN owner_username TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE manual_assets ADD COLUMN owner_username TEXT NOT NULL DEFAULT ''`,
 	}
 	for _, q := range alters {
 		_, _ = db.Exec(q)
@@ -223,7 +251,7 @@ func (d *DB) GetDevice(id string) (*models.Device, error) {
 	row := d.db.QueryRow(`SELECT id, hostname, os, arch, ip, local_ip, cpu_model, cpu_cores,
 		memory_total, memory_used, disk_total, disk_used, version, status, tags, group_name,
 		branch, verification_status, verified_at, verified_by, verification_note, note,
-		last_seen, registered_at FROM devices WHERE id=?`, id)
+		owner_username, acquisition_year, last_seen, registered_at FROM devices WHERE id=?`, id)
 	return scanDevice(row)
 }
 
@@ -251,7 +279,7 @@ func (d *DB) ListDevices(group, search string, limit, offset int) ([]*models.Dev
 	query := fmt.Sprintf(`SELECT id, hostname, os, arch, ip, local_ip, cpu_model, cpu_cores,
 		memory_total, memory_used, disk_total, disk_used, version, status, tags, group_name,
 		branch, verification_status, verified_at, verified_by, verification_note, note,
-		last_seen, registered_at FROM devices WHERE %s ORDER BY last_seen DESC LIMIT ? OFFSET ?`, where)
+		owner_username, acquisition_year, last_seen, registered_at FROM devices WHERE %s ORDER BY last_seen DESC LIMIT ? OFFSET ?`, where)
 	args = append(args, limit, offset)
 	rows, err := d.db.Query(query, args...)
 	if err != nil {
@@ -270,9 +298,49 @@ func (d *DB) ListDevices(group, search string, limit, offset int) ([]*models.Dev
 	return devices, total, nil
 }
 
-func (d *DB) UpdateDeviceMeta(id, tags, group, note string) error {
+func (d *DB) ListDevicesForOwner(username, search string, limit, offset int) ([]*models.Device, int, error) {
+	where := "owner_username=?"
+	args := []interface{}{username}
+	if search != "" {
+		where += " AND (hostname LIKE ? OR ip LIKE ? OR id LIKE ? OR branch LIKE ?)"
+		s := "%" + search + "%"
+		args = append(args, s, s, s, s)
+	}
+	var total int
+	countArgs := make([]interface{}, len(args))
+	copy(countArgs, args)
+	if err := d.db.QueryRow("SELECT COUNT(*) FROM devices WHERE "+where, countArgs...).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+	query := fmt.Sprintf(`SELECT id, hostname, os, arch, ip, local_ip, cpu_model, cpu_cores,
+		memory_total, memory_used, disk_total, disk_used, version, status, tags, group_name,
+		branch, verification_status, verified_at, verified_by, verification_note, note,
+		owner_username, acquisition_year, last_seen, registered_at FROM devices WHERE %s ORDER BY last_seen DESC LIMIT ? OFFSET ?`, where)
+	args = append(args, limit, offset)
+	rows, err := d.db.Query(query, args...)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+	var devices []*models.Device
+	for rows.Next() {
+		dev, err := scanDeviceRows(rows)
+		if err != nil {
+			return nil, 0, err
+		}
+		devices = append(devices, dev)
+	}
+	return devices, total, nil
+}
+
+func (d *DB) UpdateDeviceMeta(id, tags, group, note, ownerUsername string) error {
 	_, err := d.db.Exec(`UPDATE devices SET tags=?, group_name=?, branch=?, note=? WHERE id=?`,
 		tags, group, group, note, id)
+	return err
+}
+
+func (d *DB) UpdateDeviceOwner(id, ownerUsername string) error {
+	_, err := d.db.Exec(`UPDATE devices SET owner_username=? WHERE id=?`, strings.TrimSpace(ownerUsername), id)
 	return err
 }
 
@@ -403,6 +471,13 @@ func (d *DB) CreateUser(username, passwordHash, role, branch string) error {
 }
 
 func (d *DB) DeleteUser(id int64) error {
+	var assigned int
+	if err := d.db.QueryRow(`SELECT (SELECT COUNT(*) FROM devices WHERE owner_username=u.username) + (SELECT COUNT(*) FROM manual_assets WHERE owner_username=u.username) + (SELECT COUNT(*) FROM asset_switch_requests WHERE status='pending' AND (from_owner=u.username OR to_owner=u.username)) FROM users u WHERE id=?`, id).Scan(&assigned); err != nil {
+		return err
+	}
+	if assigned > 0 {
+		return fmt.Errorf("pindahkan aset dan selesaikan permintaan switch sebelum menghapus akun")
+	}
 	var role string
 	err := d.db.QueryRow(`SELECT role FROM users WHERE id=?`, id).Scan(&role)
 	if err != nil {
@@ -425,8 +500,24 @@ func (d *DB) UpdateUsername(oldUsername, newUsername string) error {
 	if count > 0 {
 		return fmt.Errorf("username '%s' sudah digunakan", newUsername)
 	}
-	_, err := d.db.Exec(`UPDATE users SET username=? WHERE username=?`, newUsername, oldUsername)
-	return err
+	tx, err := d.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	for _, query := range []string{
+		`UPDATE users SET username=? WHERE username=?`,
+		`UPDATE devices SET owner_username=? WHERE owner_username=?`,
+		`UPDATE manual_assets SET owner_username=? WHERE owner_username=?`,
+		`UPDATE asset_switch_requests SET from_owner=? WHERE from_owner=? AND status='pending'`,
+		`UPDATE asset_switch_requests SET to_owner=? WHERE to_owner=? AND status='pending'`,
+		`UPDATE asset_switch_requests SET requested_by=? WHERE requested_by=? AND status='pending'`,
+	} {
+		if _, err := tx.Exec(query, newUsername, oldUsername); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
 }
 
 func (d *DB) UpdatePassword(username, passwordHash string) error {
@@ -556,13 +647,13 @@ func (d *DB) CreateManualAsset(a *models.ManualAsset) error {
 	query := `INSERT INTO manual_assets (
 		id, asset_tag, name, category, branch, location, assigned_to, serial_number,
 		specs, condition, status, verification_status, verified_at, verified_by,
-		verification_note, created_by, created_at, updated_at
-	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+		verification_note, owner_username, acquisition_year, created_by, created_at, updated_at
+	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 
 	_, err := d.db.Exec(query,
 		a.ID, a.AssetTag, a.Name, a.Category, a.Branch, a.Location, a.AssignedTo, a.SerialNumber,
 		a.Specs, a.Condition, a.Status, a.VerificationStatus, a.VerifiedAt, a.VerifiedBy,
-		a.VerificationNote, a.CreatedBy, a.CreatedAt, a.UpdatedAt,
+		a.VerificationNote, a.OwnerUsername, a.AcquisitionYear, a.CreatedBy, a.CreatedAt, a.UpdatedAt,
 	)
 	return err
 }
@@ -571,11 +662,16 @@ func (d *DB) UpdateManualAsset(a *models.ManualAsset) error {
 	a.UpdatedAt = time.Now()
 	query := `UPDATE manual_assets SET
 		asset_tag=?, name=?, category=?, branch=?, location=?, assigned_to=?,
-		serial_number=?, specs=?, condition=?, status=?, updated_at=?
+		serial_number=?, specs=?, condition=?, status=?, acquisition_year=?, updated_at=?
 		WHERE id=?`
 	_, err := d.db.Exec(query,
 		a.AssetTag, a.Name, a.Category, a.Branch, a.Location, a.AssignedTo,
-		a.SerialNumber, a.Specs, a.Condition, a.Status, a.UpdatedAt, a.ID)
+		a.SerialNumber, a.Specs, a.Condition, a.Status, a.AcquisitionYear, a.UpdatedAt, a.ID)
+	return err
+}
+
+func (d *DB) UpdateManualAssetOwner(id, ownerUsername string) error {
+	_, err := d.db.Exec(`UPDATE manual_assets SET owner_username=?, updated_at=? WHERE id=?`, strings.TrimSpace(ownerUsername), time.Now(), id)
 	return err
 }
 
@@ -592,7 +688,7 @@ func (d *DB) RecordAssetDeletion(id, assetType, name, branch, deletedBy, reason 
 func (d *DB) GetManualAsset(id string) (*models.ManualAsset, error) {
 	row := d.db.QueryRow(`SELECT id, asset_tag, name, category, branch, location, assigned_to,
 		serial_number, specs, condition, status, verification_status, verified_at, verified_by,
-		verification_note, created_by, created_at, updated_at
+		verification_note, owner_username, acquisition_year, created_by, created_at, updated_at
 		FROM manual_assets WHERE id=?`, id)
 	return scanManualAsset(row)
 }
@@ -620,7 +716,7 @@ func (d *DB) ListManualAssets(branch, category, verificationStatus, search strin
 
 	query := fmt.Sprintf(`SELECT id, asset_tag, name, category, branch, location, assigned_to,
 		serial_number, specs, condition, status, verification_status, verified_at, verified_by,
-		verification_note, created_by, created_at, updated_at
+		verification_note, owner_username, acquisition_year, created_by, created_at, updated_at
 		FROM manual_assets WHERE %s ORDER BY updated_at DESC`, where)
 
 	rows, err := d.db.Query(query, args...)
@@ -629,6 +725,42 @@ func (d *DB) ListManualAssets(branch, category, verificationStatus, search strin
 	}
 	defer rows.Close()
 
+	var assets []models.ManualAsset
+	for rows.Next() {
+		a, err := scanManualAsset(rows)
+		if err != nil {
+			return nil, err
+		}
+		assets = append(assets, *a)
+	}
+	return assets, nil
+}
+
+func (d *DB) ListManualAssetsForOwner(username, category, verificationStatus, search string) ([]models.ManualAsset, error) {
+	where := "owner_username=?"
+	args := []interface{}{username}
+	if category != "" {
+		where += " AND category=?"
+		args = append(args, category)
+	}
+	if verificationStatus != "" {
+		where += " AND verification_status=?"
+		args = append(args, verificationStatus)
+	}
+	if search != "" {
+		where += " AND (name LIKE ? OR asset_tag LIKE ? OR location LIKE ? OR assigned_to LIKE ? OR serial_number LIKE ?)"
+		s := "%" + search + "%"
+		args = append(args, s, s, s, s, s)
+	}
+	query := fmt.Sprintf(`SELECT id, asset_tag, name, category, branch, location, assigned_to,
+		serial_number, specs, condition, status, verification_status, verified_at, verified_by,
+		verification_note, owner_username, acquisition_year, created_by, created_at, updated_at
+		FROM manual_assets WHERE %s ORDER BY updated_at DESC`, where)
+	rows, err := d.db.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
 	var assets []models.ManualAsset
 	for rows.Next() {
 		a, err := scanManualAsset(rows)
@@ -732,6 +864,152 @@ func (d *DB) GetAssetVerifications(assetID, branch string, limit int) ([]models.
 	return vers, nil
 }
 
+func (d *DB) CreateSwitchRequest(req *models.AssetSwitchRequest) error {
+	if req.Status == "" {
+		req.Status = "pending"
+	}
+	req.CreatedAt = time.Now()
+	result, err := d.db.Exec(`INSERT INTO asset_switch_requests (
+		asset_id, asset_type, asset_name, branch, from_owner, to_owner, requested_by,
+		reason, status, reviewed_by, reviewed_at, review_note, responsibility, recommendation, created_at, swap_asset_id, swap_asset_type
+	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		req.AssetID, req.AssetType, req.AssetName, req.Branch, req.FromOwner, req.ToOwner, req.RequestedBy,
+		req.Reason, req.Status, req.ReviewedBy, req.ReviewedAt, req.ReviewNote, req.Responsibility, req.Recommendation, req.CreatedAt, req.SwapAssetID, req.SwapAssetType)
+	if err == nil {
+		req.ID, err = result.LastInsertId()
+	}
+	return err
+}
+
+func (d *DB) ListSwitchRequests(branch, username, status string, limit int) ([]models.AssetSwitchRequest, error) {
+	where := "1=1"
+	var args []interface{}
+	if branch != "" {
+		where += " AND branch=?"
+		args = append(args, branch)
+	}
+	if username != "" {
+		where += " AND (requested_by=? OR from_owner=? OR to_owner=?)"
+		args = append(args, username, username, username)
+	}
+	if status != "" {
+		where += " AND status=?"
+		args = append(args, status)
+	}
+	if limit <= 0 || limit > 200 {
+		limit = 80
+	}
+	query := fmt.Sprintf(`SELECT id, asset_id, asset_type, asset_name, branch, from_owner, to_owner,
+		requested_by, reason, status, reviewed_by, reviewed_at, review_note, responsibility, recommendation, created_at, swap_asset_id, swap_asset_type
+		FROM asset_switch_requests WHERE %s ORDER BY created_at DESC LIMIT ?`, where)
+	args = append(args, limit)
+	rows, err := d.db.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var list []models.AssetSwitchRequest
+	for rows.Next() {
+		var req models.AssetSwitchRequest
+		var reviewedAt sql.NullTime
+		if err := rows.Scan(&req.ID, &req.AssetID, &req.AssetType, &req.AssetName, &req.Branch, &req.FromOwner, &req.ToOwner,
+			&req.RequestedBy, &req.Reason, &req.Status, &req.ReviewedBy, &reviewedAt, &req.ReviewNote, &req.Responsibility, &req.Recommendation, &req.CreatedAt, &req.SwapAssetID, &req.SwapAssetType); err != nil {
+			return nil, err
+		}
+		if reviewedAt.Valid {
+			req.ReviewedAt = &reviewedAt.Time
+		}
+		list = append(list, req)
+	}
+	return list, rows.Err()
+}
+
+func (d *DB) GetSwitchRequest(id int64) (*models.AssetSwitchRequest, error) {
+	row := d.db.QueryRow(`SELECT id, asset_id, asset_type, asset_name, branch, from_owner, to_owner,
+		requested_by, reason, status, reviewed_by, reviewed_at, review_note, responsibility, recommendation, created_at, swap_asset_id, swap_asset_type
+		FROM asset_switch_requests WHERE id=?`, id)
+	var req models.AssetSwitchRequest
+	var reviewedAt sql.NullTime
+	if err := row.Scan(&req.ID, &req.AssetID, &req.AssetType, &req.AssetName, &req.Branch, &req.FromOwner, &req.ToOwner,
+		&req.RequestedBy, &req.Reason, &req.Status, &req.ReviewedBy, &reviewedAt, &req.ReviewNote, &req.Responsibility, &req.Recommendation, &req.CreatedAt, &req.SwapAssetID, &req.SwapAssetType); err != nil {
+		return nil, err
+	}
+	if reviewedAt.Valid {
+		req.ReviewedAt = &reviewedAt.Time
+	}
+	return &req, nil
+}
+
+func (d *DB) ReviewSwitchRequest(id int64, status, reviewedBy, note string) error {
+	if status != "approved" && status != "rejected" {
+		return fmt.Errorf("invalid switch status")
+	}
+	req, err := d.GetSwitchRequest(id)
+	if err != nil {
+		return err
+	}
+	if req.Status != "pending" {
+		return fmt.Errorf("request already reviewed")
+	}
+	tx, err := d.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	now := time.Now()
+	result, err := tx.Exec(`UPDATE asset_switch_requests SET status=?, reviewed_by=?, reviewed_at=?, review_note=? WHERE id=? AND status='pending'`,
+		status, reviewedBy, now, strings.TrimSpace(note), id)
+	if err != nil {
+		return err
+	}
+	if n, _ := result.RowsAffected(); n != 1 {
+		return fmt.Errorf("request already reviewed")
+	}
+	if status == "approved" {
+		var targetBranch string
+		if err := tx.QueryRow(`SELECT branch FROM users WHERE username=? AND role='user'`, req.ToOwner).Scan(&targetBranch); err != nil || targetBranch != req.Branch {
+			return fmt.Errorf("pemegang tujuan harus akun user di lokasi aset")
+		}
+		switch req.AssetType {
+		case "manual":
+			result, err = tx.Exec(`UPDATE manual_assets SET owner_username=?, assigned_to=?, updated_at=? WHERE id=? AND owner_username=? AND branch=?`, req.ToOwner, req.ToOwner, now, req.AssetID, req.FromOwner, req.Branch)
+		case "device":
+			result, err = tx.Exec(`UPDATE devices SET owner_username=? WHERE id=? AND owner_username=? AND COALESCE(NULLIF(branch,''),group_name)=?`, req.ToOwner, req.AssetID, req.FromOwner, req.Branch)
+		default:
+			return fmt.Errorf("invalid asset type")
+		}
+		if err != nil {
+			return err
+		}
+		if n, _ := result.RowsAffected(); n != 1 {
+			return fmt.Errorf("aset atau pemegang sudah berubah; buat permintaan baru")
+		}
+		if req.SwapAssetID != "" {
+			if req.FromOwner == "" {
+				return fmt.Errorf("aset awal belum memiliki pemegang")
+			}
+			if err := tx.QueryRow(`SELECT branch FROM users WHERE username=? AND role='user'`, req.FromOwner).Scan(&targetBranch); err != nil || targetBranch != req.Branch {
+				return fmt.Errorf("pemegang awal tidak lagi valid")
+			}
+			switch req.SwapAssetType {
+			case "manual":
+				result, err = tx.Exec(`UPDATE manual_assets SET owner_username=?, assigned_to=?, updated_at=? WHERE id=? AND owner_username=? AND branch=?`, req.FromOwner, req.FromOwner, now, req.SwapAssetID, req.ToOwner, req.Branch)
+			case "device":
+				result, err = tx.Exec(`UPDATE devices SET owner_username=? WHERE id=? AND owner_username=? AND COALESCE(NULLIF(branch,''),group_name)=?`, req.FromOwner, req.SwapAssetID, req.ToOwner, req.Branch)
+			default:
+				return fmt.Errorf("invalid swap asset type")
+			}
+			if err != nil {
+				return err
+			}
+			if n, _ := result.RowsAffected(); n != 1 {
+				return fmt.Errorf("aset pengganti sudah berubah; buat permintaan baru")
+			}
+		}
+	}
+	return tx.Commit()
+}
+
 func (d *DB) GetBranchStats(branch string) (map[string]interface{}, error) {
 	whereManual := "1=1"
 	whereDevice := "1=1"
@@ -813,7 +1091,7 @@ func scanDevice(row scanner) (*models.Device, error) {
 		&dev.CPUModel, &dev.CPUCores, &dev.MemoryTotal, &dev.MemoryUsed,
 		&dev.DiskTotal, &dev.DiskUsed, &dev.Version, &dev.Status,
 		&dev.Tags, &dev.GroupName, &dev.Branch, &dev.VerificationStatus, &vAt,
-		&dev.VerifiedBy, &dev.VerificationNote, &dev.Note, &dev.LastSeen, &dev.RegisteredAt)
+		&dev.VerifiedBy, &dev.VerificationNote, &dev.Note, &dev.OwnerUsername, &dev.AcquisitionYear, &dev.LastSeen, &dev.RegisteredAt)
 	if err != nil {
 		return nil, err
 	}
@@ -839,7 +1117,7 @@ func scanManualAsset(row scanner) (*models.ManualAsset, error) {
 	err := row.Scan(&a.ID, &a.AssetTag, &a.Name, &a.Category, &a.Branch, &a.Location,
 		&a.AssignedTo, &a.SerialNumber, &a.Specs, &a.Condition, &a.Status,
 		&a.VerificationStatus, &vAt, &a.VerifiedBy, &a.VerificationNote,
-		&a.CreatedBy, &a.CreatedAt, &a.UpdatedAt)
+		&a.OwnerUsername, &a.AcquisitionYear, &a.CreatedBy, &a.CreatedAt, &a.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
