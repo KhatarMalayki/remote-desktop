@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>RemoteDesk - Device & Branch Asset Management</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%234f8cff'><rect x='2' y='3' width='20' height='14' rx='2' fill='%234f8cff'/><rect x='4' y='5' width='16' height='10' fill='%230f1117'/><rect x='8' y='19' width='8' height='2' rx='1' fill='%234f8cff'/><rect x='11' y='17' width='2' height='2' fill='%234f8cff'/></svg>">
-  <link rel="stylesheet" href="/static/style.css?v=0.1.8">
+  <link rel="stylesheet" href="/static/style.css?v=0.1.9">
   <script src="/static/qrcode.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 </head>
@@ -54,7 +54,7 @@
   <aside class="sidebar">
     <div class="sidebar-logo">
       <h1>&#128421; RemoteDesk</h1>
-      <small id="sidebarVersion">Server v0.1.8 &bull; Enterprise Asset</small>
+      <small id="sidebarVersion">Server v0.1.9 &bull; Enterprise Asset</small>
     </div>
 
     <div class="sidebar-section-title">Menu Utama</div>
@@ -270,6 +270,12 @@
         <button class="btn btn-primary" id="btnConnect" onclick="startRemote()">&#9654; Connect</button>
         <button class="btn btn-danger" id="btnDisconnect" onclick="stopRemote()" style="display:none">&#9632; Disconnect</button>
         <select class="filter-select" id="remoteMonitorSelect" onchange="changeRemoteMonitor()" style="display:none;min-width:130px"></select>
+        <select class="filter-select" id="remoteQualitySelect" onchange="changeRemoteQuality()" style="display:none;min-width:135px">
+          <option value="smooth">Lancar</option><option value="balanced" selected>Seimbang</option><option value="sharp">Tajam</option>
+        </select>
+        <select class="filter-select" id="remoteShortcutSelect" onchange="sendRemoteShortcut()" style="display:none;min-width:145px">
+          <option value="">Kirim Shortcut...</option><option value="alt-tab">Alt + Tab</option><option value="task-manager">Task Manager</option><option value="win-d">Tampilkan Desktop</option>
+        </select>
         <button class="btn btn-ghost" id="btnClipboardSend" onclick="sendLocalClipboard()" style="display:none">Kirim Clipboard</button>
         <button class="btn btn-ghost" id="btnClipboardGet" onclick="getRemoteClipboardText()" style="display:none">Ambil Clipboard</button>
         <button class="btn btn-ghost" id="btnRemoteFullscreen" onclick="toggleRemoteFullscreen()" style="display:none">Fullscreen</button>
@@ -713,8 +719,8 @@
 <div id="switchHistoryModal" class="modal-overlay" style="display:none" onclick="if(event.target===this)this.style.display='none'">
   <div class="modal" style="max-width:850px"><h3>Switch Aset & Approval</h3><p class="asset-advice">Perubahan pemegang dari user berlaku setelah disetujui ADH. Riwayat serah terima tersimpan di sini.</p><div id="switchHistoryContent"></div><div class="modal-actions"><button class="btn btn-ghost" onclick="document.getElementById('switchHistoryModal').style.display='none'">Tutup</button></div></div>
 </div>
-<script src="/static/ownership.js?v=0.1.8"></script>
-<script src="/static/app.js?v=0.1.8"></script>
+<script src="/static/ownership.js?v=0.1.9"></script>
+<script src="/static/app.js?v=0.1.9"></script>
 </body>
 </html>
 

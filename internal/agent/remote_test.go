@@ -42,3 +42,18 @@ func TestEncodeRemoteFrameProducesDecodableJPEG(t *testing.T) {
 		t.Fatalf("decoded dimensions = %v, want 320x180", decoded.Bounds())
 	}
 }
+
+func TestEncodeRemoteFrameProfileDownscalesLargeDesktop(t *testing.T) {
+	img := image.NewRGBA(image.Rect(0, 0, 3840, 2160))
+	encoded, err := encodeRemoteFrameProfile(img, 42, 1280)
+	if err != nil {
+		t.Fatal(err)
+	}
+	decoded, err := jpeg.Decode(bytes.NewReader(encoded))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if decoded.Bounds().Dx() != 1280 || decoded.Bounds().Dy() != 720 {
+		t.Fatalf("scaled dimensions = %v, want 1280x720", decoded.Bounds())
+	}
+}

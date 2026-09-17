@@ -14,31 +14,37 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/kbinani/screenshot"
+	"golang.org/x/image/draw"
 )
 
-const remoteFrameInterval = 50 * time.Millisecond
+const remoteFrameTick = 25 * time.Millisecond
 
 type remoteCommand struct {
-	Type    string  `json:"type"`
-	X       float64 `json:"x"`
-	Y       float64 `json:"y"`
-	DeltaX  int     `json:"delta_x"`
-	DeltaY  int     `json:"delta_y"`
-	Button  int     `json:"button"`
-	Key     string  `json:"key"`
-	Code    string  `json:"code"`
-	Ctrl    bool    `json:"ctrl"`
-	Alt     bool    `json:"alt"`
-	Shift   bool    `json:"shift"`
-	Meta    bool    `json:"meta"`
-	Monitor int     `json:"monitor"`
-	Text    string  `json:"text"`
+	Type    string   `json:"type"`
+	X       float64  `json:"x"`
+	Y       float64  `json:"y"`
+	DeltaX  int      `json:"delta_x"`
+	DeltaY  int      `json:"delta_y"`
+	Button  int      `json:"button"`
+	Key     string   `json:"key"`
+	Code    string   `json:"code"`
+	Ctrl    bool     `json:"ctrl"`
+	Alt     bool     `json:"alt"`
+	Shift   bool     `json:"shift"`
+	Meta    bool     `json:"meta"`
+	Monitor int      `json:"monitor"`
+	Text    string   `json:"text"`
+	Profile string   `json:"profile"`
+	Keys    []string `json:"keys"`
 }
 
 type remoteScreenState struct {
 	sync.RWMutex
-	monitor int
-	bounds  image.Rectangle
+	monitor       int
+	bounds        image.Rectangle
+	quality       int
+	maxWidth      int
+	frameInterval time.Duration
 }
 
 func validRemoteSessionID(value string) bool {
@@ -94,7 +100,7 @@ func (a *Agent) startRemoteRelay(sessionID string) {
 		a.remoteMu.Unlock()
 	}()
 
-	state := &remoteScreenState{monitor: 0, bounds: screenshot.GetDisplayBounds(0)}
+	state := &remoteScreenState{monitor: 0, bounds: screenshot.GetDisplayBounds(0), quality: 52, maxWidth: 1600, frameInterval: 60 * time.Millisecond}
 	var writeMu sync.Mutex
 	writeMessage := func(messageType int, payload []byte) error {
 		writeMu.Lock()
@@ -159,6 +165,21 @@ func (a *Agent) startRemoteRelay(sessionID string) {
 				} else {
 					_ = sendJSON(map[string]string{"type": "clipboard", "text": text})
 				}
+			case "set_quality":
+				state.Lock()
+				switch command.Profile {
+				case "smooth":
+					state.quality, state.maxWidth, state.frameInterval = 42, 1280, 50*time.Millisecond
+				case "sharp":
+					state.quality, state.maxWidth, state.frameInterval = 68, 2560, 100*time.Millisecond
+				default:
+					state.quality, state.maxWidth, state.frameInterval = 52, 1600, 60*time.Millisecond
+				}
+				state.Unlock()
+			case "hotkey":
+				if inputErr := sendRemoteHotkey(command.Keys); inputErr != nil {
+					_ = sendJSON(map[string]string{"type": "input_error", "message": inputErr.Error()})
+				}
 			default:
 				state.RLock()
 				bounds := state.bounds
@@ -170,19 +191,24 @@ func (a *Agent) startRemoteRelay(sessionID string) {
 		}
 	}()
 
-	ticker := time.NewTicker(remoteFrameInterval)
+	ticker := time.NewTicker(remoteFrameTick)
 	defer ticker.Stop()
 	var lastChecksum uint32
 	hasChecksum := false
 	lastSent := time.Time{}
+	lastCapture := time.Time{}
 	for {
 		select {
 		case <-readDone:
 			return
 		case <-ticker.C:
 			state.RLock()
-			bounds := state.bounds
+			bounds, quality, maxWidth, frameInterval := state.bounds, state.quality, state.maxWidth, state.frameInterval
 			state.RUnlock()
+			if time.Since(lastCapture) < frameInterval {
+				continue
+			}
+			lastCapture = time.Now()
 			img, captureErr := screenshot.CaptureRect(bounds)
 			if captureErr != nil {
 				log.Printf("[remote] screen capture failed: %v", captureErr)
@@ -192,7 +218,7 @@ func (a *Agent) startRemoteRelay(sessionID string) {
 			if hasChecksum && checksum == lastChecksum && time.Since(lastSent) < 2*time.Second {
 				continue
 			}
-			frame, encodeErr := encodeRemoteFrame(img)
+			frame, encodeErr := encodeRemoteFrameProfile(img, quality, maxWidth)
 			if encodeErr != nil {
 				log.Printf("[remote] frame encoding failed: %v", encodeErr)
 				return
@@ -215,8 +241,18 @@ func captureRemoteFrame(bounds image.Rectangle) ([]byte, error) {
 }
 
 func encodeRemoteFrame(img image.Image) ([]byte, error) {
+	return encodeRemoteFrameProfile(img, 52, 0)
+}
+
+func encodeRemoteFrameProfile(img image.Image, quality, maxWidth int) ([]byte, error) {
+	if maxWidth > 0 && img.Bounds().Dx() > maxWidth {
+		height := img.Bounds().Dy() * maxWidth / img.Bounds().Dx()
+		resized := image.NewRGBA(image.Rect(0, 0, maxWidth, height))
+		draw.CatmullRom.Scale(resized, resized.Bounds(), img, img.Bounds(), draw.Over, nil)
+		img = resized
+	}
 	var frame bytes.Buffer
-	if err := jpeg.Encode(&frame, img, &jpeg.Options{Quality: 52}); err != nil {
+	if err := jpeg.Encode(&frame, img, &jpeg.Options{Quality: quality}); err != nil {
 		return nil, err
 	}
 	return frame.Bytes(), nil

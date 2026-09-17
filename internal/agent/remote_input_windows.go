@@ -80,6 +80,25 @@ func releaseRemoteInputs() {
 	}
 }
 
+func sendRemoteHotkey(keys []string) error {
+	if len(keys) == 0 || len(keys) > 6 {
+		return fmt.Errorf("shortcut remote tidak valid")
+	}
+	virtualKeys := make([]uintptr, 0, len(keys))
+	for _, code := range keys {
+		vk, ok := windowsVirtualKey(code, "")
+		if !ok {
+			return fmt.Errorf("tombol shortcut tidak didukung: %s", code)
+		}
+		virtualKeys = append(virtualKeys, vk)
+		keybdEventProc.Call(vk, 0, 0, 0)
+	}
+	for i := len(virtualKeys) - 1; i >= 0; i-- {
+		keybdEventProc.Call(virtualKeys[i], 0, keyEventKeyUp, 0)
+	}
+	return nil
+}
+
 func setRemoteCursor(x, y float64, bounds image.Rectangle) {
 	if x < 0 {
 		x = 0

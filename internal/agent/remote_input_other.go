@@ -13,6 +13,10 @@ func handleRemoteInput(command remoteCommand, bounds image.Rectangle) error {
 
 func releaseRemoteInputs() {}
 
+func sendRemoteHotkey(keys []string) error {
+	return fmt.Errorf("remote hotkeys are only supported on Windows")
+}
+
 func setRemoteClipboard(text string) error {
 	return fmt.Errorf("clipboard is only supported on Windows")
 }

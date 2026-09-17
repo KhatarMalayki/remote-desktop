@@ -926,7 +926,7 @@ function startRemote() {
         if (relayMessage.type === 'clipboard') {
           navigator.clipboard.writeText(relayMessage.text || '').then(function(){ showToast('Clipboard komputer remote sudah disalin ke perangkat ini'); }).catch(function(){ showToast('Browser menolak akses clipboard'); });
         }
-        if (relayMessage.type === 'clipboard_error' || relayMessage.type === 'error') showToast(relayMessage.message || 'Remote session mengalami masalah');
+        if (relayMessage.type === 'clipboard_error' || relayMessage.type === 'input_error' || relayMessage.type === 'error') showToast(relayMessage.message || 'Remote session mengalami masalah');
       } catch (_) {}
     }
   };
@@ -971,13 +971,32 @@ function startRemote() {
 function setRemoteControls(active) {
   document.getElementById('btnConnect').style.display = active ? 'none' : '';
   document.getElementById('btnDisconnect').style.display = active ? '' : 'none';
-  ['remoteMonitorSelect','btnClipboardSend','btnClipboardGet','btnRemoteFullscreen'].forEach(function(id){ document.getElementById(id).style.display = active ? '' : 'none'; });
+  ['remoteMonitorSelect','remoteQualitySelect','remoteShortcutSelect','btnClipboardSend','btnClipboardGet','btnRemoteFullscreen'].forEach(function(id){ document.getElementById(id).style.display = active ? '' : 'none'; });
   if (!active) document.getElementById('remoteStats').textContent = '';
 }
 
 function changeRemoteMonitor() {
   var select = document.getElementById('remoteMonitorSelect');
   if (remoteWS && remoteWS.readyState === WebSocket.OPEN) remoteWS.send(JSON.stringify({ type: 'set_monitor', monitor: Number(select.value) }));
+}
+
+function changeRemoteQuality() {
+  var profile = document.getElementById('remoteQualitySelect').value;
+  if (remoteWS && remoteWS.readyState === WebSocket.OPEN) remoteWS.send(JSON.stringify({ type: 'set_quality', profile: profile }));
+}
+
+function sendRemoteShortcut() {
+  var select = document.getElementById('remoteShortcutSelect');
+  var shortcuts = {
+    'alt-tab': ['AltLeft', 'Tab'],
+    'task-manager': ['ControlLeft', 'ShiftLeft', 'Escape'],
+    'win-d': ['MetaLeft', 'KeyD']
+  };
+  if (shortcuts[select.value] && remoteWS && remoteWS.readyState === WebSocket.OPEN) {
+    remoteWS.send(JSON.stringify({ type: 'hotkey', keys: shortcuts[select.value] }));
+    document.getElementById('remoteCanvas').focus();
+  }
+  select.value = '';
 }
 
 async function sendLocalClipboard() {
