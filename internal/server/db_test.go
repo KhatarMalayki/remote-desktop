@@ -632,6 +632,7 @@ func TestAgentPackageDownload(t *testing.T) {
 	foundExe := false
 	foundCfg := false
 	foundBat := false
+	foundInstaller := false
 
 	for _, f := range zr.File {
 		if f.Name == "rd-agent.exe" {
@@ -639,6 +640,24 @@ func TestAgentPackageDownload(t *testing.T) {
 		}
 		if f.Name == "run-agent.bat" {
 			foundBat = true
+		}
+		if f.Name == "install-startup.vbs" {
+			foundInstaller = true
+			rc, _ := f.Open()
+			data, _ := io.ReadAll(rc)
+			rc.Close()
+			if !strings.Contains(string(data), `SpecialFolders("Startup")`) || !strings.Contains(string(data), `link.Save`) {
+				t.Fatalf("invalid startup installer: %s", string(data))
+			}
+		}
+		if f.Name == "pasang-otomatis.bat" {
+			rc, _ := f.Open()
+			data, _ := io.ReadAll(rc)
+			rc.Close()
+			bat := string(data)
+			if strings.Contains(bat, "chr(34)") || !strings.Contains(bat, `cscript //nologo "%~dp0install-startup.vbs"`) || !strings.Contains(bat, "if errorlevel 1") {
+				t.Fatalf("installer batch still has unsafe shortcut generation: %s", bat)
+			}
 		}
 		if f.Name == "agent.json" {
 			foundCfg = true
@@ -654,7 +673,7 @@ func TestAgentPackageDownload(t *testing.T) {
 		}
 	}
 
-	if !foundExe || !foundCfg || !foundBat {
-		t.Fatalf("zip archive missing expected files: exe=%v cfg=%v bat=%v", foundExe, foundCfg, foundBat)
+	if !foundExe || !foundCfg || !foundBat || !foundInstaller {
+		t.Fatalf("zip archive missing expected files: exe=%v cfg=%v bat=%v startupInstaller=%v", foundExe, foundCfg, foundBat, foundInstaller)
 	}
 }

@@ -2342,6 +2342,28 @@ WshShell.Run chr(34) & WshShell.CurrentDirectory & "\rd-agent.exe" & chr(34), 0,
 			_, _ = fVbs.Write([]byte(vbsContent))
 		}
 
+		// Keep shortcut creation in a real VBS file. Building VBS with CMD echo is
+		// fragile because '&' is a command separator even inside an echoed line.
+		installStartupVBS := `Option Explicit
+Dim shell, fso, agentDir, startupDir, shortcutPath, link
+Set shell = CreateObject("WScript.Shell")
+Set fso = CreateObject("Scripting.FileSystemObject")
+agentDir = fso.GetParentFolderName(WScript.ScriptFullName)
+startupDir = shell.SpecialFolders("Startup")
+shortcutPath = fso.BuildPath(startupDir, "RemoteDesk-Agent.lnk")
+Set link = shell.CreateShortcut(shortcutPath)
+link.TargetPath = shell.ExpandEnvironmentStrings("%SystemRoot%\System32\wscript.exe")
+link.Arguments = Chr(34) & fso.BuildPath(agentDir, "start-hidden.vbs") & Chr(34)
+link.WorkingDirectory = agentDir
+link.WindowStyle = 7
+link.Save
+If Not fso.FileExists(shortcutPath) Then WScript.Quit 1
+WScript.Quit 0
+`
+		if fStartup, err := zw.Create("install-startup.vbs"); err == nil {
+			_, _ = fStartup.Write([]byte(installStartupVBS))
+		}
+
 		// 2. pasang-otomatis.bat (auto-start via Startup folder without requiring Run As Administrator)
 		installBat := fmt.Sprintf(`@echo off
 title Pasang RemoteDesk Agent - %s
@@ -2360,20 +2382,21 @@ if not exist "%%~dp0rd-agent.exe" (
 taskkill /f /im rd-agent.exe >nul 2>&1
 
 :: Daftarkan ke folder Startup Windows (Otomatis Jalan Tiap Komputer Nyala)
-set "STARTUP_FOLDER=%%APPDATA%%\Microsoft\Windows\Start Menu\Programs\Startup"
-echo Set oWS = WScript.CreateObject("WScript.Shell") > "%%TEMP%%\CreateRemoteDeskLnk.vbs"
-echo sLinkFile = "%%STARTUP_FOLDER%%\RemoteDesk-Agent.lnk" >> "%%TEMP%%\CreateRemoteDeskLnk.vbs"
-echo Set oLink = oWS.CreateShortcut(sLinkFile) >> "%%TEMP%%\CreateRemoteDeskLnk.vbs"
-echo oLink.TargetPath = "wscript.exe" >> "%%TEMP%%\CreateRemoteDeskLnk.vbs"
-echo oLink.Arguments = chr(34) ^^& "%%~dp0start-hidden.vbs" ^^& chr(34) >> "%%TEMP%%\CreateRemoteDeskLnk.vbs"
-echo oLink.WorkingDirectory = "%%~dp0" >> "%%TEMP%%\CreateRemoteDeskLnk.vbs"
-echo oLink.WindowStyle = 7 >> "%%TEMP%%\CreateRemoteDeskLnk.vbs"
-echo oLink.Save >> "%%TEMP%%\CreateRemoteDeskLnk.vbs"
-cscript //nologo "%%TEMP%%\CreateRemoteDeskLnk.vbs"
-del "%%TEMP%%\CreateRemoteDeskLnk.vbs" >nul 2>&1
+cscript //nologo "%%~dp0install-startup.vbs"
+if errorlevel 1 (
+    echo [ERROR] Shortcut Startup gagal dipasang.
+    echo Pastikan paket sudah diekstrak, lalu jalankan ulang installer.
+    pause
+    exit /b 1
+)
 
 :: Jalankan agent sekarang di background secara silent (tanpa jendela hitam)
 wscript.exe "%%~dp0start-hidden.vbs"
+if errorlevel 1 (
+    echo [ERROR] Agent gagal dijalankan.
+    pause
+    exit /b 1
+)
 
 echo [OK] Shortcut Startup berhasil dipasang.
 echo [OK] Agent RemoteDesk sudah aktif di background!
