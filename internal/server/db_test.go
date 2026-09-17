@@ -203,6 +203,9 @@ func TestAgentVersionEndpoint(t *testing.T) {
 	if w.Code != 200 {
 		t.Fatalf("expected 200, got %d", w.Code)
 	}
+	if !strings.Contains(w.Body.String(), `"version":"0.2.0"`) {
+		t.Fatalf("expected configured server version, got %s", w.Body.String())
+	}
 
 	// Test /api/agent/download
 	reqDl := httptest.NewRequest("GET", "/api/agent/download?os=windows&arch=amd64&key=test-key", nil)

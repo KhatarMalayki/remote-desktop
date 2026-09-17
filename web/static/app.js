@@ -28,6 +28,21 @@ const CHART_COLORS = [
 
 // ==================== AUTH ====================
 
+async function loadServerVersion() {
+  try {
+    const res = await fetch('/api/agent/version', { cache: 'no-store' });
+    const data = await res.json();
+    const label = 'Server v' + (data.version || 'tidak diketahui');
+    const sidebar = document.getElementById('sidebarVersion');
+    const login = document.getElementById('loginServerVersion');
+    if (sidebar) sidebar.textContent = label + ' • Enterprise Asset';
+    if (login) login.textContent = label;
+  } catch (e) {
+    const login = document.getElementById('loginServerVersion');
+    if (login) login.textContent = 'Versi server tidak dapat dibaca';
+  }
+}
+
 async function checkAuth() {
   if (!token) {
     document.getElementById('loginPage').style.display = 'flex';
@@ -942,6 +957,7 @@ function showToast(msg) {
 }
 
 // ==================== BOOT ====================
+loadServerVersion();
 checkAuth();
 
 // ==================== RECONFIGURE ENDPOINT (ADMIN) ====================

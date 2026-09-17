@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>RemoteDesk - Device & Branch Asset Management</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%234f8cff'><rect x='2' y='3' width='20' height='14' rx='2' fill='%234f8cff'/><rect x='4' y='5' width='16' height='10' fill='%230f1117'/><rect x='8' y='19' width='8' height='2' rx='1' fill='%234f8cff'/><rect x='11' y='17' width='2' height='2' fill='%234f8cff'/></svg>">
-  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/style.css?v=0.1.5">
   <script src="/static/qrcode.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 </head>
@@ -16,6 +16,7 @@
   <div class="login-box">
     <h1>&#128421; RemoteDesk</h1>
     <p>Remote Desktop &amp; Branch Asset Verification</p>
+    <small id="loginServerVersion" style="display:block;margin:-10px 0 16px;color:var(--fg2)">Memeriksa versi server...</small>
     
     <div id="loginCreds">
       <div class="form-group">
@@ -26,7 +27,7 @@
         <label>Password</label>
         <input type="password" id="loginPass" value="" autocomplete="current-password" onkeyup="if(event.key==='Enter')doLogin()">
       </div>
-      <label style="display:flex;gap:8px;align-items:center;font-size:12px;margin:8px 0 12px"><input type="checkbox" id="rememberDevice"> Ingat perangkat ini selama 30 hari</label>
+      <label style="display:flex;gap:8px;align-items:center;font-size:12px;margin:8px 0 12px"><input type="checkbox" id="rememberDevice"> Ingat akun ini di perangkat selama 14 hari</label>
       <button class="btn btn-primary" style="width:100%" onclick="doLogin()">Sign In</button>
     </div>
 
@@ -53,7 +54,7 @@
   <aside class="sidebar">
     <div class="sidebar-logo">
       <h1>&#128421; RemoteDesk</h1>
-      <small>v0.1.4 &bull; Enterprise Asset</small>
+      <small id="sidebarVersion">Server v0.1.5 &bull; Enterprise Asset</small>
     </div>
 
     <div class="sidebar-section-title">Menu Utama</div>
@@ -707,8 +708,8 @@
 <div id="switchHistoryModal" class="modal-overlay" style="display:none" onclick="if(event.target===this)this.style.display='none'">
   <div class="modal" style="max-width:850px"><h3>Switch Aset & Approval</h3><p class="asset-advice">Perubahan pemegang dari user berlaku setelah disetujui ADH. Riwayat serah terima tersimpan di sini.</p><div id="switchHistoryContent"></div><div class="modal-actions"><button class="btn btn-ghost" onclick="document.getElementById('switchHistoryModal').style.display='none'">Tutup</button></div></div>
 </div>
-<script src="/static/ownership.js"></script>
-<script src="/static/app.js"></script>
+<script src="/static/ownership.js?v=0.1.5"></script>
+<script src="/static/app.js?v=0.1.5"></script>
 </body>
 </html>
 
