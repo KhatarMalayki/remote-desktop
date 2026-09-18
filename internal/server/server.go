@@ -2419,6 +2419,14 @@ WshShell.Run chr(34) & WshShell.CurrentDirectory & "\rd-agent.exe" & chr(34), 0,
 $packageDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $installDir = Join-Path $env:ProgramData "RemoteDesk\Agent"
 $serviceName = "RemoteDeskAgent"
+$previousDeviceID = ""
+if (Test-Path -LiteralPath (Join-Path $installDir "agent.json")) {
+    try { $previousDeviceID = (Get-Content -LiteralPath (Join-Path $installDir "agent.json") -Raw | ConvertFrom-Json).device_id } catch {}
+}
+if ([string]::IsNullOrWhiteSpace($previousDeviceID)) {
+    $legacyIdFile = Join-Path $env:TEMP "rd-device-id"
+    if (Test-Path -LiteralPath $legacyIdFile) { $previousDeviceID = (Get-Content -LiteralPath $legacyIdFile -Raw).Trim() }
+}
 # Stop every process that can hold rd-agent.exe before overwriting it.  A
 # Windows service keeps its image file open, so copying first makes upgrades
 # fail deterministically with "being used by another process".
@@ -2434,6 +2442,11 @@ Copy-Item -LiteralPath (Join-Path $packageDir "rd-agent.exe") -Destination (Join
 Copy-Item -LiteralPath (Join-Path $packageDir "agent.json") -Destination (Join-Path $installDir "agent.json") -Force
 $exe = Join-Path $installDir "rd-agent.exe"
 $config = Join-Path $installDir "agent.json"
+if (-not [string]::IsNullOrWhiteSpace($previousDeviceID)) {
+    $newConfig = Get-Content -LiteralPath $config -Raw | ConvertFrom-Json
+    $newConfig.device_id = $previousDeviceID
+    $newConfig | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $config -Encoding UTF8
+}
 $binPath = '"' + $exe + '" --system-service --config "' + $config + '"'
 if (Get-Service -Name $serviceName -ErrorAction SilentlyContinue) {
 	& sc.exe config $serviceName binPath= $binPath start= auto obj= LocalSystem | Out-Null

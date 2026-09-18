@@ -43,18 +43,26 @@ func NewAgent(cfg AgentConfig, version, cfgPath string) *Agent {
 	if cfg.Heartbeat <= 0 {
 		cfg.Heartbeat = 30
 	}
-	if cfg.DeviceID == "" {
+	generatedDeviceID := cfg.DeviceID == ""
+	if generatedDeviceID {
 		cfg.DeviceID = generateDeviceID()
 	}
 	if version == "" {
 		version = "0.1.0"
 	}
-	return &Agent{
+	agent := &Agent{
 		cfg:     cfg,
 		cfgPath: cfgPath,
 		version: version,
 		done:    make(chan struct{}),
 	}
+	// Device identity must survive updates and a move from a user task to a
+	// LocalSystem service. Persisting it in agent.json avoids a second record
+	// being created simply because those contexts use different Temp folders.
+	if generatedDeviceID && cfgPath != "" {
+		agent.saveConfig()
+	}
+	return agent
 }
 
 func (a *Agent) Run() {

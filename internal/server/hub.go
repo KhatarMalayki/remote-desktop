@@ -35,8 +35,14 @@ func NewHub(db *DB) *Hub {
 
 func (h *Hub) RegisterAgent(c *Client) {
 	h.mu.Lock()
+	previous := h.agents[c.DeviceID]
 	h.agents[c.DeviceID] = c
 	h.mu.Unlock()
+	// An upgrade/reconnect can briefly overlap the old socket. Close the old
+	// connection so its later cleanup cannot leave a ghost agent behind.
+	if previous != nil && previous != c {
+		_ = previous.Conn.Close()
+	}
 	log.Printf("[hub] agent registered: %s", c.DeviceID)
 	h.broadcastStatus()
 }
