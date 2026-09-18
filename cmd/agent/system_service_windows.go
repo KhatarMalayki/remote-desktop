@@ -31,6 +31,7 @@ func runSystemService(configPath string) {
 	if logFile, openErr := os.OpenFile(filepath.Join(filepath.Dir(configPath), "service.log"), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600); openErr == nil {
 		log.SetOutput(io.MultiWriter(os.Stderr, logFile))
 	}
+	writeServiceDiagnostic(configPath, "service process starting")
 	isService, err := svc.IsWindowsService()
 	if err != nil {
 		log.Fatalf("cannot detect Windows service context: %v", err)
@@ -50,6 +51,7 @@ func (s *remoteDeskService) Execute(_ []string, requests <-chan svc.ChangeReques
 	changes <- svc.Status{State: svc.StartPending}
 	stop := make(chan struct{})
 	var once sync.Once
+	writeServiceDiagnostic(s.configPath, "service accepted by SCM; starting console-worker supervisor")
 	go superviseConsoleWorker(s.configPath, stop)
 	changes <- svc.Status{State: svc.Running, Accepts: svc.AcceptStop | svc.AcceptShutdown}
 	for request := range requests {
@@ -67,6 +69,7 @@ func superviseConsoleWorker(configPath string, stop <-chan struct{}) {
 	// A worker is intentionally restarted only after it exits.  It prevents the
 	// service from creating duplicate agents after lock/unlock transitions.
 	for {
+		writeServiceDiagnostic(configPath, "console-worker supervisor cycle started")
 		select {
 		case <-stop:
 			return
@@ -74,6 +77,7 @@ func superviseConsoleWorker(configPath string, stop <-chan struct{}) {
 		}
 		if err := startConsoleSystemWorker(configPath); err != nil {
 			log.Printf("[service] console worker not started: %v", err)
+			writeServiceDiagnostic(configPath, "console worker failed: "+err.Error())
 		}
 		select {
 		case <-stop:
@@ -88,6 +92,7 @@ func startConsoleSystemWorker(configPath string) error {
 	if sessionID == 0xFFFFFFFF {
 		return fmt.Errorf("no active console session")
 	}
+	writeServiceDiagnostic(configPath, fmt.Sprintf("active console session is %d", sessionID))
 	exe, err := os.Executable()
 	if err != nil {
 		return err
@@ -133,8 +138,21 @@ func startConsoleSystemWorker(configPath string) error {
 	defer windows.CloseHandle(process.Thread)
 	defer windows.CloseHandle(process.Process)
 	log.Printf("[service] SYSTEM worker started in console session %d (pid %d)", sessionID, process.ProcessId)
+	writeServiceDiagnostic(configPath, fmt.Sprintf("SYSTEM worker started in session %d (pid %d)", sessionID, process.ProcessId))
 
 	// Wait for the worker to end before the supervisor considers a replacement.
 	_, _ = windows.WaitForSingleObject(process.Process, windows.INFINITE)
 	return nil
+}
+
+func writeServiceDiagnostic(configPath, message string) {
+	path := filepath.Join(filepath.Dir(configPath), "service.log")
+	if configPath == "" {
+		path = filepath.Join(os.Getenv("ProgramData"), "RemoteDesk", "Agent", "service.log")
+	}
+	line := fmt.Sprintf("%s %s\r\n", time.Now().Format(time.RFC3339), message)
+	if file, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600); err == nil {
+		_, _ = file.WriteString(line)
+		_ = file.Close()
+	}
 }
