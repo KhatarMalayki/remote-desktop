@@ -129,7 +129,8 @@ func startConsoleSystemWorker(configPath string) error {
 	if err != nil {
 		return err
 	}
-	command, err := windows.UTF16PtrFromString(fmt.Sprintf("\"%s\" --system-worker --config \"%s\"", exe, configPath))
+	workerLog := filepath.Join(filepath.Dir(configPath), "worker.log")
+	command, err := windows.UTF16PtrFromString(fmt.Sprintf("\"%s\" --system-worker --config \"%s\" --log-file \"%s\"", exe, configPath, workerLog))
 	if err != nil {
 		return err
 	}

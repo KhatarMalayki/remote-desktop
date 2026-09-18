@@ -10,7 +10,7 @@ import (
 	"github.com/user/remote-desktop/internal/agent"
 )
 
-var version = "0.2.8"
+var version = "0.2.9"
 
 func main() {
 	serverURL := flag.String("server", envOr("RD_SERVER_URL", ""), "server URL")
@@ -19,9 +19,17 @@ func main() {
 	branch := flag.String("branch", envOr("RD_BRANCH", ""), "branch name (e.g. Medan, Surabaya)")
 	heartbeat := flag.Int("heartbeat", 30, "heartbeat interval in seconds")
 	configFile := flag.String("config", "", "config file path (JSON)")
+	logFile := flag.String("log-file", "", "append agent runtime log to this file")
 	systemService := flag.Bool("system-service", false, "run as the RemoteDesk Windows system service")
 	systemWorker := flag.Bool("system-worker", false, "run as a SYSTEM helper in the active console session")
 	flag.Parse()
+	if *logFile != "" {
+		if file, err := os.OpenFile(*logFile, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600); err == nil {
+			log.SetOutput(file)
+		} else {
+			log.Printf("[agent] cannot open log file %s: %v", *logFile, err)
+		}
+	}
 
 	// The service deliberately has no network/relay role of its own.  It only
 	// creates a LocalSystem worker inside the currently active console session.
