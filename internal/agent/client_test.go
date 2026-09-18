@@ -12,8 +12,7 @@ func TestNewAgentPersistsGeneratedDeviceID(t *testing.T) {
 	if agent.cfg.DeviceID == "" {
 		t.Fatal("generated device ID is empty")
 	}
-	data, err := os.ReadFile(configPath)
-	if err != nil {
+	if _, err := os.ReadFile(configPath); err != nil {
 		t.Fatalf("generated identity was not persisted: %v", err)
 	}
 	loaded, err := LoadConfig(configPath)
