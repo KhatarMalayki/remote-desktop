@@ -656,6 +656,9 @@ func TestAgentPackageDownload(t *testing.T) {
 			if !strings.Contains(script, `sc.exe create`) || !strings.Contains(script, `RemoteDeskAgent`) || !strings.Contains(script, `LocalSystem`) || !strings.Contains(script, `Start-Service`) {
 				t.Fatalf("invalid system service installer: %s", script)
 			}
+			if !strings.Contains(script, `Stop-Service -Name $serviceName`) || !strings.Contains(script, `WaitForStatus('Stopped'`) || !strings.Contains(script, `Get-Process -Name "rd-agent"`) || !strings.Contains(script, `Copy-Item`) {
+				t.Fatalf("installer must stop the old service before replacing its binary: %s", script)
+			}
 		}
 		if f.Name == "pasang-otomatis.bat" {
 			rc, _ := f.Open()

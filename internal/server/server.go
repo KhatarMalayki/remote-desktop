@@ -2419,6 +2419,16 @@ WshShell.Run chr(34) & WshShell.CurrentDirectory & "\rd-agent.exe" & chr(34), 0,
 $packageDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $installDir = Join-Path $env:ProgramData "RemoteDesk\Agent"
 $serviceName = "RemoteDeskAgent"
+# Stop every process that can hold rd-agent.exe before overwriting it.  A
+# Windows service keeps its image file open, so copying first makes upgrades
+# fail deterministically with "being used by another process".
+if (Get-Service -Name $serviceName -ErrorAction SilentlyContinue) {
+    Stop-Service -Name $serviceName -Force -ErrorAction SilentlyContinue
+    $service = Get-Service -Name $serviceName
+    $service.WaitForStatus('Stopped', (New-TimeSpan -Seconds 20))
+}
+Get-Process -Name "rd-agent" -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+Start-Sleep -Milliseconds 750
 New-Item -ItemType Directory -Path $installDir -Force | Out-Null
 Copy-Item -LiteralPath (Join-Path $packageDir "rd-agent.exe") -Destination (Join-Path $installDir "rd-agent.exe") -Force
 Copy-Item -LiteralPath (Join-Path $packageDir "agent.json") -Destination (Join-Path $installDir "agent.json") -Force
@@ -2426,12 +2436,12 @@ $exe = Join-Path $installDir "rd-agent.exe"
 $config = Join-Path $installDir "agent.json"
 $binPath = '"' + $exe + '" --system-service --config "' + $config + '"'
 if (Get-Service -Name $serviceName -ErrorAction SilentlyContinue) {
-    Stop-Service -Name $serviceName -Force -ErrorAction SilentlyContinue
-    & sc.exe delete $serviceName | Out-Null
-    Start-Sleep -Seconds 1
+	& sc.exe config $serviceName binPath= $binPath start= auto obj= LocalSystem | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "Konfigurasi Windows service gagal diperbarui" }
+} else {
+	& sc.exe create $serviceName binPath= $binPath start= auto obj= LocalSystem | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "Windows service gagal dibuat" }
 }
-& sc.exe create $serviceName binPath= $binPath start= auto obj= LocalSystem | Out-Null
-if ($LASTEXITCODE -ne 0) { throw "Windows service gagal dibuat" }
 & sc.exe description $serviceName "RemoteDesk secure desktop remote service" | Out-Null
 & sc.exe failure $serviceName reset= 86400 actions= restart/5000/restart/15000/restart/60000 | Out-Null
 Start-Service -Name $serviceName
