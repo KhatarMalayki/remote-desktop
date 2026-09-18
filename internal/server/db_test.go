@@ -621,8 +621,11 @@ func TestAgentPackageDownload(t *testing.T) {
 	if w.Code != 200 {
 		t.Fatalf("expected 200 for zip download, got %d, body=%s", w.Code, w.Body.String())
 	}
-	if !strings.Contains(w.Header().Get("Content-Disposition"), "RemoteDesk-Agent-Medan.zip") {
-		t.Fatalf("expected filename containing Medan.zip, got %s", w.Header().Get("Content-Disposition"))
+	if !strings.Contains(w.Header().Get("Content-Disposition"), "RemoteDesk-Agent-Medan-vcurrent.zip") {
+		t.Fatalf("expected versioned filename, got %s", w.Header().Get("Content-Disposition"))
+	}
+	if got := w.Header().Get("Cache-Control"); !strings.Contains(got, "no-store") {
+		t.Fatalf("agent package must not be cacheable, got Cache-Control=%q", got)
 	}
 
 	// 2. Inspect ZIP contents

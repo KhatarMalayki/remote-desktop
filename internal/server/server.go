@@ -2481,7 +2481,7 @@ taskkill /f /im rd-agent.exe >nul 2>&1
 
 :: Hapus mekanisme lama agar tidak ada dua agent untuk device yang sama.
 del "%%APPDATA%%\Microsoft\Windows\Start Menu\Programs\Startup\RemoteDesk-Agent.lnk" >nul 2>&1
-powershell.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "Unregister-ScheduledTask -TaskName 'RemoteDesk Agent' -Confirm:$false -ErrorAction SilentlyContinue"
+powershell.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "Unregister-ScheduledTask -TaskName 'RemoteDesk Agent' -Confirm:$false -ErrorAction SilentlyContinue; Stop-Service -Name 'RemoteDeskAgent' -Force -ErrorAction SilentlyContinue; sc.exe delete RemoteDeskAgent | Out-Null"
 powershell.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "%%~dp0install-service.ps1"
 if errorlevel 1 (
     echo [ERROR] Windows service RemoteDesk gagal dipasang.
@@ -2540,7 +2540,7 @@ if errorlevel 1 (
 echo Mematikan dan mencopot auto-start RemoteDesk...
 taskkill /f /im rd-agent.exe >nul 2>&1
 del "%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup\RemoteDesk-Agent.lnk" >nul 2>&1
-powershell.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "Unregister-ScheduledTask -TaskName 'RemoteDesk Agent' -Confirm:$false -ErrorAction SilentlyContinue"
+powershell.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "Unregister-ScheduledTask -TaskName 'RemoteDesk Agent' -Confirm:$false -ErrorAction SilentlyContinue; Stop-Service -Name 'RemoteDeskAgent' -Force -ErrorAction SilentlyContinue; sc.exe delete RemoteDeskAgent | Out-Null"
 echo Selesai! Auto-start telah dihapus.
 pause
 `
@@ -2560,12 +2560,12 @@ CARA PASANG PALING MUDAH:
 2. KLIK DUA KALI file "pasang-otomatis.bat", lalu klik Yes satu kali pada permintaan Administrator.
 3. SELESAI!
    - Agent akan langsung berjalan diam-diam di background (tanpa jendela hitam).
-   - Agent akan OTOMATIS JALAN dengan hak tertinggi setiap kali user Windows login.
+   - Agent dijalankan oleh Windows service SYSTEM dan tetap tersedia saat lock screen.
 
 KETERANGAN FILE:
-- pasang-otomatis.bat : Mengaktifkan auto-start dan menjalankan agent di background.
+- pasang-otomatis.bat : Memasang Windows service dan menjalankan agent di background.
 - run-agent.bat       : Menjalankan agent di jendela hitam untuk tes melihat log.
-- hapus-otomatis.bat  : Menghapus agent dari daftar startup Windows.
+- hapus-otomatis.bat  : Menghapus service dan auto-start agent.
 `, branch, serverURL)
 	if fReadme, err := zw.Create("PETUNJUK_CARA_PAKAI.txt"); err == nil {
 		_, _ = fReadme.Write([]byte(readmeContent))
@@ -2574,9 +2574,17 @@ KETERANGAN FILE:
 	_ = zw.Close()
 
 	cleanBranch := strings.ReplaceAll(branch, " ", "-")
-	zipName := fmt.Sprintf("RemoteDesk-Agent-%s.zip", cleanBranch)
+	versionSuffix := strings.TrimSpace(s.cfg.Version)
+	if versionSuffix == "" {
+		versionSuffix = "current"
+	}
+	// The package URL is stable; preventing HTTP caching ensures the binary in
+	// a freshly downloaded ZIP is from this server release.
+	zipName := fmt.Sprintf("RemoteDesk-Agent-%s-v%s.zip", cleanBranch, versionSuffix)
 	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", zipName))
 	w.Header().Set("Content-Type", "application/zip")
+	w.Header().Set("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
+	w.Header().Set("Pragma", "no-cache")
 	w.Header().Set("Content-Length", strconv.Itoa(buf.Len()))
 	_, _ = w.Write(buf.Bytes())
 }
