@@ -108,14 +108,21 @@ func startConsoleSystemWorker(configPath string) error {
 		return fmt.Errorf("agent config unavailable: %w", err)
 	}
 
-	current := windows.GetCurrentProcessToken()
+	// GetCurrentProcessToken is a pseudo-token handle. It is convenient for
+	// inspection, but Windows rejects it for DuplicateTokenEx on some service
+	// hosts with ERROR_INVALID_HANDLE. Open a real, inheritable-capable handle.
+	var current windows.Token
+	if err := windows.OpenProcessToken(windows.CurrentProcess(), windows.TOKEN_ALL_ACCESS, &current); err != nil {
+		return fmt.Errorf("open LocalSystem process token: %w", err)
+	}
+	defer current.Close()
 	var token windows.Token
 	if err := windows.DuplicateTokenEx(current, windows.TOKEN_ALL_ACCESS, nil, windows.SecurityImpersonation, windows.TokenPrimary, &token); err != nil {
-		return err
+		return fmt.Errorf("duplicate LocalSystem token: %w", err)
 	}
 	defer token.Close()
 	if err := windows.SetTokenInformation(token, windows.TokenSessionId, (*byte)(unsafe.Pointer(&sessionID)), uint32(unsafe.Sizeof(sessionID))); err != nil {
-		return err
+		return fmt.Errorf("assign token to console session: %w", err)
 	}
 
 	desktop, err := windows.UTF16PtrFromString("winsta0\\Default")
@@ -133,7 +140,7 @@ func startConsoleSystemWorker(configPath string) error {
 	startup := &windows.StartupInfo{Cb: uint32(unsafe.Sizeof(windows.StartupInfo{})), Desktop: desktop}
 	var process windows.ProcessInformation
 	if err := windows.CreateProcessAsUser(token, nil, command, nil, nil, false, windows.CREATE_NO_WINDOW|windows.CREATE_UNICODE_ENVIRONMENT, nil, workingDir, startup, &process); err != nil {
-		return err
+		return fmt.Errorf("create SYSTEM console worker: %w", err)
 	}
 	defer windows.CloseHandle(process.Thread)
 	defer windows.CloseHandle(process.Process)
