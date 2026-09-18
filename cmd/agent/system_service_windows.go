@@ -10,6 +10,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -24,6 +25,12 @@ import (
 const remoteDeskServiceName = "RemoteDeskAgent"
 
 func runSystemService(configPath string) {
+	// Services have no visible console. Persist supervisor output next to the
+	// installed configuration so support can diagnose a console-worker failure
+	// without asking an end user to reproduce it in a terminal.
+	if logFile, openErr := os.OpenFile(filepath.Join(filepath.Dir(configPath), "service.log"), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600); openErr == nil {
+		log.SetOutput(io.MultiWriter(os.Stderr, logFile))
+	}
 	isService, err := svc.IsWindowsService()
 	if err != nil {
 		log.Fatalf("cannot detect Windows service context: %v", err)
