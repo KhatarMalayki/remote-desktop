@@ -2450,7 +2450,8 @@ if (-not [string]::IsNullOrWhiteSpace($previousDeviceID)) {
     # Add-Member handles both packages created before device_id existed and
     # current packages that already include the property.
     $newConfig | Add-Member -NotePropertyName "device_id" -NotePropertyValue $previousDeviceID -Force
-    $newConfig | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $config -Encoding UTF8
+    $configJSON = $newConfig | ConvertTo-Json -Depth 8
+    [System.IO.File]::WriteAllText($config, $configJSON, (New-Object System.Text.UTF8Encoding($false)))
 }
 $binPath = '"' + $exe + '" --system-service --config "' + $config + '"'
 if (Get-Service -Name $serviceName -ErrorAction SilentlyContinue) {

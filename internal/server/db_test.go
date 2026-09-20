@@ -662,6 +662,9 @@ func TestAgentPackageDownload(t *testing.T) {
 			if !strings.Contains(script, `Add-Member -NotePropertyName "device_id"`) {
 				t.Fatalf("installer must preserve the device identity for packages without device_id: %s", script)
 			}
+			if !strings.Contains(script, `System.Text.UTF8Encoding($false)`) || strings.Contains(script, `Set-Content -LiteralPath $config -Encoding UTF8`) {
+				t.Fatalf("installer must write agent.json as UTF-8 without BOM: %s", script)
+			}
 		}
 		if f.Name == "pasang-otomatis.bat" {
 			rc, _ := f.Open()

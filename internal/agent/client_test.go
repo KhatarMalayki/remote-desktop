@@ -6,6 +6,22 @@ import (
 	"testing"
 )
 
+func TestLoadConfigAcceptsUTF8BOM(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "agent.json")
+	data := append([]byte{0xEF, 0xBB, 0xBF}, []byte(`{"server_url":"https://example.test","api_key":"test","device_id":"device-1"}`)...)
+	if err := os.WriteFile(configPath, data, 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := LoadConfig(configPath)
+	if err != nil {
+		t.Fatalf("LoadConfig rejected UTF-8 BOM: %v", err)
+	}
+	if cfg.DeviceID != "device-1" {
+		t.Fatalf("device ID = %q, want device-1", cfg.DeviceID)
+	}
+}
+
 func TestNewAgentPersistsGeneratedDeviceID(t *testing.T) {
 	configPath := filepath.Join(t.TempDir(), "agent.json")
 	agent := NewAgent(AgentConfig{ServerURL: "https://example.test", APIKey: "test"}, "test", configPath)

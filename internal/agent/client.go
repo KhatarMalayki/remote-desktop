@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -511,6 +512,10 @@ func LoadConfig(path string) (AgentConfig, error) {
 	if err != nil {
 		return AgentConfig{}, err
 	}
+	// Windows PowerShell 5 writes a UTF-8 BOM when using Set-Content
+	// -Encoding UTF8. Accept existing configurations produced by older
+	// installers so the service can recover without manual file editing.
+	data = bytes.TrimPrefix(data, []byte{0xEF, 0xBB, 0xBF})
 	var cfg AgentConfig
 	if err := json.Unmarshal(data, &cfg); err != nil {
 		return AgentConfig{}, err
