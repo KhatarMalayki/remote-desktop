@@ -659,6 +659,9 @@ func TestAgentPackageDownload(t *testing.T) {
 			if !strings.Contains(script, `Stop-Service -Name $serviceName`) || !strings.Contains(script, `WaitForStatus('Stopped'`) || !strings.Contains(script, `Get-Process -Name "rd-agent"`) || !strings.Contains(script, `Copy-Item`) {
 				t.Fatalf("installer must stop the old service before replacing its binary: %s", script)
 			}
+			if !strings.Contains(script, `Add-Member -NotePropertyName "device_id"`) {
+				t.Fatalf("installer must preserve the device identity for packages without device_id: %s", script)
+			}
 		}
 		if f.Name == "pasang-otomatis.bat" {
 			rc, _ := f.Open()
@@ -679,6 +682,9 @@ func TestAgentPackageDownload(t *testing.T) {
 			}
 			if !strings.Contains(string(cfgData), `"api_key": "my-test-api-key"`) {
 				t.Fatalf("expected agent.json to have api key, got: %s", string(cfgData))
+			}
+			if !strings.Contains(string(cfgData), `"device_id": ""`) {
+				t.Fatalf("expected agent.json to reserve device_id, got: %s", string(cfgData))
 			}
 		}
 	}

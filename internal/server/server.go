@@ -2379,9 +2379,12 @@ func (s *Server) handleAgentPackageDownload(w http.ResponseWriter, r *http.Reque
 
 	// Create pre-configured agent.json
 	cfgObj := map[string]interface{}{
-		"server_url":        serverURL,
-		"api_key":           s.cfg.APIKey,
-		"branch":            branch,
+		"server_url": serverURL,
+		"api_key":    s.cfg.APIKey,
+		"branch":     branch,
+		// Keep the identity key present even in a fresh package.  The installer
+		// can then safely retain an existing device ID during an in-place upgrade.
+		"device_id":         "",
 		"heartbeat_seconds": 60,
 		"update_url":        "https://github.com/KhatarMalayki/remote-desktop/releases/latest",
 	}
@@ -2444,7 +2447,9 @@ $exe = Join-Path $installDir "rd-agent.exe"
 $config = Join-Path $installDir "agent.json"
 if (-not [string]::IsNullOrWhiteSpace($previousDeviceID)) {
     $newConfig = Get-Content -LiteralPath $config -Raw | ConvertFrom-Json
-    $newConfig.device_id = $previousDeviceID
+    # Add-Member handles both packages created before device_id existed and
+    # current packages that already include the property.
+    $newConfig | Add-Member -NotePropertyName "device_id" -NotePropertyValue $previousDeviceID -Force
     $newConfig | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $config -Encoding UTF8
 }
 $binPath = '"' + $exe + '" --system-service --config "' + $config + '"'
