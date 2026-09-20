@@ -10,7 +10,7 @@ import (
 	"github.com/user/remote-desktop/internal/agent"
 )
 
-var version = "0.2.13"
+var version = "0.2.14"
 
 func main() {
 	serverURL := flag.String("server", envOr("RD_SERVER_URL", ""), "server URL")
@@ -38,6 +38,17 @@ func main() {
 	if *systemService {
 		runSystemService(*configFile)
 		return
+	}
+	if *systemWorker {
+		release, acquired, err := acquireSystemWorkerLock()
+		if err != nil {
+			log.Fatalf("[agent] cannot acquire SYSTEM worker lock: %v", err)
+		}
+		if !acquired {
+			log.Printf("[agent] another SYSTEM console worker is already running; exiting duplicate")
+			return
+		}
+		defer release()
 	}
 
 	var cfg agent.AgentConfig
