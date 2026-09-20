@@ -23,6 +23,7 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/user/remote-desktop/internal/models"
+	"github.com/user/remote-desktop/internal/versioncmp"
 )
 
 type Config struct {
@@ -1523,7 +1524,7 @@ func (s *Server) handleAgentMessage(c *Client, raw []byte) {
 		s.db.UpsertDevice(&dev)
 		s.db.AddLog(dev.ID, "register", fmt.Sprintf("%s %s v%s", dev.Hostname, dev.OS, dev.Version))
 
-		if s.cfg.Version != "" && dev.Version != "" && dev.Version != s.cfg.Version {
+		if versioncmp.IsNewer(s.cfg.Version, dev.Version) {
 			log.Printf("[server] agent %s is on version %s, server is %s. Triggering upgrade.", dev.ID, dev.Version, s.cfg.Version)
 			upMsg := map[string]interface{}{
 				"action": "upgrade",
@@ -1812,8 +1813,12 @@ func (s *Server) handleBroadcastAgentUpdate(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	s.hub.mu.RLock()
-	count := len(s.hub.agents)
+	count := 0
 	for _, client := range s.hub.agents {
+		device, err := s.db.GetDevice(client.DeviceID)
+		if err != nil || !versioncmp.IsNewer(s.cfg.Version, device.Version) {
+			continue
+		}
 		upMsg := map[string]interface{}{
 			"action": "upgrade",
 			"data": map[string]string{
@@ -1824,6 +1829,7 @@ func (s *Server) handleBroadcastAgentUpdate(w http.ResponseWriter, r *http.Reque
 		if upRaw, err := json.Marshal(upMsg); err == nil {
 			select {
 			case client.Send <- upRaw:
+				count++
 			default:
 			}
 		}
@@ -2386,7 +2392,9 @@ func (s *Server) handleAgentPackageDownload(w http.ResponseWriter, r *http.Reque
 		// can then safely retain an existing device ID during an in-place upgrade.
 		"device_id":         "",
 		"heartbeat_seconds": 60,
-		"update_url":        "https://github.com/KhatarMalayki/remote-desktop/releases/latest",
+		// Agent updates are distributed by this server. GitHub Releases currently
+		// contains an older legacy build and must not be used as an update source.
+		"update_url": "",
 	}
 	cfgBytes, _ := json.MarshalIndent(cfgObj, "", "  ")
 

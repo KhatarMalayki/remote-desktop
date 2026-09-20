@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/user/remote-desktop/internal/versioncmp"
 )
 
 type AgentConfig struct {
@@ -210,7 +211,10 @@ func (a *Agent) checkGitHubRelease() {
 	}
 
 	releaseVersion := strings.TrimPrefix(release.TagName, "v")
-	if releaseVersion == "" || releaseVersion == a.version {
+	if !versioncmp.IsNewer(releaseVersion, a.version) {
+		if releaseVersion != "" && releaseVersion != a.version {
+			log.Printf("[agent] ignoring non-newer GitHub release: current v%s, offered v%s", a.version, releaseVersion)
+		}
 		return
 	}
 
@@ -272,7 +276,10 @@ func (a *Agent) handleMessage(raw []byte) {
 			URL     string `json:"download_url"`
 		}
 		if err := json.Unmarshal(msg.Data, &req); err == nil && req.URL != "" {
-			if req.Version != "" && req.Version == a.version {
+			if !versioncmp.IsNewer(req.Version, a.version) {
+				if req.Version != "" && req.Version != a.version {
+					log.Printf("[agent] ignoring non-newer upgrade command: current v%s, offered v%s", a.version, req.Version)
+				}
 				return
 			}
 			log.Printf("[agent] upgrade command received: %s -> %s", a.version, req.Version)
