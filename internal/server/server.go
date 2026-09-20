@@ -269,6 +269,7 @@ func (s *Server) ListenAndServe() error {
 	mux.HandleFunc("/api/agent/version", s.handleAgentVersion)
 	mux.HandleFunc("/api/agent/download", s.handleAgentDownload)
 	mux.HandleFunc("/api/agent/package", s.authMiddleware(s.handleAgentPackageDownload))
+	mux.HandleFunc("/api/agent/update", s.authMiddleware(s.handleAgentUpdate))
 	mux.HandleFunc("/api/agent/broadcast-update", s.authMiddleware(s.handleBroadcastAgentUpdate))
 	mux.HandleFunc("/api/agent/reconfigure", s.authMiddleware(s.handleReconfigureAgents))
 	mux.HandleFunc("/api/users", s.authMiddleware(s.handleUsers))
@@ -408,10 +409,11 @@ func (s *Server) handleDevices(w http.ResponseWriter, r *http.Request) {
 		}
 
 		jsonResp(w, map[string]interface{}{
-			"devices": devices,
-			"total":   total,
-			"limit":   limit,
-			"offset":  offset,
+			"devices":        devices,
+			"total":          total,
+			"limit":          limit,
+			"offset":         offset,
+			"server_version": s.cfg.Version,
 		}, 200)
 	default:
 		http.Error(w, "method not allowed", 405)
@@ -1524,22 +1526,8 @@ func (s *Server) handleAgentMessage(c *Client, raw []byte) {
 		s.db.UpsertDevice(&dev)
 		s.db.AddLog(dev.ID, "register", fmt.Sprintf("%s %s v%s", dev.Hostname, dev.OS, dev.Version))
 
-		if versioncmp.IsNewer(s.cfg.Version, dev.Version) {
-			log.Printf("[server] agent %s is on version %s, server is %s. Triggering upgrade.", dev.ID, dev.Version, s.cfg.Version)
-			upMsg := map[string]interface{}{
-				"action": "upgrade",
-				"data": map[string]string{
-					"version":      s.cfg.Version,
-					"download_url": fmt.Sprintf("/api/agent/download?os=%s&arch=%s&key=%s", dev.OS, dev.Arch, s.cfg.APIKey),
-				},
-			}
-			if upRaw, err := json.Marshal(upMsg); err == nil {
-				select {
-				case c.Send <- upRaw:
-				default:
-				}
-			}
-		}
+		// Updates are intentionally not pushed during registration. Administrators
+		// stage them from the dashboard after validating a pilot device.
 
 	case "heartbeat":
 		var hb models.DeviceHeartbeat
@@ -1812,34 +1800,77 @@ func (s *Server) handleBroadcastAgentUpdate(w http.ResponseWriter, r *http.Reque
 		jsonError(w, "forbidden", 403)
 		return
 	}
-	s.hub.mu.RLock()
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
 	count := 0
-	for _, client := range s.hub.agents {
-		device, err := s.db.GetDevice(client.DeviceID)
-		if err != nil || !versioncmp.IsNewer(s.cfg.Version, device.Version) {
-			continue
-		}
-		upMsg := map[string]interface{}{
-			"action": "upgrade",
-			"data": map[string]string{
-				"version":      s.cfg.Version,
-				"download_url": fmt.Sprintf("/api/agent/download?key=%s", s.cfg.APIKey),
-			},
-		}
-		if upRaw, err := json.Marshal(upMsg); err == nil {
-			select {
-			case client.Send <- upRaw:
-				count++
-			default:
-			}
+	for _, deviceID := range s.hub.OnlineIDs() {
+		if status, err := s.queueAgentUpdate(deviceID, claims.Username); err == nil && status == "queued" {
+			count++
 		}
 	}
-	s.hub.mu.RUnlock()
+	_ = s.db.RecordAuthLog(claims.Username, r.RemoteAddr, "agent_update_batch", fmt.Sprintf("Update agent massal ke v%s: %d perangkat", s.cfg.Version, count), r.UserAgent())
 	jsonResp(w, map[string]interface{}{
 		"status":          "broadcast_sent",
 		"agents_notified": count,
 		"version":         s.cfg.Version,
 	}, 200)
+}
+
+func (s *Server) handleAgentUpdate(w http.ResponseWriter, r *http.Request) {
+	claims := getClaims(r)
+	if claims.Role != "admin" {
+		jsonError(w, "forbidden", http.StatusForbidden)
+		return
+	}
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		DeviceID string `json:"device_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || strings.TrimSpace(req.DeviceID) == "" {
+		jsonError(w, "device_id is required", http.StatusBadRequest)
+		return
+	}
+	status, err := s.queueAgentUpdate(strings.TrimSpace(req.DeviceID), claims.Username)
+	if err != nil {
+		jsonError(w, err.Error(), http.StatusConflict)
+		return
+	}
+	_ = s.db.RecordAuthLog(claims.Username, r.RemoteAddr, "agent_update", fmt.Sprintf("Update agent %s ke v%s: %s", req.DeviceID, s.cfg.Version, status), r.UserAgent())
+	jsonResp(w, map[string]interface{}{"status": status, "device_id": req.DeviceID, "version": s.cfg.Version}, http.StatusAccepted)
+}
+
+func (s *Server) queueAgentUpdate(deviceID, actor string) (string, error) {
+	device, err := s.db.GetDevice(deviceID)
+	if err != nil {
+		return "", fmt.Errorf("device not found")
+	}
+	if !versioncmp.IsNewer(s.cfg.Version, device.Version) {
+		return "up_to_date", nil
+	}
+	if !s.hub.IsOnline(deviceID) {
+		return "", fmt.Errorf("device is offline; update can be sent after it reconnects")
+	}
+
+	upMsg := map[string]interface{}{
+		"action": "upgrade",
+		"data": map[string]string{
+			"version":      s.cfg.Version,
+			"download_url": fmt.Sprintf("/api/agent/download?os=%s&arch=%s&key=%s", device.OS, device.Arch, s.cfg.APIKey),
+		},
+	}
+	upRaw, err := json.Marshal(upMsg)
+	if err != nil || !s.hub.SendToAgent(deviceID, upRaw) {
+		return "", fmt.Errorf("agent update queue is unavailable")
+	}
+	_ = s.db.AddLog(deviceID, "agent_update_requested", fmt.Sprintf("v%s -> v%s by=%s", device.Version, s.cfg.Version, actor))
+	return "queued", nil
 }
 
 func (s *Server) handleReconfigureAgents(w http.ResponseWriter, r *http.Request) {

@@ -10,7 +10,7 @@ import (
 	"github.com/user/remote-desktop/internal/agent"
 )
 
-var version = "0.2.12"
+var version = "0.2.13"
 
 func main() {
 	serverURL := flag.String("server", envOr("RD_SERVER_URL", ""), "server URL")
@@ -98,6 +98,7 @@ func main() {
 		log.Printf("[agent] version %s starting...", version)
 	}
 	a := agent.NewAgent(cfg, version, configPath)
+	a.SetServiceManaged(*systemWorker)
 	a.Run()
 }
 

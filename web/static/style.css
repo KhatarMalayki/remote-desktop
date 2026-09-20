@@ -177,6 +177,9 @@ select.filter-select {
 
 .btn-primary { background: var(--accent); color: white; }
 .btn-primary:hover { background: var(--accent2); }
+.btn-warning { background: #b7791f; color: white; border-color: #d69e2e; }
+.btn-warning:hover { background: #975a16; }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .btn-danger { background: var(--red); color: white; }
 .btn-danger:hover { opacity: 0.85; }
 .btn-ghost { background: transparent; color: var(--fg2); border: 1px solid var(--border); }

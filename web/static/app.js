@@ -12,6 +12,8 @@ let ws = null;
 let remoteWS = null;
 let searchTimeout = null;
 let idleTimer = null;
+let serverAgentVersion = '';
+let pendingAgentUpdates = {};
 const IDLE_TIMEOUT_MS = 30 * 60 * 1000;
 let currentOffset = 0;
 const PAGE_SIZE = 50;
@@ -32,6 +34,7 @@ async function loadServerVersion() {
   try {
     const res = await fetch('/api/agent/version', { cache: 'no-store' });
     const data = await res.json();
+    serverAgentVersion = data.version || '';
     const label = 'Server v' + (data.version || 'tidak diketahui');
     const sidebar = document.getElementById('sidebarVersion');
     const login = document.getElementById('loginServerVersion');
@@ -133,6 +136,8 @@ function updateUserUI() {
   if (navReconf) navReconf.style.display = currentUser.role === 'admin' ? 'flex' : 'none';
   var navSec = document.getElementById('navSecurityLogs');
   if (navSec) navSec.style.display = currentUser.role === 'admin' ? 'flex' : 'none';
+  const updateAllBtn = document.getElementById('updateOutdatedAgentsBtn');
+  if (updateAllBtn) updateAllBtn.style.display = currentUser.role === 'admin' ? 'inline-flex' : 'none';
   var adminHdr = document.getElementById('adminSectionHeader');
   if (adminHdr) adminHdr.style.display = currentUser.role === 'admin' ? 'block' : 'none';
   var bTitle = document.getElementById('branchBannerTitle');
@@ -277,6 +282,7 @@ async function loadDevices() {
   var data = await api('/api/devices?group=' + encodeURIComponent(group) + '&search=' + encodeURIComponent(search) + '&offset=' + currentOffset + '&limit=' + PAGE_SIZE);
   if (!data) return;
   devices = data.devices || [];
+  serverAgentVersion = data.server_version || serverAgentVersion;
   if (currentPage === 'devices') renderDevices();
   if (currentPage === 'dashboard') renderRecentDevices();
   if (currentPage === 'assets') renderAssets();
@@ -288,15 +294,21 @@ function renderDevices() {
   var filtered = devices;
   if (sf === 'online') filtered = devices.filter(function(d){return d.online});
   if (sf === 'offline') filtered = devices.filter(function(d){return !d.online});
+  if (sf === 'outdated') filtered = devices.filter(function(d){return isVersionNewer(serverAgentVersion, d.version || '')});
   if (filtered.length === 0) { document.getElementById('devicesTable').innerHTML = '<div class="empty-state"><p>No devices found</p></div>'; return; }
   document.getElementById('devicesTable').innerHTML = buildDeviceTable(filtered);
 }
 
 function buildDeviceTable(list) {
-  return '<table class="device-table"><thead><tr><th>Status</th><th>Hostname</th><th>OS</th><th>IP</th><th>CPU</th><th>RAM</th><th>Disk</th><th>Group</th><th>Last Seen</th><th>Actions</th></tr></thead><tbody>' +
+  return '<table class="device-table"><thead><tr><th>Status</th><th>Hostname</th><th>OS</th><th>IP</th><th>CPU</th><th>RAM</th><th>Disk</th><th>Group</th><th>Agent</th><th>Last Seen</th><th>Actions</th></tr></thead><tbody>' +
     list.map(function(d) {
       var ramPct = d.memory_total ? Math.round(d.memory_used / d.memory_total * 100) : 0;
       var diskPct = d.disk_total ? Math.round(d.disk_used / d.disk_total * 100) : 0;
+      var outdated = isVersionNewer(serverAgentVersion, d.version || '');
+      var pending = !!pendingAgentUpdates[d.id];
+      var versionLabel = d.version ? 'v' + esc(d.version) : 'Tidak diketahui';
+      var updateLabel = pending ? 'Memproses' : (outdated ? 'Perlu Update' : 'Terbaru');
+      var updateColor = pending ? '#fbbf24' : (outdated ? '#ef4444' : '#34d399');
       return '<tr><td><span class="status-dot '+(d.online?'online':'offline')+'"></span>'+(d.online?'Online':'Offline')+'</td>' +
         '<td><strong>'+esc(d.hostname)+'</strong><br><small style="color:var(--fg2)">'+esc(d.id)+'</small></td>' +
         '<td>'+osIcon(d.os)+' '+esc(d.os)+' '+esc(d.arch)+'</td>' +
@@ -305,11 +317,59 @@ function buildDeviceTable(list) {
         '<td><div class="progress-bar"><div class="fill '+(ramPct>80?'danger':'')+'" style="width:'+ramPct+'%"></div></div>'+ramPct+'%</td>' +
         '<td><div class="progress-bar"><div class="fill '+(diskPct>80?'danger':'')+'" style="width:'+diskPct+'%"></div></div>'+diskPct+'%</td>' +
         '<td><span class="tag">'+esc(d.branch||d.group||'default')+'</span></td>' +
+        '<td><strong>'+versionLabel+'</strong><br><small style="color:'+updateColor+'">'+updateLabel+'</small></td>' +
         '<td>'+timeAgo(d.last_seen)+'</td>' +
         '<td><button class="btn btn-ghost btn-sm" onclick="openDeviceModal(\''+d.id+'\')">Details</button>' +
         (d.online ? ' <button class="btn btn-primary btn-sm" onclick="quickRemote(\''+d.id+'\')">Remote</button>' : '') +
+        (currentUser && currentUser.role === 'admin' && outdated ? ' <button class="btn btn-warning btn-sm" '+(!d.online||pending?'disabled':'')+' onclick="updateDeviceAgent(\''+d.id+'\')">Update</button>' : '') +
         '</td></tr>';
     }).join('') + '</tbody></table>';
+}
+
+function parseAgentVersion(value) {
+  var clean = String(value || '').trim().replace(/^v/i, '').split('-')[0];
+  if (!/^\d+(\.\d+)*$/.test(clean)) return null;
+  return clean.split('.').map(function(part){ return Number(part); });
+}
+
+function isVersionNewer(candidate, current) {
+  var a = parseAgentVersion(candidate);
+  var b = parseAgentVersion(current);
+  if (!a || !b) return !!a && !b;
+  var length = Math.max(a.length, b.length);
+  for (var i = 0; i < length; i++) {
+    var av = a[i] || 0;
+    var bv = b[i] || 0;
+    if (av !== bv) return av > bv;
+  }
+  return false;
+}
+
+async function updateDeviceAgent(deviceID) {
+  var device = devices.find(function(d){ return d.id === deviceID; });
+  if (!device) return;
+  var hostname = device.hostname || device.id;
+  var currentVersion = device.version || 'tidak diketahui';
+  if (!confirm('Update agent ' + hostname + ' dari v' + currentVersion + ' ke v' + serverAgentVersion + '?\n\nLakukan satu perangkat pilot terlebih dahulu. Remote akan terputus beberapa detik saat agent restart.')) return;
+  pendingAgentUpdates[deviceID] = true;
+  renderDevices();
+  var res = await api('/api/agent/update', { method:'POST', body:JSON.stringify({device_id:deviceID}) });
+  if (!res || res.error) {
+    delete pendingAgentUpdates[deviceID];
+    renderDevices();
+    alert('Update gagal dikirim: ' + ((res && res.error) || 'Unknown error'));
+    return;
+  }
+  showToast('Update v' + serverAgentVersion + ' dikirim ke ' + hostname + '.');
+  setTimeout(function(){ delete pendingAgentUpdates[deviceID]; loadDevices(); }, 12000);
+}
+
+async function updateAllOutdatedAgents() {
+  if (!confirm('Update semua agent Online yang tertinggal ke v' + serverAgentVersion + '?\n\nSebaiknya gunakan ini hanya setelah satu perangkat pilot berhasil. Agent Offline tidak akan disentuh.')) return;
+  var res = await api('/api/agent/broadcast-update', { method:'POST' });
+  if (!res || res.error) { alert('Update massal gagal: ' + ((res && res.error) || 'Unknown error')); return; }
+  showToast('Update dikirim ke ' + res.agents_notified + ' agent yang tertinggal.');
+  setTimeout(loadDevices, 12000);
 }
 
 function searchDevices() { clearTimeout(searchTimeout); searchTimeout = setTimeout(function(){ currentOffset=0; loadDevices(); }, 300); }

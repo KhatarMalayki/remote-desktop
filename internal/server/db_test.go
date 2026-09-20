@@ -696,3 +696,61 @@ func TestAgentPackageDownload(t *testing.T) {
 		t.Fatalf("zip archive missing expected files: exe=%v cfg=%v bat=%v serviceInstaller=%v", foundExe, foundCfg, foundBat, foundInstaller)
 	}
 }
+
+func TestAgentRegistrationDoesNotAutoUpdate(t *testing.T) {
+	db, err := NewDB(filepath.Join(t.TempDir(), "test.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	s := &Server{cfg: Config{Version: "0.2.13", APIKey: "test-key"}, db: db}
+	s.hub = NewHub(db)
+	client := &Client{DeviceID: "pilot-1", Send: make(chan []byte, 1), Hub: s.hub, IsAgent: true}
+	deviceData, _ := json.Marshal(models.Device{Hostname: "PILOT", OS: "windows", Arch: "amd64", Version: "0.2.12"})
+	raw, _ := json.Marshal(models.WSMessage{Action: "register", Data: deviceData})
+
+	s.handleAgentMessage(client, raw)
+	if len(client.Send) != 0 {
+		t.Fatal("registration queued an automatic update; updates must require dashboard approval")
+	}
+}
+
+func TestQueueAgentUpdateOnlyForOnlineOutdatedDevice(t *testing.T) {
+	db, err := NewDB(filepath.Join(t.TempDir(), "test.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	s := &Server{cfg: Config{Version: "0.2.13", APIKey: "test-key"}, db: db}
+	s.hub = NewHub(db)
+	device := &models.Device{ID: "pilot-1", Hostname: "PILOT", OS: "windows", Arch: "amd64", Version: "0.2.12"}
+	if err := db.UpsertDevice(device); err != nil {
+		t.Fatal(err)
+	}
+	client := &Client{DeviceID: device.ID, Send: make(chan []byte, 1), Hub: s.hub, IsAgent: true}
+	s.hub.RegisterAgent(client)
+
+	status, err := s.queueAgentUpdate(device.ID, "admin")
+	if err != nil || status != "queued" {
+		t.Fatalf("queueAgentUpdate status=%q err=%v", status, err)
+	}
+	select {
+	case raw := <-client.Send:
+		if !strings.Contains(string(raw), `"action":"upgrade"`) || !strings.Contains(string(raw), `"version":"0.2.13"`) {
+			t.Fatalf("unexpected update command: %s", raw)
+		}
+	default:
+		t.Fatal("expected an update command for the online outdated agent")
+	}
+
+	device.Version = "0.2.13"
+	if err := db.UpsertDevice(device); err != nil {
+		t.Fatal(err)
+	}
+	status, err = s.queueAgentUpdate(device.ID, "admin")
+	if err != nil || status != "up_to_date" {
+		t.Fatalf("up-to-date agent status=%q err=%v", status, err)
+	}
+}

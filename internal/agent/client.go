@@ -37,8 +37,16 @@ type Agent struct {
 	done       chan struct{}
 	updatingMu sync.Mutex
 	isUpdating bool
-	remoteMu   sync.Mutex
-	remoteConn *websocket.Conn
+	// serviceManaged means the Windows service supervisor owns this worker's
+	// lifecycle. After replacing the binary, the worker exits and lets the
+	// supervisor start exactly one replacement process.
+	serviceManaged bool
+	remoteMu       sync.Mutex
+	remoteConn     *websocket.Conn
+}
+
+func (a *Agent) SetServiceManaged(managed bool) {
+	a.serviceManaged = managed
 }
 
 func NewAgent(cfg AgentConfig, version, cfgPath string) *Agent {
@@ -477,8 +485,13 @@ func (a *Agent) PerformUpdate(rawURL string) {
 		return
 	}
 
-	log.Printf("[agent] update applied successfully (%d bytes). Spawning new agent process...", n)
+	log.Printf("[agent] update applied successfully (%d bytes)", n)
+	if a.serviceManaged {
+		log.Printf("[agent] update installed; exiting so the Windows service supervisor can restart the worker")
+		os.Exit(0)
+	}
 
+	log.Printf("[agent] spawning replacement process...")
 	cmd := exec.Command(exePath, os.Args[1:]...)
 	cmd.Dir = dir
 	cmd.Stdout = os.Stdout
