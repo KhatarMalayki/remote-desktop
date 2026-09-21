@@ -499,40 +499,67 @@ function renderBranchAssets() {
     return;
   }
 
-  container.innerHTML = '<table class="device-table"><thead><tr><th>Tag / Hostname</th><th>Nama Perangkat</th><th>Kategori</th><th>Cabang & Lokasi</th><th>PIC</th><th>Kondisi</th><th>Status Verifikasi</th><th>Verifikator</th><th>Aksi</th></tr></thead><tbody>' +
-    items.map(function(it) {
+  container.innerHTML = '<div class="asset-record-list">' +
+    items.map(function(it, index) {
       var vBadge = it.vStatus==='verified'?'verified':(it.vStatus==='discrepancy'?'discrepancy':'unverified');
       var vLabel = it.vStatus==='verified'?'&#10004; Terverifikasi':(it.vStatus==='discrepancy'?'&#10008; Selisih':'&#9203; Belum');
       var condClass = it.condition==='good'?'good':(it.condition==='fair'?'fair':'damaged');
       var condLabel = it.condition==='good'?'Baik':(it.condition==='fair'?'Rusak Ringan':'Rusak Berat');
-      return '<tr>' +
-        '<td><strong>'+esc(it.tag)+'</strong><br><small style="color:var(--fg2)">'+(it.isManual?'Manual':'Agent')+'</small></td>' +
-        '<td><strong>'+esc(it.name)+'</strong><br><small style="color:var(--fg2)">'+esc(it.specs||'-')+'</small></td>' +
-        '<td><span class="tag">'+esc(it.category.toUpperCase())+'</span></td>' +
-        '<td>'+esc(it.branch)+'<br><small style="color:var(--fg2)">'+esc(it.location||'-')+'</small></td>' +
-        '<td>'+esc(it.pic||'-')+'</td>' +
-        '<td><span class="badge-cond '+condClass+'">'+condLabel+'</span></td>' +
-        '<td><span class="badge-status '+vBadge+'">'+vLabel+'</span></td>' +
-        '<td>'+(it.vBy?'<strong>'+esc(it.vBy)+'</strong><br><small style="color:var(--fg2)">'+(it.vAt?new Date(it.vAt).toLocaleDateString():'')+' '+esc(it.vNote||'')+'</small>':'<span style="color:var(--fg2);font-size:11px">Belum dicek</span>')+'</td>' +
-        '<td><div style="display:flex;gap:4px;flex-wrap:wrap"><button class="btn-verify" onclick="openVerifyModal(\''+it.id+'\',\''+(it.isManual?'manual':'device')+'\',\''+esc(it.name).replace(/'/g,"\\'")+'\',\''+esc(it.tag).replace(/'/g,"\\'")+'\',\''+esc(it.location||it.branch).replace(/'/g,"\\'")+'\',\''+esc(it.pic||'-').replace(/'/g,"\\'")+'\',\''+it.condition+'\')">&#9989; Verifikasi</button>' +
-        (it.isManual ? '<button class="btn-sm-action" onclick="openEditAssetModal(\''+it.id+'\')">&#9998;</button><button class="btn-sm-action" style="color:var(--red)" onclick="deleteManualAsset(\''+it.id+'\')">&#128465;</button>' : '') +
-        '</div></td></tr>';
-    }).join('') + '</tbody></table>';
-  container.querySelectorAll('tbody tr').forEach(function(row, index) {
+      var verifiedMeta = it.vBy
+        ? '<strong>'+esc(it.vBy)+'</strong><span>'+esc(it.vAt?new Date(it.vAt).toLocaleDateString():'')+(it.vNote?' · '+esc(it.vNote):'')+'</span>'
+        : '<strong>Belum dicek</strong><span>Belum ada riwayat verifikasi</span>';
+      return '<article class="asset-record" data-item-index="'+index+'">' +
+        '<div class="asset-record-head">' +
+          '<div class="asset-record-identity"><div class="asset-record-icon">'+(it.isManual?'&#128230;':'&#128421;')+'</div><div>' +
+            '<div class="asset-record-title">'+esc(it.name)+'</div>' +
+            '<div class="asset-record-subtitle"><span>'+esc(it.tag)+'</span><span class="asset-source">'+(it.isManual?'Manual':'Agent')+'</span><span class="tag">'+esc(it.category.toUpperCase())+'</span></div>' +
+          '</div></div>' +
+          '<div class="asset-record-badges"><span class="badge-cond '+condClass+'">'+condLabel+'</span><span class="badge-status '+vBadge+'">'+vLabel+'</span></div>' +
+        '</div>' +
+        '<div class="asset-record-details">' +
+          '<div class="asset-detail"><span>Spesifikasi</span><strong>'+esc(it.specs||'Belum tersedia')+'</strong></div>' +
+          '<div class="asset-detail"><span>Cabang & lokasi</span><strong>'+esc(it.branch||'-')+'</strong><small>'+esc(it.location||'Lokasi belum diisi')+'</small></div>' +
+          '<div class="asset-detail"><span>Pemegang aset</span><strong class="asset-holder">Belum ditugaskan</strong><small>'+esc(it.pic&&it.pic!=='-'?it.pic:'PIC belum diisi')+'</small></div>' +
+          '<div class="asset-detail asset-verifier"><span>Verifikator</span>'+verifiedMeta+'</div>' +
+        '</div>' +
+        '<div class="asset-recommendation-slot"></div>' +
+        '<div class="asset-record-footer"><span class="asset-responsibility">Pastikan data dan pemegang aset selalu sesuai kondisi aktual.</span><div class="asset-record-actions"></div></div>' +
+      '</article>';
+    }).join('') + '</div>';
+  container.querySelectorAll('.asset-record').forEach(function(card, index) {
     var item = items[index];
-    var asset = (item.isManual ? manualAssets : devices).find(function(a) { return a.id === item.id; });
-    var actions = row.lastElementChild.firstElementChild;
-    if (isAssetUser() || currentUser.role === 'viewer') actions.innerHTML = '';
+    var asset = (item.isManual ? manualAssets : devices).find(function(a) { return a.id === item.id; }) || {};
+    var actions = card.querySelector('.asset-record-actions');
+    var holder = card.querySelector('.asset-holder');
+    holder.textContent = asset.owner_username || 'Belum ditugaskan';
+    function addAction(label, className, handler) {
+      var button = document.createElement('button');
+      button.className = className;
+      button.textContent = label;
+      button.onclick = handler;
+      actions.appendChild(button);
+    }
+    if (!isAssetUser() && currentUser.role !== 'viewer') {
+      addAction('✓ Verifikasi', 'btn-verify', function() {
+        openVerifyModal(item.id, item.isManual?'manual':'device', item.name, item.tag, item.location||item.branch, item.pic||'-', item.condition);
+      });
+    }
     if (currentUser.role !== 'viewer') {
       if (isAssetUser() || !item.isManual) {
-        var edit = document.createElement('button'); edit.className = 'btn-sm-action'; edit.textContent = 'Edit';
-        edit.onclick = function() { if (item.isManual) openEditAssetModal(item.id); else openDeviceModal(item.id); }; actions.appendChild(edit);
+        addAction(item.isManual?'Edit':'Detail', 'btn-sm-action', function() { if (item.isManual) openEditAssetModal(item.id); else openDeviceModal(item.id); });
+      } else if (item.isManual) {
+        addAction('Edit', 'btn-sm-action', function() { openEditAssetModal(item.id); });
+        addAction('Hapus', 'btn-sm-action btn-delete-asset', function() { deleteManualAsset(item.id); });
       }
-      var button = document.createElement('button'); button.className = 'btn-sm-action'; button.textContent = isAssetUser() ? 'Ajukan Switch' : 'Switch / Tugaskan';
-      button.onclick = function() { requestAssetSwitch(item.isManual ? 'manual' : 'device', item.id); }; actions.appendChild(button);
+      addAction(isAssetUser() ? 'Ajukan Switch' : 'Switch / Tugaskan', 'btn-sm-action', function() { requestAssetSwitch(item.isManual ? 'manual' : 'device', item.id); });
     }
-    var holder = document.createElement('div'); holder.textContent = 'Akun pemegang: ' + (asset.owner_username || 'Belum ditugaskan'); row.children[4].appendChild(holder);
-    if (asset.recommendation) { var advice = document.createElement('p'); advice.className = 'asset-advice'; advice.textContent = asset.recommendation; row.children[1].appendChild(advice); }
+    if (asset.recommendation) {
+      var advice = document.createElement('div');
+      advice.className = 'asset-advice asset-record-advice';
+      advice.innerHTML = '<strong>Rekomendasi operasional</strong><span></span>';
+      advice.querySelector('span').textContent = asset.recommendation;
+      card.querySelector('.asset-recommendation-slot').appendChild(advice);
+    }
   });
 }
 
