@@ -659,7 +659,7 @@ func TestAgentPackageDownload(t *testing.T) {
 			data, _ := io.ReadAll(rc)
 			rc.Close()
 			script := string(data)
-			if !strings.Contains(script, `sc.exe create`) || !strings.Contains(script, `RemoteDeskAgent`) || !strings.Contains(script, `Start-Service`) {
+			if !strings.Contains(script, `Invoke-CimMethod`) || !strings.Contains(script, `New-Service`) || !strings.Contains(script, `RemoteDeskAgent`) || !strings.Contains(script, `Start-Service`) {
 				t.Fatalf("invalid system service installer: %s", script)
 			}
 			if !strings.Contains(script, `Stop-Service -Name $serviceName`) || !strings.Contains(script, `WaitForStatus('Stopped'`) || !strings.Contains(script, `Get-Process -Name "rd-agent"`) || !strings.Contains(script, `Copy-Item`) {

@@ -2553,12 +2553,12 @@ if (-not [string]::IsNullOrWhiteSpace($previousDeviceID)) {
     [System.IO.File]::WriteAllText($config, $configJSON, (New-Object System.Text.UTF8Encoding($false)))
 }
 $binPath = '"' + $exe + '" --system-service --config "' + $config + '"'
-if (Get-Service -Name $serviceName -ErrorAction SilentlyContinue) {
-	$scResult = & sc.exe config $serviceName binPath= $binPath start= auto 2>&1
-    if ($LASTEXITCODE -ne 0) { throw "Konfigurasi Windows service gagal diperbarui: $($scResult -join ' ')" }
+$existingService = Get-CimInstance -ClassName Win32_Service -Filter "Name='$serviceName'" -ErrorAction SilentlyContinue
+if ($null -ne $existingService) {
+    $changeResult = Invoke-CimMethod -InputObject $existingService -MethodName Change -Arguments @{ PathName = $binPath; StartMode = 'Automatic' }
+    if ($changeResult.ReturnValue -ne 0) { throw "Konfigurasi Windows service gagal diperbarui (kode $($changeResult.ReturnValue))" }
 } else {
-	$scResult = & sc.exe create $serviceName binPath= $binPath start= auto 2>&1
-    if ($LASTEXITCODE -ne 0) { throw "Windows service gagal dibuat: $($scResult -join ' ')" }
+    New-Service -Name $serviceName -BinaryPathName $binPath -StartupType Automatic -DisplayName "RemoteDesk Agent" | Out-Null
 }
 & sc.exe description $serviceName "RemoteDesk secure desktop remote service" | Out-Null
 & sc.exe failure $serviceName reset= 86400 actions= restart/5000/restart/15000/restart/60000 | Out-Null
