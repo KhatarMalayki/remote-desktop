@@ -34,7 +34,7 @@ func ManageRustDesk(command models.RustDeskCommand) models.RustDeskResult {
 	if err == nil && command.Config != "" {
 		err = runRustDeskAdmin(binary, "--config", command.Config)
 	}
-	if err == nil {
+	if err == nil && command.Password != "" {
 		err = runRustDeskAdmin(binary, "--password", command.Password)
 	}
 	if err != nil {

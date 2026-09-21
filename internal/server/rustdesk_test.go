@@ -81,3 +81,91 @@ func TestRustDeskConfigFallsBackToDeploymentConfig(t *testing.T) {
 		t.Fatalf("rustDeskConfig()=%q", got)
 	}
 }
+
+func TestRegistrationQueuesRustDeskBootstrap(t *testing.T) {
+	db, err := NewDB(t.TempDir() + "/test.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	hub := NewHub(db)
+	hub.agents["pc-1"] = &Client{DeviceID: "pc-1", Send: make(chan []byte, 1)}
+	s := &Server{db: db, hub: hub, cfg: Config{RustDeskConfig: "=deployment-config"}}
+
+	registration, _ := json.Marshal(models.Device{
+		Hostname: "PC Epson",
+		OS:       "windows",
+		Version:  rustDeskAutoInstallAgentVersion,
+	})
+	payload, _ := json.Marshal(map[string]interface{}{"action": "register", "data": json.RawMessage(registration)})
+	s.handleAgentMessage(hub.agents["pc-1"], payload)
+
+	select {
+	case raw := <-hub.agents["pc-1"].Send:
+		var envelope struct {
+			Action string                 `json:"action"`
+			Data   models.RustDeskCommand `json:"data"`
+		}
+		if err := json.Unmarshal(raw, &envelope); err != nil {
+			t.Fatal(err)
+		}
+		if envelope.Action != "rustdesk_manage" || envelope.Data.Operation != "install" {
+			t.Fatalf("unexpected bootstrap command: %#v", envelope)
+		}
+		if envelope.Data.Config != "=deployment-config" || envelope.Data.DownloadURL == "" || envelope.Data.SHA256 == "" {
+			t.Fatalf("incomplete bootstrap command: %#v", envelope.Data)
+		}
+		if envelope.Data.Password != "" {
+			t.Fatal("automatic bootstrap must not assign or retain a password")
+		}
+	default:
+		t.Fatal("automatic RustDesk bootstrap was not queued")
+	}
+}
+
+func TestRegistrationDoesNotBootstrapRustDeskWhenAlreadyDetected(t *testing.T) {
+	db, err := NewDB(t.TempDir() + "/test.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	hub := NewHub(db)
+	hub.agents["pc-1"] = &Client{DeviceID: "pc-1", Send: make(chan []byte, 1)}
+	s := &Server{db: db, hub: hub, cfg: Config{RustDeskConfig: "=deployment-config"}}
+
+	registration, _ := json.Marshal(models.Device{
+		Hostname:   "PC Epson",
+		OS:         "windows",
+		Version:    rustDeskAutoInstallAgentVersion,
+		RustDeskID: "123456789",
+	})
+	payload, _ := json.Marshal(map[string]interface{}{"action": "register", "data": json.RawMessage(registration)})
+	s.handleAgentMessage(hub.agents["pc-1"], payload)
+
+	select {
+	case raw := <-hub.agents["pc-1"].Send:
+		t.Fatalf("unexpected bootstrap command: %s", raw)
+	default:
+	}
+}
+
+func TestRegistrationDoesNotBootstrapUnsupportedAgent(t *testing.T) {
+	db, err := NewDB(t.TempDir() + "/test.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	hub := NewHub(db)
+	hub.agents["pc-1"] = &Client{DeviceID: "pc-1", Send: make(chan []byte, 1)}
+	s := &Server{db: db, hub: hub, cfg: Config{RustDeskConfig: "=deployment-config"}}
+
+	registration, _ := json.Marshal(models.Device{Hostname: "PC Epson", OS: "windows", Version: "0.2.31"})
+	payload, _ := json.Marshal(map[string]interface{}{"action": "register", "data": json.RawMessage(registration)})
+	s.handleAgentMessage(hub.agents["pc-1"], payload)
+
+	select {
+	case raw := <-hub.agents["pc-1"].Send:
+		t.Fatalf("unsupported agent received bootstrap command: %s", raw)
+	default:
+	}
+}

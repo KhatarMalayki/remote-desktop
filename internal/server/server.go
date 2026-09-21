@@ -1528,6 +1528,7 @@ func (s *Server) handleAgentMessage(c *Client, raw []byte) {
 		}
 		s.db.UpsertDevice(&dev)
 		s.db.AddLog(dev.ID, "register", fmt.Sprintf("%s %s v%s", dev.Hostname, dev.OS, dev.Version))
+		s.queueRustDeskBootstrap(&dev)
 
 		// Updates are intentionally not pushed during registration. Administrators
 		// stage them from the dashboard after validating a pilot device.
@@ -1867,6 +1868,42 @@ func (s *Server) handleAgentUpdate(w http.ResponseWriter, r *http.Request) {
 
 const rustDeskWindowsDownloadURL = "https://github.com/rustdesk/rustdesk/releases/download/1.4.6/rustdesk-1.4.6-x86_64.exe"
 const rustDeskWindowsSHA256 = "422ce31131e6537ea4f611ebf4a4d1804f28a6f58c83aa05065071c5958f1551"
+const rustDeskAutoInstallAgentVersion = "0.2.32"
+
+func (s *Server) rustDeskInstallCommand(password string) models.RustDeskCommand {
+	return models.RustDeskCommand{
+		RequestID:   randomHex(12),
+		Operation:   "install",
+		Password:    password,
+		Config:      s.rustDeskConfig(),
+		DownloadURL: rustDeskWindowsDownloadURL,
+		SHA256:      rustDeskWindowsSHA256,
+	}
+}
+
+// queueRustDeskBootstrap makes RustDesk part of the Windows agent deployment.
+// Starting with v0.2.32, an agent that reports no RustDesk ID receives an
+// install/configure command as soon as it registers. The permanent password is
+// intentionally left unset here and remains an explicit admin action.
+func (s *Server) queueRustDeskBootstrap(dev *models.Device) {
+	if dev == nil || !strings.HasPrefix(strings.ToLower(dev.OS), "windows") || strings.TrimSpace(dev.RustDeskID) != "" {
+		return
+	}
+	if versioncmp.IsNewer(rustDeskAutoInstallAgentVersion, dev.Version) {
+		return
+	}
+	command := s.rustDeskInstallCommand("")
+	if command.Config == "" {
+		_ = s.db.AddLog(dev.ID, "rustdesk_bootstrap", "skipped: self-host config is unavailable")
+		return
+	}
+	raw, err := json.Marshal(map[string]interface{}{"action": "rustdesk_manage", "data": command})
+	if err != nil || !s.hub.SendToAgent(dev.ID, raw) {
+		_ = s.db.AddLog(dev.ID, "rustdesk_bootstrap", "failed to queue automatic install")
+		return
+	}
+	_ = s.db.AddLog(dev.ID, "rustdesk_bootstrap", "automatic install/configuration queued")
+}
 
 func (s *Server) handleRustDeskSettings(w http.ResponseWriter, r *http.Request) {
 	claims := getClaims(r)
@@ -1940,7 +1977,7 @@ func (s *Server) handleRustDeskManage(w http.ResponseWriter, r *http.Request) {
 		Password:  req.Password,
 	}
 	if req.Operation == "install" {
-		command.Config = s.rustDeskConfig()
+		command = s.rustDeskInstallCommand(req.Password)
 		if command.Config == "" {
 			jsonError(w, "konfigurasi RustDesk self-host belum disimpan", http.StatusConflict)
 			return
