@@ -14,9 +14,12 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"time"
+	"unsafe"
 
 	"github.com/user/remote-desktop/internal/models"
+	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/svc"
 	"golang.org/x/sys/windows/svc/mgr"
 )
@@ -34,7 +37,14 @@ func ManageRustDesk(command models.RustDeskCommand) models.RustDeskResult {
 		}
 	}
 	if err == nil && command.Config != "" {
-		err = runRustDeskAdmin(binary, "--config", command.Config)
+		var cliConfig string
+		cliConfig, err = rustDeskCLIConfig(command.Config)
+		if err == nil {
+			err = runRustDeskAdmin(binary, "--config", cliConfig)
+		}
+		if err == nil {
+			err = runRustDeskAsConsoleUser(binary, "--config", cliConfig)
+		}
 		if err == nil {
 			err = restartRustDeskService()
 		}
@@ -48,6 +58,53 @@ func ManageRustDesk(command models.RustDeskCommand) models.RustDeskResult {
 	}
 	result.RustDeskID = getRustDeskID()
 	return result
+}
+
+func runRustDeskAsConsoleUser(binary string, args ...string) error {
+	sessionID := windows.WTSGetActiveConsoleSessionId()
+	if sessionID == 0xFFFFFFFF {
+		return nil
+	}
+	var token windows.Token
+	if err := windows.WTSQueryUserToken(sessionID, &token); err != nil {
+		return fmt.Errorf("mengambil token pengguna aktif gagal: %w", err)
+	}
+	defer token.Close()
+	var environment *uint16
+	if err := windows.CreateEnvironmentBlock(&environment, token, false); err != nil {
+		return fmt.Errorf("membuat environment pengguna aktif gagal: %w", err)
+	}
+	defer windows.DestroyEnvironmentBlock(environment)
+
+	parts := []string{syscall.EscapeArg(binary)}
+	for _, arg := range args {
+		parts = append(parts, syscall.EscapeArg(arg))
+	}
+	command, err := windows.UTF16PtrFromString(strings.Join(parts, " "))
+	if err != nil {
+		return err
+	}
+	application, err := windows.UTF16PtrFromString(binary)
+	if err != nil {
+		return err
+	}
+	desktop, _ := windows.UTF16PtrFromString("winsta0\\default")
+	workingDirectory, _ := windows.UTF16PtrFromString(filepath.Dir(binary))
+	startup := &windows.StartupInfo{Cb: uint32(unsafe.Sizeof(windows.StartupInfo{})), Desktop: desktop}
+	var process windows.ProcessInformation
+	if err := windows.CreateProcessAsUser(token, application, command, nil, nil, false, windows.CREATE_NO_WINDOW|windows.CREATE_UNICODE_ENVIRONMENT, environment, workingDirectory, startup, &process); err != nil {
+		return fmt.Errorf("menerapkan config ke profil pengguna aktif gagal: %w", err)
+	}
+	defer windows.CloseHandle(process.Thread)
+	defer windows.CloseHandle(process.Process)
+	if result, err := windows.WaitForSingleObject(process.Process, 45*1000); err != nil || result == uint32(windows.WAIT_TIMEOUT) {
+		return fmt.Errorf("RustDesk profil pengguna tidak selesai menerapkan config")
+	}
+	var exitCode uint32
+	if err := windows.GetExitCodeProcess(process.Process, &exitCode); err != nil || exitCode != 0 {
+		return fmt.Errorf("RustDesk profil pengguna gagal menerapkan config (exit %d)", exitCode)
+	}
+	return nil
 }
 
 func restartRustDeskService() error {
