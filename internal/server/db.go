@@ -46,6 +46,7 @@ func migrate(db *sql.DB) error {
 		disk_total INTEGER NOT NULL DEFAULT 0,
 		disk_used INTEGER NOT NULL DEFAULT 0,
 		version TEXT NOT NULL DEFAULT '',
+		rustdesk_id TEXT NOT NULL DEFAULT '',
 		status TEXT NOT NULL DEFAULT 'active',
 		tags TEXT NOT NULL DEFAULT '',
 		group_name TEXT NOT NULL DEFAULT 'default',
@@ -206,6 +207,7 @@ func migrate(db *sql.DB) error {
 		`ALTER TABLE asset_switch_requests ADD COLUMN swap_asset_type TEXT NOT NULL DEFAULT ''`,
 		`ALTER TABLE manual_assets ADD COLUMN acquisition_year INTEGER NOT NULL DEFAULT 0`,
 		`ALTER TABLE devices ADD COLUMN owner_username TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE devices ADD COLUMN rustdesk_id TEXT NOT NULL DEFAULT ''`,
 		`ALTER TABLE manual_assets ADD COLUMN owner_username TEXT NOT NULL DEFAULT ''`,
 	}
 	for _, q := range alters {
@@ -222,20 +224,20 @@ func (d *DB) UpsertDevice(dev *models.Device) error {
 	}
 	query := `
 	INSERT INTO devices (id, hostname, os, arch, ip, local_ip, cpu_model, cpu_cores,
-		memory_total, memory_used, disk_total, disk_used, version, status, tags, group_name, branch, note, last_seen, registered_at)
-	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		memory_total, memory_used, disk_total, disk_used, version, rustdesk_id, status, tags, group_name, branch, note, last_seen, registered_at)
+	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	ON CONFLICT(id) DO UPDATE SET
 		hostname=excluded.hostname, os=excluded.os, arch=excluded.arch,
 		ip=excluded.ip, local_ip=excluded.local_ip, cpu_model=excluded.cpu_model,
 		cpu_cores=excluded.cpu_cores, memory_total=excluded.memory_total,
 		memory_used=excluded.memory_used, disk_total=excluded.disk_total,
-		disk_used=excluded.disk_used, version=excluded.version,
+		disk_used=excluded.disk_used, version=excluded.version, rustdesk_id=excluded.rustdesk_id,
 		last_seen=excluded.last_seen
 	`
 	_, err := d.db.Exec(query,
 		dev.ID, dev.Hostname, dev.OS, dev.Arch, dev.IP, dev.LocalIP,
 		dev.CPUModel, dev.CPUCores, dev.MemoryTotal, dev.MemoryUsed,
-		dev.DiskTotal, dev.DiskUsed, dev.Version, dev.Status,
+		dev.DiskTotal, dev.DiskUsed, dev.Version, dev.RustDeskID, dev.Status,
 		dev.Tags, dev.GroupName, branch, dev.Note, dev.LastSeen, dev.RegisteredAt,
 	)
 	return err
@@ -243,15 +245,15 @@ func (d *DB) UpsertDevice(dev *models.Device) error {
 
 func (d *DB) UpdateHeartbeat(hb *models.DeviceHeartbeat) error {
 	_, err := d.db.Exec(
-		`UPDATE devices SET memory_used=?, disk_used=?, last_seen=? WHERE id=?`,
-		hb.MemoryUsed, hb.DiskUsed, time.Now(), hb.ID,
+		`UPDATE devices SET memory_used=?, disk_used=?, rustdesk_id=CASE WHEN ?='' THEN rustdesk_id ELSE ? END, last_seen=? WHERE id=?`,
+		hb.MemoryUsed, hb.DiskUsed, hb.RustDeskID, hb.RustDeskID, time.Now(), hb.ID,
 	)
 	return err
 }
 
 func (d *DB) GetDevice(id string) (*models.Device, error) {
 	row := d.db.QueryRow(`SELECT id, hostname, os, arch, ip, local_ip, cpu_model, cpu_cores,
-		memory_total, memory_used, disk_total, disk_used, version, status, tags, group_name,
+		memory_total, memory_used, disk_total, disk_used, version, rustdesk_id, status, tags, group_name,
 		branch, verification_status, verified_at, verified_by, verification_note, note,
 		owner_username, acquisition_year, last_seen, registered_at FROM devices WHERE id=?`, id)
 	return scanDevice(row)
@@ -279,7 +281,7 @@ func (d *DB) ListDevices(group, search string, limit, offset int) ([]*models.Dev
 	}
 
 	query := fmt.Sprintf(`SELECT id, hostname, os, arch, ip, local_ip, cpu_model, cpu_cores,
-		memory_total, memory_used, disk_total, disk_used, version, status, tags, group_name,
+		memory_total, memory_used, disk_total, disk_used, version, rustdesk_id, status, tags, group_name,
 		branch, verification_status, verified_at, verified_by, verification_note, note,
 		owner_username, acquisition_year, last_seen, registered_at FROM devices WHERE %s ORDER BY last_seen DESC LIMIT ? OFFSET ?`, where)
 	args = append(args, limit, offset)
@@ -315,7 +317,7 @@ func (d *DB) ListDevicesForOwner(username, search string, limit, offset int) ([]
 		return nil, 0, err
 	}
 	query := fmt.Sprintf(`SELECT id, hostname, os, arch, ip, local_ip, cpu_model, cpu_cores,
-		memory_total, memory_used, disk_total, disk_used, version, status, tags, group_name,
+		memory_total, memory_used, disk_total, disk_used, version, rustdesk_id, status, tags, group_name,
 		branch, verification_status, verified_at, verified_by, verification_note, note,
 		owner_username, acquisition_year, last_seen, registered_at FROM devices WHERE %s ORDER BY last_seen DESC LIMIT ? OFFSET ?`, where)
 	args = append(args, limit, offset)
@@ -1095,7 +1097,7 @@ func scanDevice(row scanner) (*models.Device, error) {
 	var vAt sql.NullTime
 	err := row.Scan(&dev.ID, &dev.Hostname, &dev.OS, &dev.Arch, &dev.IP, &dev.LocalIP,
 		&dev.CPUModel, &dev.CPUCores, &dev.MemoryTotal, &dev.MemoryUsed,
-		&dev.DiskTotal, &dev.DiskUsed, &dev.Version, &dev.Status,
+		&dev.DiskTotal, &dev.DiskUsed, &dev.Version, &dev.RustDeskID, &dev.Status,
 		&dev.Tags, &dev.GroupName, &dev.Branch, &dev.VerificationStatus, &vAt,
 		&dev.VerifiedBy, &dev.VerificationNote, &dev.Note, &dev.OwnerUsername, &dev.AcquisitionYear, &dev.LastSeen, &dev.RegisteredAt)
 	if err != nil {

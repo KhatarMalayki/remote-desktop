@@ -310,6 +310,7 @@ function buildDeviceTable(list) {
       var versionLabel = d.version ? 'v' + esc(d.version) : 'Tidak diketahui';
       var updateLabel = pending ? 'Memproses' : (outdated ? 'Perlu Update' : 'Terbaru');
       var updateColor = pending ? '#fbbf24' : (outdated ? '#ef4444' : '#34d399');
+      var rustDeskID = /^\d{6,20}$/.test(String(d.rustdesk_id || '')) ? String(d.rustdesk_id) : '';
       return '<tr><td><span class="status-dot '+(d.online?'online':'offline')+'"></span>'+(d.online?'Online':'Offline')+'</td>' +
         '<td><strong>'+esc(d.hostname)+'</strong><br><small style="color:var(--fg2)">'+esc(d.id)+'</small></td>' +
         '<td>'+osIcon(d.os)+' '+esc(d.os)+' '+esc(d.arch)+'</td>' +
@@ -321,7 +322,8 @@ function buildDeviceTable(list) {
         '<td><strong>'+versionLabel+'</strong><br><small style="color:'+updateColor+'">'+updateLabel+'</small></td>' +
         '<td>'+timeAgo(d.last_seen)+'</td>' +
         '<td><button class="btn btn-ghost btn-sm" onclick="openDeviceModal(\''+d.id+'\')">Details</button>' +
-        (d.online ? ' <button class="btn btn-primary btn-sm" onclick="quickRemote(\''+d.id+'\')">Remote</button>' : '') +
+        (d.online ? ' <button class="btn btn-primary btn-sm" onclick="quickRemote(\''+d.id+'\')">Remote Web</button>' : '') +
+        (rustDeskID ? ' <button class="btn btn-warning btn-sm" onclick="openRustDesk(\''+rustDeskID+'\')">RustDesk</button>' : '') +
         (currentUser && currentUser.role === 'admin' && outdated ? ' <button class="btn btn-warning btn-sm" '+(!d.online||pending?'disabled':'')+' onclick="updateDeviceAgent(\''+d.id+'\')">Update</button>' : '') +
         '</td></tr>';
     }).join('') + '</tbody></table>';
@@ -331,6 +333,13 @@ function parseAgentVersion(value) {
   var clean = String(value || '').trim().replace(/^v/i, '').split('-')[0];
   if (!/^\d+(\.\d+)*$/.test(clean)) return null;
   return clean.split('.').map(function(part){ return Number(part); });
+}
+
+function openRustDesk(id) {
+  id = String(id || '').trim();
+  if (!/^\d{6,20}$/.test(id)) { showToast('ID RustDesk perangkat belum valid'); return; }
+  window.location.href = 'rustdesk://connection/new/' + encodeURIComponent(id);
+  showToast('Membuka RustDesk ID ' + id + '. Gunakan ini untuk lock screen/UAC.');
 }
 
 function isVersionNewer(candidate, current) {
@@ -769,6 +778,7 @@ async function openDeviceModal(id) {
   var dev = await api('/api/devices/' + id);
   if (!dev) return;
   currentDevice = dev;
+  var rustDeskID = /^\d{6,20}$/.test(String(dev.rustdesk_id || '')) ? String(dev.rustdesk_id) : '';
   document.getElementById('modalTitle').textContent = dev.hostname + ' - ' + dev.id;
   document.getElementById('modalDetails').innerHTML =
     '<div class="detail-item"><div class="label">OS</div><div class="value">'+esc(dev.os)+' '+esc(dev.arch)+'</div></div>' +
@@ -777,6 +787,7 @@ async function openDeviceModal(id) {
     '<div class="detail-item"><div class="label">Memory</div><div class="value">'+fmtBytes(dev.memory_used)+' / '+fmtBytes(dev.memory_total)+'</div></div>' +
     '<div class="detail-item"><div class="label">Disk</div><div class="value">'+fmtBytes(dev.disk_used)+' / '+fmtBytes(dev.disk_total)+'</div></div>' +
     '<div class="detail-item"><div class="label">Status</div><div class="value"><span class="status-dot '+(dev.online?'online':'offline')+'"></span>'+(dev.online?'Online':'Offline')+'</div></div>' +
+    '<div class="detail-item"><div class="label">RustDesk Self-host</div><div class="value">'+(rustDeskID ? esc(rustDeskID)+' <button class="btn btn-warning btn-sm" onclick="openRustDesk(\''+rustDeskID+'\')">Buka</button>' : 'Belum terdeteksi')+'</div></div>' +
     '<div class="detail-item"><div class="label">Cabang</div><div class="value">'+esc(dev.branch||dev.group||'-')+'</div></div>' +
     '<div class="detail-item"><div class="label">Registered</div><div class="value">'+new Date(dev.registered_at).toLocaleString()+'</div></div>';
   document.getElementById('modalTags').value = dev.tags || '';
@@ -889,11 +900,19 @@ function updateRemoteDeviceList() {
   if (!sel) return;
   var cur = sel.value;
   sel.innerHTML = '<option value="">Select Device...</option>';
-  devices.filter(function(d){return d.online}).forEach(function(d){ sel.innerHTML += '<option value="'+d.id+'">'+esc(d.hostname)+' ('+d.id+')</option>'; });
+  devices.filter(function(d){return d.online || d.rustdesk_id}).forEach(function(d){ sel.innerHTML += '<option value="'+d.id+'">'+esc(d.hostname)+' ('+d.id+')'+(d.online?'':' — offline web')+'</option>'; });
   if (cur) sel.value = cur;
 }
 
 function quickRemote(id) { showPage('remote'); document.getElementById('remoteDeviceSelect').value = id; startRemote(); }
+
+function openSelectedRustDesk() {
+  var deviceId = document.getElementById('remoteDeviceSelect').value;
+  var device = devices.find(function(item){ return item.id === deviceId; });
+  if (!device) { showToast('Pilih perangkat terlebih dahulu'); return; }
+  if (!device.rustdesk_id) { showToast('RustDesk belum terdeteksi. Update agent lalu restart servicenya.'); return; }
+  openRustDesk(device.rustdesk_id);
+}
 
 function startRemote() {
   var deviceId = document.getElementById('remoteDeviceSelect').value;

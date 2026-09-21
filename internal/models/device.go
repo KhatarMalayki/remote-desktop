@@ -19,6 +19,7 @@ type Device struct {
 	DiskTotal          uint64     `json:"disk_total"`
 	DiskUsed           uint64     `json:"disk_used"`
 	Version            string     `json:"version"`
+	RustDeskID         string     `json:"rustdesk_id"`
 	Status             string     `json:"status"`
 	Tags               string     `json:"tags"`
 	GroupName          string     `json:"group"`
@@ -143,6 +144,7 @@ type DeviceHeartbeat struct {
 	MemoryUsed uint64  `json:"memory_used"`
 	DiskUsed   uint64  `json:"disk_used"`
 	Uptime     int64   `json:"uptime"`
+	RustDeskID string  `json:"rustdesk_id"`
 }
 
 type SignalMessage struct {

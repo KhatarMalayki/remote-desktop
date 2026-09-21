@@ -34,6 +34,7 @@ type Agent struct {
 	cfg        AgentConfig
 	cfgPath    string
 	version    string
+	rustDeskID string
 	conn       *websocket.Conn
 	done       chan struct{}
 	updatingMu sync.Mutex
@@ -144,6 +145,7 @@ func (a *Agent) connect() error {
 
 func (a *Agent) register() {
 	info := CollectSystemInfo()
+	a.rustDeskID = info.RustDeskID
 	info.Version = a.version
 	info.Branch = a.cfg.Branch
 	data, _ := json.Marshal(info)
@@ -171,6 +173,7 @@ func (a *Agent) heartbeatLoop() {
 				"cpu_usage":   GetCPUUsage(),
 				"memory_used": memUsed,
 				"disk_used":   diskUsed,
+				"rustdesk_id": a.rustDeskID,
 			}
 			data, _ := json.Marshal(hb)
 			msg := map[string]interface{}{

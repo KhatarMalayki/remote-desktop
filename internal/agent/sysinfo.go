@@ -22,6 +22,7 @@ type SystemInfo struct {
 	LocalIP     string `json:"local_ip"`
 	Version     string `json:"version"`
 	Branch      string `json:"branch"`
+	RustDeskID  string `json:"rustdesk_id"`
 }
 
 func CollectSystemInfo() SystemInfo {
@@ -36,6 +37,7 @@ func CollectSystemInfo() SystemInfo {
 	info.MemoryTotal, info.MemoryUsed = getMemoryInfo()
 	info.DiskTotal, info.DiskUsed = getDiskInfo()
 	info.LocalIP = getLocalIP()
+	info.RustDeskID = getRustDeskID()
 
 	return info
 }
