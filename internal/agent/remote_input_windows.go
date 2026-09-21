@@ -8,20 +8,17 @@ import (
 	"os/exec"
 	"strings"
 	"syscall"
+	"unsafe"
+
+	"github.com/lxn/win"
 )
 
 var (
 	user32DLL            = syscall.NewLazyDLL("user32.dll")
 	setCursorPos         = user32DLL.NewProc("SetCursorPos")
-	mouseEventProc       = user32DLL.NewProc("mouse_event")
-	keybdEventProc       = user32DLL.NewProc("keybd_event")
 	openInputDesktopProc = user32DLL.NewProc("OpenInputDesktop")
 	setThreadDesktopProc = user32DLL.NewProc("SetThreadDesktop")
 	closeDesktopProc     = user32DLL.NewProc("CloseDesktop")
-)
-
-const (
-	keyEventKeyUp = 0x0002
 )
 
 func handleRemoteInput(command remoteCommand, bounds image.Rectangle) error {
@@ -39,15 +36,18 @@ func handleRemoteInput(command remoteCommand, bounds image.Rectangle) error {
 		if command.Type == "mouse_up" {
 			flag = up
 		}
-		mouseEventProc.Call(flag, 0, 0, 0, 0)
-		return nil
+		return sendMouseInput(uint32(flag), 0)
 	case "mouse_wheel":
 		setRemoteCursor(command.X, command.Y, bounds)
 		if command.DeltaY != 0 {
-			mouseEventProc.Call(0x0800, 0, 0, uintptr(int32(-command.DeltaY)), 0)
+			if err := sendMouseInput(win.MOUSEEVENTF_WHEEL, int32(-command.DeltaY)); err != nil {
+				return err
+			}
 		}
 		if command.DeltaX != 0 {
-			mouseEventProc.Call(0x01000, 0, 0, uintptr(int32(command.DeltaX)), 0)
+			if err := sendMouseInput(win.MOUSEEVENTF_HWHEEL, int32(command.DeltaX)); err != nil {
+				return err
+			}
 		}
 		return nil
 	case "key_down", "key_up":
@@ -55,12 +55,11 @@ func handleRemoteInput(command remoteCommand, bounds image.Rectangle) error {
 		if !ok {
 			return fmt.Errorf("unsupported key %q (%s)", command.Key, command.Code)
 		}
-		flags := uintptr(0)
+		flags := uint32(0)
 		if command.Type == "key_up" {
-			flags = keyEventKeyUp
+			flags = win.KEYEVENTF_KEYUP
 		}
-		keybdEventProc.Call(vk, 0, flags, 0)
-		return nil
+		return sendKeyboardInput(uint16(vk), flags)
 	default:
 		return fmt.Errorf("unsupported command %q", command.Type)
 	}
@@ -99,10 +98,10 @@ func mouseFlags(button int) (uintptr, uintptr) {
 
 func releaseRemoteInputs() {
 	for _, vk := range []uintptr{0x10, 0x11, 0x12, 0x5B, 0x5C} {
-		keybdEventProc.Call(vk, 0, keyEventKeyUp, 0)
+		_ = sendKeyboardInput(uint16(vk), win.KEYEVENTF_KEYUP)
 	}
 	for _, flag := range []uintptr{0x0004, 0x0010, 0x0040} {
-		mouseEventProc.Call(flag, 0, 0, 0, 0)
+		_ = sendMouseInput(uint32(flag), 0)
 	}
 }
 
@@ -123,10 +122,37 @@ func sendRemoteHotkey(keys []string) error {
 			return fmt.Errorf("tombol shortcut tidak didukung: %s", code)
 		}
 		virtualKeys = append(virtualKeys, vk)
-		keybdEventProc.Call(vk, 0, 0, 0)
+		if err := sendKeyboardInput(uint16(vk), 0); err != nil {
+			return err
+		}
 	}
 	for i := len(virtualKeys) - 1; i >= 0; i-- {
-		keybdEventProc.Call(virtualKeys[i], 0, keyEventKeyUp, 0)
+		if err := sendKeyboardInput(uint16(virtualKeys[i]), win.KEYEVENTF_KEYUP); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// SendInput inserts an event into Windows' actual input stream. It is more
+// reliable than the deprecated keybd_event/mouse_event APIs on the Winlogon
+// desktop and reports when Windows rejects an event instead of failing silently.
+func sendKeyboardInput(vk uint16, flags uint32) error {
+	input := win.KEYBD_INPUT{Type: win.INPUT_KEYBOARD}
+	input.Ki.WVk = vk
+	input.Ki.DwFlags = flags
+	if sent := win.SendInput(1, unsafe.Pointer(&input), int32(unsafe.Sizeof(input))); sent != 1 {
+		return fmt.Errorf("Windows menolak input keyboard (SendInput: %d, error: %d)", sent, win.GetLastError())
+	}
+	return nil
+}
+
+func sendMouseInput(flags uint32, data int32) error {
+	input := win.MOUSE_INPUT{Type: win.INPUT_MOUSE}
+	input.Mi.DwFlags = flags
+	input.Mi.MouseData = uint32(data)
+	if sent := win.SendInput(1, unsafe.Pointer(&input), int32(unsafe.Sizeof(input))); sent != 1 {
+		return fmt.Errorf("Windows menolak input mouse (SendInput: %d, error: %d)", sent, win.GetLastError())
 	}
 	return nil
 }
