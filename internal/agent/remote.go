@@ -256,11 +256,12 @@ func (a *Agent) startRemoteRelay(sessionID string) {
 			}
 		case <-ticker.C:
 			secureDesktop := isSecureInputDesktop()
-			if a.secureDesktopOnly && !secureDesktop {
-				log.Printf("[remote] Winlogon desktop ended; secure relay worker requesting reconnect")
-				_ = sendJSON(map[string]string{"type": "desktop_transition", "message": "Windows terbuka; menyambungkan ulang remote…"})
-				return
-			}
+			// A worker created directly on Winlogon must not infer an unlock from
+			// OpenInputDesktop. On some Windows 11 builds that API reports Default
+			// to a UIAccess process even while the credential screen is visible,
+			// which previously caused an endless normal/secure reconnect loop.
+			// Keep the secure relay until the viewer disconnects; after an actual
+			// unlock the operator can reconnect explicitly to return to Default.
 			if !a.secureDesktopOnly && a.secureRelayStarter != nil && secureDesktop {
 				a.forceSecureUntil.Store(time.Now().Add(15 * time.Second).UnixNano())
 				log.Printf("[remote] Winlogon desktop became active; requesting secure relay reconnect")

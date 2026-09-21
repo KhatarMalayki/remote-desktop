@@ -10,6 +10,7 @@ let manualAssets = [];
 let currentDevice = null;
 let ws = null;
 let remoteWS = null;
+let remoteTransitionHistory = [];
 let searchTimeout = null;
 let idleTimer = null;
 let serverAgentVersion = '';
@@ -989,8 +990,16 @@ function startRemote() {
         }
         if (relayMessage.type === 'clipboard_error' || relayMessage.type === 'input_error' || relayMessage.type === 'error' || relayMessage.type === 'relay_info') showToast(relayMessage.message || 'Remote session mengalami masalah');
 		if (relayMessage.type === 'desktop_transition') {
-		  desktopTransition = true;
-		  showToast(relayMessage.message || 'Desktop Windows berubah; menyambungkan ulang…');
+		  var transitionNow = Date.now();
+		  remoteTransitionHistory = remoteTransitionHistory.filter(function(t){ return transitionNow - t < 10000; });
+		  if (remoteTransitionHistory.length < 2) {
+		    remoteTransitionHistory.push(transitionNow);
+		    desktopTransition = true;
+		    showToast(relayMessage.message || 'Desktop Windows berubah; menyambungkan ulang…');
+		  } else {
+		    desktopTransition = false;
+		    showToast('Perpindahan desktop dihentikan agar tidak berulang. Klik Connect untuk mencoba kembali.');
+		  }
 		}
       } catch (_) {}
     }
