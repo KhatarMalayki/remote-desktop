@@ -471,6 +471,19 @@ func (a *Agent) PerformUpdate(rawURL string) {
 		log.Printf("[agent] downloaded file incomplete or corrupt (bytes=%d, err=%v)", n, err)
 		return
 	}
+	if a.serviceManaged {
+		// A Windows service keeps rd-agent.exe open, so a worker cannot rename
+		// its own image in place. A separate PowerShell helper survives after the
+		// worker exits, stops the service, swaps the binary, and starts the service
+		// again. This keeps dashboard updates usable for SYSTEM-installed agents.
+		if err := scheduleServiceManagedUpdate(exePath, newPath, oldPath); err != nil {
+			os.Remove(newPath)
+			log.Printf("[agent] failed to schedule service-managed update: %v", err)
+			return
+		}
+		log.Printf("[agent] service-managed update scheduled (%d bytes); exiting for helper", n)
+		os.Exit(0)
+	}
 
 	_ = os.Remove(oldPath)
 	if err := os.Rename(exePath, oldPath); err != nil {
@@ -486,11 +499,6 @@ func (a *Agent) PerformUpdate(rawURL string) {
 	}
 
 	log.Printf("[agent] update applied successfully (%d bytes)", n)
-	if a.serviceManaged {
-		log.Printf("[agent] update installed; exiting so the Windows service supervisor can restart the worker")
-		os.Exit(0)
-	}
-
 	log.Printf("[agent] spawning replacement process...")
 	cmd := exec.Command(exePath, os.Args[1:]...)
 	cmd.Dir = dir

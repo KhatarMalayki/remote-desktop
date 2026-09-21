@@ -704,7 +704,7 @@ func TestAgentRegistrationDoesNotAutoUpdate(t *testing.T) {
 	}
 	defer db.Close()
 
-	s := &Server{cfg: Config{Version: "0.2.15", APIKey: "test-key"}, db: db}
+	s := &Server{cfg: Config{Version: "0.2.16", APIKey: "test-key"}, db: db}
 	s.hub = NewHub(db)
 	client := &Client{DeviceID: "pilot-1", Send: make(chan []byte, 1), Hub: s.hub, IsAgent: true}
 	deviceData, _ := json.Marshal(models.Device{Hostname: "PILOT", OS: "windows", Arch: "amd64", Version: "0.2.12"})
@@ -723,7 +723,7 @@ func TestQueueAgentUpdateOnlyForOnlineOutdatedDevice(t *testing.T) {
 	}
 	defer db.Close()
 
-	s := &Server{cfg: Config{Version: "0.2.15", APIKey: "test-key"}, db: db}
+	s := &Server{cfg: Config{Version: "0.2.16", APIKey: "test-key"}, db: db}
 	s.hub = NewHub(db)
 	device := &models.Device{ID: "pilot-1", Hostname: "PILOT", OS: "windows", Arch: "amd64", Version: "0.2.12"}
 	if err := db.UpsertDevice(device); err != nil {
@@ -738,14 +738,14 @@ func TestQueueAgentUpdateOnlyForOnlineOutdatedDevice(t *testing.T) {
 	}
 	select {
 	case raw := <-client.Send:
-		if !strings.Contains(string(raw), `"action":"upgrade"`) || !strings.Contains(string(raw), `"version":"0.2.15"`) {
+		if !strings.Contains(string(raw), `"action":"upgrade"`) || !strings.Contains(string(raw), `"version":"0.2.16"`) {
 			t.Fatalf("unexpected update command: %s", raw)
 		}
 	default:
 		t.Fatal("expected an update command for the online outdated agent")
 	}
 
-	device.Version = "0.2.15"
+	device.Version = "0.2.16"
 	if err := db.UpsertDevice(device); err != nil {
 		t.Fatal(err)
 	}
