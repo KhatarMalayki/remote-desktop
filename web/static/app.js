@@ -918,6 +918,7 @@ function startRemote() {
   var pressedKeys = {};
   var pendingMove = null;
   var moveScheduled = false;
+	var desktopTransition = false;
   var connectTimer = setTimeout(function() {
     if (!receivedFrame && remoteWS === sessionSocket) {
       showToast('Layar device belum merespons. Pastikan agent terbaru aktif pada sesi Windows yang sedang login.');
@@ -987,6 +988,10 @@ function startRemote() {
           navigator.clipboard.writeText(relayMessage.text || '').then(function(){ showToast('Clipboard komputer remote sudah disalin ke perangkat ini'); }).catch(function(){ showToast('Browser menolak akses clipboard'); });
         }
         if (relayMessage.type === 'clipboard_error' || relayMessage.type === 'input_error' || relayMessage.type === 'error' || relayMessage.type === 'relay_info') showToast(relayMessage.message || 'Remote session mengalami masalah');
+		if (relayMessage.type === 'desktop_transition') {
+		  desktopTransition = true;
+		  showToast(relayMessage.message || 'Desktop Windows berubah; menyambungkan ulang…');
+		}
       } catch (_) {}
     }
   };
@@ -998,6 +1003,9 @@ function startRemote() {
     clearTimeout(connectTimer);
     setRemoteStatus('disconnected');
     setRemoteControls(false);
+	if (desktopTransition) setTimeout(function() {
+	  if (!remoteWS && document.getElementById('remoteDeviceSelect').value === deviceId) startRemote();
+	}, 700);
   };
 
   canvas.addEventListener('mousemove', function(e) {

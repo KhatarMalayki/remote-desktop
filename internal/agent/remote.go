@@ -66,7 +66,8 @@ func (a *Agent) startRemoteRelay(sessionID string) {
 	// normal desktop to Winlogon. Hand the relay to a LocalSystem child that was
 	// created directly on winsta0\\Winlogon instead.
 	desktopName := activeInputDesktopName()
-	if a.secureRelayStarter != nil && strings.EqualFold(desktopName, "Winlogon") {
+	forceSecure := time.Now().UnixNano() < a.forceSecureUntil.Load()
+	if a.secureRelayStarter != nil && (strings.EqualFold(desktopName, "Winlogon") || forceSecure) {
 		if err := a.secureRelayStarter(sessionID); err == nil {
 			log.Printf("[remote] delegated locked-screen relay to Winlogon worker")
 			return
@@ -244,10 +245,26 @@ func (a *Agent) startRemoteRelay(sessionID string) {
 			if inputErr := handleRemoteInput(command, bounds); inputErr != nil {
 				log.Printf("[remote] input ignored: %v", inputErr)
 				_ = sendJSON(map[string]string{"type": "input_error", "message": inputErr.Error()})
+				if !a.secureDesktopOnly && a.secureRelayStarter != nil && strings.Contains(inputErr.Error(), "SendInput") {
+					// Windows deliberately reports zero/ERROR_SUCCESS when UIPI
+					// blocks injection. Remember this briefly so the replacement
+					// viewer session is delegated directly to Winlogon.
+					a.forceSecureUntil.Store(time.Now().Add(15 * time.Second).UnixNano())
+					_ = sendJSON(map[string]string{"type": "desktop_transition", "message": "Beralih ke kontrol lock screen Windows…"})
+					return
+				}
 			}
 		case <-ticker.C:
-			if a.secureDesktopOnly && !isSecureInputDesktop() {
-				log.Printf("[remote] Winlogon desktop ended; secure relay worker exiting")
+			secureDesktop := isSecureInputDesktop()
+			if a.secureDesktopOnly && !secureDesktop {
+				log.Printf("[remote] Winlogon desktop ended; secure relay worker requesting reconnect")
+				_ = sendJSON(map[string]string{"type": "desktop_transition", "message": "Windows terbuka; menyambungkan ulang remote…"})
+				return
+			}
+			if !a.secureDesktopOnly && a.secureRelayStarter != nil && secureDesktop {
+				a.forceSecureUntil.Store(time.Now().Add(15 * time.Second).UnixNano())
+				log.Printf("[remote] Winlogon desktop became active; requesting secure relay reconnect")
+				_ = sendJSON(map[string]string{"type": "desktop_transition", "message": "Windows terkunci; menyambungkan kontrol lock screen…"})
 				return
 			}
 			// On Windows this re-attaches the current OS thread to the desktop
