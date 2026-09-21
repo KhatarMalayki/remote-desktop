@@ -665,6 +665,9 @@ func TestAgentPackageDownload(t *testing.T) {
 			if !strings.Contains(script, `Stop-Service -Name $serviceName`) || !strings.Contains(script, `WaitForStatus('Stopped'`) || !strings.Contains(script, `Get-Process -Name "rd-agent"`) || !strings.Contains(script, `Copy-Item`) {
 				t.Fatalf("installer must stop the old service before replacing its binary: %s", script)
 			}
+			if !strings.Contains(script, `Get-Process -Name "rd-agent", "rd-agent-uiaccess"`) || !strings.Contains(script, `function Copy-WithRetry`) {
+				t.Fatalf("installer must stop and retry replacement of both agent executables: %s", script)
+			}
 			if !strings.Contains(script, `Add-Member -NotePropertyName "device_id"`) {
 				t.Fatalf("installer must preserve the device identity for packages without device_id: %s", script)
 			}

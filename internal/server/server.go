@@ -2535,13 +2535,31 @@ if (Get-Service -Name $serviceName -ErrorAction SilentlyContinue) {
     $service = Get-Service -Name $serviceName
     $service.WaitForStatus('Stopped', (New-TimeSpan -Seconds 20))
 }
-Get-Process -Name "rd-agent" -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
-Start-Sleep -Milliseconds 750
+Get-Process -Name "rd-agent", "rd-agent-uiaccess" -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+for ($attempt = 0; $attempt -lt 40; $attempt++) {
+    $remaining = Get-Process -Name "rd-agent", "rd-agent-uiaccess" -ErrorAction SilentlyContinue
+    if ($null -eq $remaining) { break }
+    Start-Sleep -Milliseconds 250
+}
+if (Get-Process -Name "rd-agent", "rd-agent-uiaccess" -ErrorAction SilentlyContinue) {
+    throw "Proses RemoteDesk lama tidak dapat dihentikan. Restart Windows lalu jalankan installer kembali."
+}
+function Copy-WithRetry([string]$Source, [string]$Destination) {
+    for ($attempt = 1; $attempt -le 20; $attempt++) {
+        try {
+            Copy-Item -LiteralPath $Source -Destination $Destination -Force
+            return
+        } catch {
+            if ($attempt -eq 20) { throw }
+            Start-Sleep -Milliseconds 250
+        }
+    }
+}
 New-Item -ItemType Directory -Path $installDir -Force | Out-Null
 New-Item -ItemType Directory -Path $configDir -Force | Out-Null
-Copy-Item -LiteralPath (Join-Path $packageDir "rd-agent.exe") -Destination (Join-Path $installDir "rd-agent.exe") -Force
-Copy-Item -LiteralPath (Join-Path $packageDir "rd-agent-uiaccess.exe") -Destination (Join-Path $installDir "rd-agent-uiaccess.exe") -Force
-Copy-Item -LiteralPath (Join-Path $packageDir "agent.json") -Destination (Join-Path $configDir "agent.json") -Force
+Copy-WithRetry (Join-Path $packageDir "rd-agent.exe") (Join-Path $installDir "rd-agent.exe")
+Copy-WithRetry (Join-Path $packageDir "rd-agent-uiaccess.exe") (Join-Path $installDir "rd-agent-uiaccess.exe")
+Copy-WithRetry (Join-Path $packageDir "agent.json") (Join-Path $configDir "agent.json")
 $exe = Join-Path $installDir "rd-agent.exe"
 $config = Join-Path $configDir "agent.json"
 if (-not [string]::IsNullOrWhiteSpace($previousDeviceID)) {
