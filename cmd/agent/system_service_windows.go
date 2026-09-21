@@ -120,6 +120,9 @@ func startConsoleSystemWorker(configPath string) error {
 		return fmt.Errorf("open LocalSystem process token: %w", err)
 	}
 	defer current.Close()
+	if err := enableTokenPrivilege(current, "SeTcbPrivilege"); err != nil {
+		return fmt.Errorf("enable LocalSystem TCB privilege: %w", err)
+	}
 	var token windows.Token
 	if err := windows.DuplicateTokenEx(current, windows.TOKEN_ALL_ACCESS, nil, windows.SecurityImpersonation, windows.TokenPrimary, &token); err != nil {
 		return fmt.Errorf("duplicate LocalSystem token: %w", err)
@@ -127,6 +130,14 @@ func startConsoleSystemWorker(configPath string) error {
 	defer token.Close()
 	if err := windows.SetTokenInformation(token, windows.TokenSessionId, (*byte)(unsafe.Pointer(&sessionID)), uint32(unsafe.Sizeof(sessionID))); err != nil {
 		return fmt.Errorf("assign token to console session: %w", err)
+	}
+	// An executable whose manifest requests uiAccess=true must be started with
+	// a token carrying TokenUIAccess. Signing it and installing it below
+	// Program Files are necessary, but do not add that token attribute by
+	// themselves when a service uses CreateProcessAsUser.
+	uiAccess := uint32(1)
+	if err := windows.SetTokenInformation(token, windows.TokenUIAccess, (*byte)(unsafe.Pointer(&uiAccess)), uint32(unsafe.Sizeof(uiAccess))); err != nil {
+		return fmt.Errorf("enable UIAccess on console-worker token: %w", err)
 	}
 
 	desktop, err := windows.UTF16PtrFromString("winsta0\\Default")
@@ -154,6 +165,29 @@ func startConsoleSystemWorker(configPath string) error {
 
 	// Wait for the worker to end before the supervisor considers a replacement.
 	_, _ = windows.WaitForSingleObject(process.Process, windows.INFINITE)
+	return nil
+}
+
+func enableTokenPrivilege(token windows.Token, privilege string) error {
+	name, err := windows.UTF16PtrFromString(privilege)
+	if err != nil {
+		return err
+	}
+	var luid windows.LUID
+	if err := windows.LookupPrivilegeValue(nil, name, &luid); err != nil {
+		return err
+	}
+	state := windows.Tokenprivileges{PrivilegeCount: 1}
+	state.Privileges[0] = windows.LUIDAndAttributes{
+		Luid:       luid,
+		Attributes: windows.SE_PRIVILEGE_ENABLED,
+	}
+	if err := windows.AdjustTokenPrivileges(token, false, &state, 0, nil, nil); err != nil {
+		return err
+	}
+	if err := windows.GetLastError(); err == windows.ERROR_NOT_ALL_ASSIGNED {
+		return err
+	}
 	return nil
 }
 
