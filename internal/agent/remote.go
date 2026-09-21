@@ -9,6 +9,7 @@ import (
 	"image/jpeg"
 	"log"
 	"net/url"
+	"runtime"
 	"sync"
 	"time"
 
@@ -60,6 +61,12 @@ func validRemoteSessionID(value string) bool {
 }
 
 func (a *Agent) startRemoteRelay(sessionID string) {
+	// A Windows desktop is bound to an OS thread, not a Go goroutine.  Keep the
+	// capture path on one thread for the complete relay lifetime so it remains
+	// attached when Windows switches Default <-> Winlogon on lock/unlock.
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
+
 	monitorCount := screenshot.NumActiveDisplays()
 	if monitorCount == 0 {
 		log.Printf("[remote] no active display is available")
@@ -132,6 +139,11 @@ func (a *Agent) startRemoteRelay(sessionID string) {
 
 	readDone := make(chan struct{})
 	go func() {
+		// Keyboard/mouse injection needs its own stable desktop-bound thread.
+		// Without this, Go may move the reader goroutine to a different thread
+		// after OpenInputDesktop succeeds, which breaks input on the lock screen.
+		runtime.LockOSThread()
+		defer runtime.UnlockOSThread()
 		defer close(readDone)
 		for {
 			messageType, payload, readErr := conn.ReadMessage()

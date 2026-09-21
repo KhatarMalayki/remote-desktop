@@ -2,10 +2,15 @@
 
 package main
 
-import "testing"
+import (
+	"fmt"
+	"os"
+	"testing"
+)
 
 func TestSystemWorkerLockRejectsDuplicate(t *testing.T) {
-	release, acquired, err := acquireSystemWorkerLock()
+	lockName := fmt.Sprintf(`Local\RemoteDeskAgentSystemWorker-test-%d`, os.Getpid())
+	release, acquired, err := acquireNamedWorkerLock(lockName)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -14,7 +19,7 @@ func TestSystemWorkerLockRejectsDuplicate(t *testing.T) {
 	}
 	defer release()
 
-	releaseDuplicate, duplicateAcquired, err := acquireSystemWorkerLock()
+	releaseDuplicate, duplicateAcquired, err := acquireNamedWorkerLock(lockName)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -110,6 +110,12 @@ func sendRemoteHotkey(keys []string) error {
 	if len(keys) == 0 || len(keys) > 6 {
 		return fmt.Errorf("shortcut remote tidak valid")
 	}
+	// Shortcuts are also input. Attach to Winlogon when the machine is locked,
+	// otherwise a key combination can be delivered to the invisible Default
+	// desktop instead of the active login screen.
+	if err := prepareRemoteDesktop(); err != nil {
+		return err
+	}
 	virtualKeys := make([]uintptr, 0, len(keys))
 	for _, code := range keys {
 		vk, ok := windowsVirtualKey(code, "")

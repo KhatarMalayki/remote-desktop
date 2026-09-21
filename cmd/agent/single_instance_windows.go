@@ -12,7 +12,11 @@ import (
 // service supervisor from running simultaneously during an upgrade. The lock
 // lives in the active console session, which is exactly where both workers run.
 func acquireSystemWorkerLock() (release func(), acquired bool, err error) {
-	name, err := windows.UTF16PtrFromString(`Local\RemoteDeskAgentSystemWorker`)
+	return acquireNamedWorkerLock(`Local\RemoteDeskAgentSystemWorker`)
+}
+
+func acquireNamedWorkerLock(lockName string) (release func(), acquired bool, err error) {
+	name, err := windows.UTF16PtrFromString(lockName)
 	if err != nil {
 		return nil, false, err
 	}
