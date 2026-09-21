@@ -15,7 +15,7 @@ RUN CGO_ENABLED=1 GOOS=linux go build -ldflags="-s -w" -o /bin/rd-server ./cmd/s
 
 # Build agent binaries for multi-platform distribution & client auto-update
 RUN mkdir -p /agents && \
-    if [ -f /prebuilt-agent/rd-agent-windows-amd64.exe ]; then cp /prebuilt-agent/rd-agent-windows-amd64.exe /agents/rd-agent-windows-amd64.exe; else echo "ERROR: signed Windows agent artifact missing" >&2; exit 1; fi && \
+    if [ -f /prebuilt-agent/rd-agent-windows-amd64.exe ] && [ -f /prebuilt-agent/rd-agent-uiaccess.exe ]; then cp /prebuilt-agent/rd-agent-windows-amd64.exe /agents/rd-agent-windows-amd64.exe && cp /prebuilt-agent/rd-agent-uiaccess.exe /agents/rd-agent-uiaccess.exe; else echo "ERROR: signed Windows agent artifacts missing" >&2; exit 1; fi && \
     CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o /agents/rd-agent-linux-amd64 ./cmd/agent && \
     CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o /agents/rd-agent-darwin-amd64 ./cmd/agent
 

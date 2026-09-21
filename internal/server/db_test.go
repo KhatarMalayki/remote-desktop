@@ -600,6 +600,7 @@ func TestAgentPackageDownload(t *testing.T) {
 	// Write dummy agent
 	dummyAgent := filepath.Join(tempDir, "rd-agent-windows-amd64.exe")
 	_ = os.WriteFile(dummyAgent, []byte("MOCK_EXE_CONTENT"), 0755)
+	_ = os.WriteFile(filepath.Join(tempDir, "rd-agent-uiaccess.exe"), []byte("MOCK_UIACCESS_EXE_CONTENT"), 0755)
 
 	s := &Server{
 		cfg: Config{
@@ -639,11 +640,15 @@ func TestAgentPackageDownload(t *testing.T) {
 	foundCfg := false
 	foundBat := false
 	foundInstaller := false
+	foundUIAccess := false
 	foundRootCert := false
 
 	for _, f := range zr.File {
 		if f.Name == "rd-agent.exe" {
 			foundExe = true
+		}
+		if f.Name == "rd-agent-uiaccess.exe" {
+			foundUIAccess = true
 		}
 		if f.Name == "run-agent.bat" {
 			foundBat = true
@@ -699,7 +704,7 @@ func TestAgentPackageDownload(t *testing.T) {
 		}
 	}
 
-	if !foundExe || !foundCfg || !foundBat || !foundInstaller || !foundRootCert {
+	if !foundExe || !foundUIAccess || !foundCfg || !foundBat || !foundInstaller || !foundRootCert {
 		t.Fatalf("zip archive missing expected files: exe=%v cfg=%v bat=%v serviceInstaller=%v", foundExe, foundCfg, foundBat, foundInstaller)
 	}
 }

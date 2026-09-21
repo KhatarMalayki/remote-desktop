@@ -37,11 +37,13 @@ jobs:
           }
           New-Item -ItemType Directory -Force -Path prebuilt-agent | Out-Null
           $agentPath = Join-Path $PWD 'prebuilt-agent\rd-agent-windows-amd64.exe'
-          go run github.com/akavel/rsrc@v0.10.2 -manifest cmd/agent/uiaccess.manifest -o cmd/agent/rd-agent-uiaccess_windows_amd64.syso
+          $uiAccessPath = Join-Path $PWD 'prebuilt-agent\rd-agent-uiaccess.exe'
           $env:CGO_ENABLED = '0'
           $env:GOOS = 'windows'
           $env:GOARCH = 'amd64'
           go build -ldflags='-s -w' -o $agentPath ./cmd/agent
+          go run github.com/akavel/rsrc@v0.10.2 -manifest cmd/agent/uiaccess.manifest -o cmd/agent/rd-agent-uiaccess_windows_amd64.syso
+          go build -ldflags='-s -w' -o $uiAccessPath ./cmd/agent
 
           $pfxPath = Join-Path $env:RUNNER_TEMP 'remotedesk-signing.pfx'
           [System.IO.File]::WriteAllBytes($pfxPath, [Convert]::FromBase64String($env:SIGN_CERT_BASE64))
@@ -50,15 +52,19 @@ jobs:
           if ([string]::IsNullOrWhiteSpace($signTool)) { throw 'signtool.exe tidak ditemukan pada runner Windows' }
           & $signTool sign /fd SHA256 /f $pfxPath /p $env:SIGN_CERT_PASSWORD /tr http://timestamp.digicert.com /td SHA256 $agentPath
           if ($LASTEXITCODE -ne 0) { throw 'Penandatanganan rd-agent.exe gagal' }
+          & $signTool sign /fd SHA256 /f $pfxPath /p $env:SIGN_CERT_PASSWORD /tr http://timestamp.digicert.com /td SHA256 $uiAccessPath
+          if ($LASTEXITCODE -ne 0) { throw 'Penandatanganan rd-agent-uiaccess.exe gagal' }
           Remove-Item -LiteralPath $pfxPath -Force
           $signature = Get-AuthenticodeSignature -FilePath $agentPath
           if ($signature.Status -ne 'Valid') { throw "Tanda tangan agent tidak valid: $($signature.Status)" }
+          $uiAccessSignature = Get-AuthenticodeSignature -FilePath $uiAccessPath
+          if ($uiAccessSignature.Status -ne 'Valid') { throw "Tanda tangan UIAccess agent tidak valid: $($uiAccessSignature.Status)" }
 
       - name: Upload signed agent
         uses: actions/upload-artifact@v4
         with:
           name: signed-windows-agent
-          path: prebuilt-agent/rd-agent-windows-amd64.exe
+          path: prebuilt-agent/
           if-no-files-found: error
 
   build-and-push:

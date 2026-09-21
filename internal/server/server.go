@@ -2448,6 +2448,30 @@ func (s *Server) handleAgentPackageDownload(w http.ResponseWriter, r *http.Reque
 	}
 
 	if targetOS == "windows" {
+		uiAccessCandidates := []string{}
+		if s.cfg.AgentsDir != "" {
+			uiAccessCandidates = append(uiAccessCandidates, filepath.Join(s.cfg.AgentsDir, "rd-agent-uiaccess.exe"))
+		}
+		uiAccessCandidates = append(uiAccessCandidates,
+			filepath.Join("bin", "agents", "rd-agent-uiaccess.exe"),
+			filepath.Join("bin", "rd-agent-uiaccess.exe"),
+			"rd-agent-uiaccess.exe",
+		)
+		var uiAccessBytes []byte
+		for _, candidate := range uiAccessCandidates {
+			if bytes, readErr := os.ReadFile(candidate); readErr == nil && len(bytes) > 0 {
+				uiAccessBytes = bytes
+				break
+			}
+		}
+		if len(uiAccessBytes) == 0 {
+			jsonError(w, "File UIAccess agent belum tersedia di server.", 503)
+			return
+		}
+		if fUIAccess, createErr := zw.Create("rd-agent-uiaccess.exe"); createErr == nil {
+			_, _ = fUIAccess.Write(uiAccessBytes)
+		}
+
 		// UIAccess only accepts an executable whose certificate chains to a root
 		// trusted by Windows.  The root is public (the signing key is never put
 		// in this ZIP) and is installed once by the elevated installer below.
@@ -2501,6 +2525,8 @@ if ($LASTEXITCODE -ne 0) { throw "Gagal memasang sertifikat root RemoteDesk" }
 if ($LASTEXITCODE -ne 0) { throw "Gagal memasang sertifikat penerbit RemoteDesk" }
 $signature = Get-AuthenticodeSignature -FilePath (Join-Path $packageDir "rd-agent.exe")
 if ($signature.Status -ne 'Valid') { throw "Agent tidak memiliki tanda tangan digital yang valid: $($signature.Status)" }
+$uiAccessSignature = Get-AuthenticodeSignature -FilePath (Join-Path $packageDir "rd-agent-uiaccess.exe")
+if ($uiAccessSignature.Status -ne 'Valid') { throw "UIAccess agent tidak memiliki tanda tangan digital yang valid: $($uiAccessSignature.Status)" }
 # Stop every process that can hold rd-agent.exe before overwriting it.  A
 # Windows service keeps its image file open, so copying first makes upgrades
 # fail deterministically with "being used by another process".
@@ -2514,6 +2540,7 @@ Start-Sleep -Milliseconds 750
 New-Item -ItemType Directory -Path $installDir -Force | Out-Null
 New-Item -ItemType Directory -Path $configDir -Force | Out-Null
 Copy-Item -LiteralPath (Join-Path $packageDir "rd-agent.exe") -Destination (Join-Path $installDir "rd-agent.exe") -Force
+Copy-Item -LiteralPath (Join-Path $packageDir "rd-agent-uiaccess.exe") -Destination (Join-Path $installDir "rd-agent-uiaccess.exe") -Force
 Copy-Item -LiteralPath (Join-Path $packageDir "agent.json") -Destination (Join-Path $configDir "agent.json") -Force
 $exe = Join-Path $installDir "rd-agent.exe"
 $config = Join-Path $configDir "agent.json"

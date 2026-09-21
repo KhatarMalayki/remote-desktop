@@ -107,6 +107,10 @@ func startConsoleSystemWorker(configPath string) error {
 	if _, err := os.Stat(configPath); err != nil {
 		return fmt.Errorf("agent config unavailable: %w", err)
 	}
+	workerExe := filepath.Join(filepath.Dir(exe), "rd-agent-uiaccess.exe")
+	if _, err := os.Stat(workerExe); err != nil {
+		return fmt.Errorf("UIAccess worker unavailable: %w", err)
+	}
 
 	// GetCurrentProcessToken is a pseudo-token handle. It is convenient for
 	// inspection, but Windows rejects it for DuplicateTokenEx on some service
@@ -130,11 +134,11 @@ func startConsoleSystemWorker(configPath string) error {
 		return err
 	}
 	workerLog := filepath.Join(filepath.Dir(configPath), "worker.log")
-	command, err := windows.UTF16PtrFromString(fmt.Sprintf("\"%s\" --system-worker --config \"%s\" --log-file \"%s\"", exe, configPath, workerLog))
+	command, err := windows.UTF16PtrFromString(fmt.Sprintf("\"%s\" --system-worker --config \"%s\" --log-file \"%s\"", workerExe, configPath, workerLog))
 	if err != nil {
 		return err
 	}
-	workingDir, err := windows.UTF16PtrFromString(filepath.Dir(exe))
+	workingDir, err := windows.UTF16PtrFromString(filepath.Dir(workerExe))
 	if err != nil {
 		return err
 	}
