@@ -3,6 +3,7 @@ bin/
 *.db-wal
 *.db-shm
 *.exe
+*.syso
 *.log
 vendor/
 .env

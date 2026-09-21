@@ -2448,6 +2448,23 @@ func (s *Server) handleAgentPackageDownload(w http.ResponseWriter, r *http.Reque
 	}
 
 	if targetOS == "windows" {
+		// UIAccess only accepts an executable whose certificate chains to a root
+		// trusted by Windows.  The root is public (the signing key is never put
+		// in this ZIP) and is installed once by the elevated installer below.
+		certCandidates := []string{
+			filepath.Join(filepath.Dir(s.cfg.AgentsDir), "certs", "RemoteDesk-Internal-Root.cer"),
+			filepath.Join("certs", "RemoteDesk-Internal-Root.cer"),
+			filepath.Join("..", "..", "certs", "RemoteDesk-Internal-Root.cer"),
+		}
+		for _, certPath := range certCandidates {
+			if certBytes, readErr := os.ReadFile(certPath); readErr == nil && len(certBytes) > 0 {
+				if fCert, createErr := zw.Create("RemoteDesk-Internal-Root.cer"); createErr == nil {
+					_, _ = fCert.Write(certBytes)
+				}
+				break
+			}
+		}
+
 		// 1. start-hidden.vbs for silent background execution
 		vbsContent := `Set WshShell = CreateObject("WScript.Shell")
 WshShell.CurrentDirectory = CreateObject("Scripting.FileSystemObject").GetParentFolderName(WScript.ScriptFullName)
@@ -2459,16 +2476,31 @@ WshShell.Run chr(34) & WshShell.CurrentDirectory & "\rd-agent.exe" & chr(34), 0,
 
 		installServicePS := `$ErrorActionPreference = "Stop"
 $packageDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$installDir = Join-Path $env:ProgramData "RemoteDesk\Agent"
+$installDir = Join-Path $env:ProgramFiles "RemoteDesk\Agent"
+$configDir = Join-Path $env:ProgramData "RemoteDesk\Agent"
+$legacyInstallDir = $configDir
 $serviceName = "RemoteDeskAgent"
 $previousDeviceID = ""
-if (Test-Path -LiteralPath (Join-Path $installDir "agent.json")) {
-    try { $previousDeviceID = (Get-Content -LiteralPath (Join-Path $installDir "agent.json") -Raw | ConvertFrom-Json).device_id } catch {}
+foreach ($previousConfig in @((Join-Path $configDir "agent.json"), (Join-Path $legacyInstallDir "agent.json"))) {
+    if (Test-Path -LiteralPath $previousConfig) {
+        try { $previousDeviceID = (Get-Content -LiteralPath $previousConfig -Raw | ConvertFrom-Json).device_id } catch {}
+        if (-not [string]::IsNullOrWhiteSpace($previousDeviceID)) { break }
+    }
 }
 if ([string]::IsNullOrWhiteSpace($previousDeviceID)) {
     $legacyIdFile = Join-Path $env:TEMP "rd-device-id"
     if (Test-Path -LiteralPath $legacyIdFile) { $previousDeviceID = (Get-Content -LiteralPath $legacyIdFile -Raw).Trim() }
 }
+# Verify the new package before interrupting a working service.  The root is
+# public; the signing private key is not present on endpoints or in this ZIP.
+$rootCert = Join-Path $packageDir "RemoteDesk-Internal-Root.cer"
+if (-not (Test-Path -LiteralPath $rootCert)) { throw "Sertifikat root RemoteDesk tidak ditemukan di paket" }
+& certutil.exe -addstore -f Root $rootCert | Out-Null
+if ($LASTEXITCODE -ne 0) { throw "Gagal memasang sertifikat root RemoteDesk" }
+& certutil.exe -addstore -f TrustedPublisher $rootCert | Out-Null
+if ($LASTEXITCODE -ne 0) { throw "Gagal memasang sertifikat penerbit RemoteDesk" }
+$signature = Get-AuthenticodeSignature -FilePath (Join-Path $packageDir "rd-agent.exe")
+if ($signature.Status -ne 'Valid') { throw "Agent tidak memiliki tanda tangan digital yang valid: $($signature.Status)" }
 # Stop every process that can hold rd-agent.exe before overwriting it.  A
 # Windows service keeps its image file open, so copying first makes upgrades
 # fail deterministically with "being used by another process".
@@ -2480,10 +2512,11 @@ if (Get-Service -Name $serviceName -ErrorAction SilentlyContinue) {
 Get-Process -Name "rd-agent" -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
 Start-Sleep -Milliseconds 750
 New-Item -ItemType Directory -Path $installDir -Force | Out-Null
+New-Item -ItemType Directory -Path $configDir -Force | Out-Null
 Copy-Item -LiteralPath (Join-Path $packageDir "rd-agent.exe") -Destination (Join-Path $installDir "rd-agent.exe") -Force
-Copy-Item -LiteralPath (Join-Path $packageDir "agent.json") -Destination (Join-Path $installDir "agent.json") -Force
+Copy-Item -LiteralPath (Join-Path $packageDir "agent.json") -Destination (Join-Path $configDir "agent.json") -Force
 $exe = Join-Path $installDir "rd-agent.exe"
-$config = Join-Path $installDir "agent.json"
+$config = Join-Path $configDir "agent.json"
 if (-not [string]::IsNullOrWhiteSpace($previousDeviceID)) {
     $newConfig = Get-Content -LiteralPath $config -Raw | ConvertFrom-Json
     # Add-Member handles both packages created before device_id existed and
@@ -2549,7 +2582,7 @@ taskkill /f /im rd-agent.exe >nul 2>&1
 
 :: Hapus mekanisme lama agar tidak ada dua agent untuk device yang sama.
 del "%%APPDATA%%\Microsoft\Windows\Start Menu\Programs\Startup\RemoteDesk-Agent.lnk" >nul 2>&1
-powershell.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "Unregister-ScheduledTask -TaskName 'RemoteDesk Agent' -Confirm:$false -ErrorAction SilentlyContinue; Stop-Service -Name 'RemoteDeskAgent' -Force -ErrorAction SilentlyContinue; sc.exe delete RemoteDeskAgent | Out-Null"
+powershell.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "Unregister-ScheduledTask -TaskName 'RemoteDesk Agent' -Confirm:$false -ErrorAction SilentlyContinue"
 powershell.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "%%~dp0install-service.ps1"
 if errorlevel 1 (
     echo [ERROR] Windows service RemoteDesk gagal dipasang.
@@ -2629,6 +2662,7 @@ CARA PASANG PALING MUDAH:
 3. SELESAI!
    - Agent akan langsung berjalan diam-diam di background (tanpa jendela hitam).
    - Agent dijalankan oleh Windows service SYSTEM dan tetap tersedia saat lock screen.
+   - Installer memasang sertifikat RemoteDesk internal untuk memverifikasi agent bertanda tangan digital.
 
 KETERANGAN FILE:
 - pasang-otomatis.bat : Memasang Windows service dan menjalankan agent di background.

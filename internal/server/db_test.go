@@ -639,6 +639,7 @@ func TestAgentPackageDownload(t *testing.T) {
 	foundCfg := false
 	foundBat := false
 	foundInstaller := false
+	foundRootCert := false
 
 	for _, f := range zr.File {
 		if f.Name == "rd-agent.exe" {
@@ -665,6 +666,9 @@ func TestAgentPackageDownload(t *testing.T) {
 			if !strings.Contains(script, `System.Text.UTF8Encoding($false)`) || strings.Contains(script, `Set-Content -LiteralPath $config -Encoding UTF8`) {
 				t.Fatalf("installer must write agent.json as UTF-8 without BOM: %s", script)
 			}
+			if !strings.Contains(script, `RemoteDesk-Internal-Root.cer`) || !strings.Contains(script, `Get-AuthenticodeSignature`) || !strings.Contains(script, `$env:ProgramFiles`) {
+				t.Fatalf("installer must validate the signed UIAccess agent: %s", script)
+			}
 		}
 		if f.Name == "pasang-otomatis.bat" {
 			rc, _ := f.Open()
@@ -690,9 +694,12 @@ func TestAgentPackageDownload(t *testing.T) {
 				t.Fatalf("expected agent.json to reserve device_id, got: %s", string(cfgData))
 			}
 		}
+		if f.Name == "RemoteDesk-Internal-Root.cer" {
+			foundRootCert = true
+		}
 	}
 
-	if !foundExe || !foundCfg || !foundBat || !foundInstaller {
+	if !foundExe || !foundCfg || !foundBat || !foundInstaller || !foundRootCert {
 		t.Fatalf("zip archive missing expected files: exe=%v cfg=%v bat=%v serviceInstaller=%v", foundExe, foundCfg, foundBat, foundInstaller)
 	}
 }

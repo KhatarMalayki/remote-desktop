@@ -11,7 +11,58 @@ env:
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
+  sign-windows-agent:
+    runs-on: windows-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Build and sign Windows UIAccess agent
+        shell: pwsh
+        env:
+          SIGN_CERT_BASE64: ${{ secrets.WINDOWS_SIGN_CERT_BASE64 }}
+          SIGN_CERT_PASSWORD: ${{ secrets.WINDOWS_SIGN_CERT_PASSWORD }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ([string]::IsNullOrWhiteSpace($env:SIGN_CERT_BASE64) -or [string]::IsNullOrWhiteSpace($env:SIGN_CERT_PASSWORD)) {
+            throw 'Windows code-signing secrets are required. Configure WINDOWS_SIGN_CERT_BASE64 and WINDOWS_SIGN_CERT_PASSWORD before publishing.'
+          }
+          New-Item -ItemType Directory -Force -Path prebuilt-agent | Out-Null
+          $agentPath = Join-Path $PWD 'prebuilt-agent\rd-agent-windows-amd64.exe'
+          go run github.com/akavel/rsrc@v0.10.2 -manifest cmd/agent/uiaccess.manifest -o cmd/agent/rd-agent-uiaccess_windows_amd64.syso
+          $env:CGO_ENABLED = '0'
+          $env:GOOS = 'windows'
+          $env:GOARCH = 'amd64'
+          go build -ldflags='-s -w' -o $agentPath ./cmd/agent
+
+          $pfxPath = Join-Path $env:RUNNER_TEMP 'remotedesk-signing.pfx'
+          [System.IO.File]::WriteAllBytes($pfxPath, [Convert]::FromBase64String($env:SIGN_CERT_BASE64))
+          certutil.exe -addstore -f Root 'certs\RemoteDesk-Internal-Root.cer' | Out-Null
+          $signTool = Get-ChildItem 'C:\Program Files (x86)\Windows Kits\10\bin\*\x64\signtool.exe' | Sort-Object FullName -Descending | Select-Object -First 1 -ExpandProperty FullName
+          if ([string]::IsNullOrWhiteSpace($signTool)) { throw 'signtool.exe tidak ditemukan pada runner Windows' }
+          & $signTool sign /fd SHA256 /f $pfxPath /p $env:SIGN_CERT_PASSWORD /tr http://timestamp.digicert.com /td SHA256 $agentPath
+          if ($LASTEXITCODE -ne 0) { throw 'Penandatanganan rd-agent.exe gagal' }
+          Remove-Item -LiteralPath $pfxPath -Force
+          $signature = Get-AuthenticodeSignature -FilePath $agentPath
+          if ($signature.Status -ne 'Valid') { throw "Tanda tangan agent tidak valid: $($signature.Status)" }
+
+      - name: Upload signed agent
+        uses: actions/upload-artifact@v4
+        with:
+          name: signed-windows-agent
+          path: prebuilt-agent/rd-agent-windows-amd64.exe
+          if-no-files-found: error
+
   build-and-push:
+    needs: sign-windows-agent
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -20,6 +71,12 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Download signed Windows agent
+        uses: actions/download-artifact@v4
+        with:
+          name: signed-windows-agent
+          path: prebuilt-agent
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
