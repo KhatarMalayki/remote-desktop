@@ -138,12 +138,8 @@ func (a *Agent) startRemoteRelay(sessionID string) {
 	}
 
 	readDone := make(chan struct{})
+	inputCommands := make(chan remoteCommand, 128)
 	go func() {
-		// Keyboard/mouse injection needs its own stable desktop-bound thread.
-		// Without this, Go may move the reader goroutine to a different thread
-		// after OpenInputDesktop succeeds, which breaks input on the lock screen.
-		runtime.LockOSThread()
-		defer runtime.UnlockOSThread()
 		defer close(readDone)
 		for {
 			messageType, payload, readErr := conn.ReadMessage()
@@ -189,16 +185,9 @@ func (a *Agent) startRemoteRelay(sessionID string) {
 				}
 				state.Unlock()
 			case "hotkey":
-				if inputErr := sendRemoteHotkey(command.Keys); inputErr != nil {
-					_ = sendJSON(map[string]string{"type": "input_error", "message": inputErr.Error()})
-				}
+				inputCommands <- command
 			default:
-				state.RLock()
-				bounds := state.bounds
-				state.RUnlock()
-				if inputErr := handleRemoteInput(command, bounds); inputErr != nil {
-					log.Printf("[remote] input ignored: %v", inputErr)
-				}
+				inputCommands <- command
 			}
 		}
 	}()
@@ -213,6 +202,28 @@ func (a *Agent) startRemoteRelay(sessionID string) {
 		select {
 		case <-readDone:
 			return
+		case command := <-inputCommands:
+			// The capture goroutine is pinned to a Windows OS thread and has
+			// successfully attached that thread to the active input desktop. Run
+			// all mouse/keyboard injection here as well; a separate goroutine can
+			// otherwise remain on Default while capture is on Winlogon.
+			if desktopErr := prepareRemoteDesktop(); desktopErr != nil {
+				_ = sendJSON(map[string]string{"type": "input_error", "message": desktopErr.Error()})
+				continue
+			}
+			if command.Type == "hotkey" {
+				if inputErr := sendRemoteHotkey(command.Keys); inputErr != nil {
+					_ = sendJSON(map[string]string{"type": "input_error", "message": inputErr.Error()})
+				}
+				continue
+			}
+			state.RLock()
+			bounds := state.bounds
+			state.RUnlock()
+			if inputErr := handleRemoteInput(command, bounds); inputErr != nil {
+				log.Printf("[remote] input ignored: %v", inputErr)
+				_ = sendJSON(map[string]string{"type": "input_error", "message": inputErr.Error()})
+			}
 		case <-ticker.C:
 			// On Windows this re-attaches the current OS thread to the desktop
 			// that is actually receiving input. A SYSTEM console worker can then
