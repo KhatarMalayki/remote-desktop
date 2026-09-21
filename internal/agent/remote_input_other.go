@@ -19,6 +19,8 @@ func sendRemoteHotkey(keys []string) error {
 
 func isSecureInputDesktop() bool { return false }
 
+func activeInputDesktopName() string { return "" }
+
 func setRemoteClipboard(text string) error {
 	return fmt.Errorf("clipboard is only supported on Windows")
 }

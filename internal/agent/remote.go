@@ -10,6 +10,7 @@ import (
 	"log"
 	"net/url"
 	"runtime"
+	"strings"
 	"sync"
 	"time"
 
@@ -64,7 +65,8 @@ func (a *Agent) startRemoteRelay(sessionID string) {
 	// SendInput is subject to UIPI and cannot cross from a process born on the
 	// normal desktop to Winlogon. Hand the relay to a LocalSystem child that was
 	// created directly on winsta0\\Winlogon instead.
-	if a.secureRelayStarter != nil && isSecureInputDesktop() {
+	desktopName := activeInputDesktopName()
+	if a.secureRelayStarter != nil && strings.EqualFold(desktopName, "Winlogon") {
 		if err := a.secureRelayStarter(sessionID); err == nil {
 			log.Printf("[remote] delegated locked-screen relay to Winlogon worker")
 			return
@@ -147,6 +149,14 @@ func (a *Agent) startRemoteRelay(sessionID string) {
 	if err := sendScreenInfo(); err != nil {
 		return
 	}
+	mode := "normal worker"
+	if a.secureDesktopOnly {
+		mode = "direct Winlogon worker"
+	}
+	if desktopName == "" {
+		desktopName = "tidak terdeteksi"
+	}
+	_ = sendJSON(map[string]string{"type": "relay_info", "message": "Desktop input Windows: " + desktopName + " (" + mode + ")"})
 
 	readDone := make(chan struct{})
 	inputCommands := make(chan remoteCommand, 128)

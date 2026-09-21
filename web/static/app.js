@@ -986,7 +986,7 @@ function startRemote() {
         if (relayMessage.type === 'clipboard') {
           navigator.clipboard.writeText(relayMessage.text || '').then(function(){ showToast('Clipboard komputer remote sudah disalin ke perangkat ini'); }).catch(function(){ showToast('Browser menolak akses clipboard'); });
         }
-        if (relayMessage.type === 'clipboard_error' || relayMessage.type === 'input_error' || relayMessage.type === 'error') showToast(relayMessage.message || 'Remote session mengalami masalah');
+        if (relayMessage.type === 'clipboard_error' || relayMessage.type === 'input_error' || relayMessage.type === 'error' || relayMessage.type === 'relay_info') showToast(relayMessage.message || 'Remote session mengalami masalah');
       } catch (_) {}
     }
   };

@@ -70,24 +70,28 @@ func handleRemoteInput(command remoteCommand, bounds image.Rectangle) error {
 // Winlogon desktop active. A relay process must be created on that desktop to
 // inject input there; merely changing the desktop of an existing process is
 // blocked by UIPI.
-func isSecureInputDesktop() bool {
+func activeInputDesktopName() string {
 	const desktopReadObjects = 0x0001
 	const userObjectName = 2
 	desktop, _, _ := openInputDesktopProc.Call(0, 0, desktopReadObjects)
 	if desktop == 0 {
-		return false
+		return ""
 	}
 	defer closeDesktopProc.Call(desktop)
 	var bytesNeeded uint32
 	getUserObjectInfoProc.Call(desktop, userObjectName, 0, 0, uintptr(unsafe.Pointer(&bytesNeeded)))
 	if bytesNeeded < 2 {
-		return false
+		return ""
 	}
 	name := make([]uint16, (bytesNeeded+1)/2)
 	if ok, _, _ := getUserObjectInfoProc.Call(desktop, userObjectName, uintptr(unsafe.Pointer(&name[0])), uintptr(bytesNeeded), uintptr(unsafe.Pointer(&bytesNeeded))); ok == 0 {
-		return false
+		return ""
 	}
-	return strings.EqualFold(syscall.UTF16ToString(name), "Winlogon")
+	return syscall.UTF16ToString(name)
+}
+
+func isSecureInputDesktop() bool {
+	return strings.EqualFold(activeInputDesktopName(), "Winlogon")
 }
 
 // prepareRemoteDesktop binds the calling thread to whichever desktop Windows
