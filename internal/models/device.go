@@ -147,6 +147,22 @@ type DeviceHeartbeat struct {
 	RustDeskID string  `json:"rustdesk_id"`
 }
 
+type RustDeskCommand struct {
+	RequestID   string `json:"request_id"`
+	Operation   string `json:"operation"`
+	Password    string `json:"password,omitempty"`
+	Config      string `json:"config,omitempty"`
+	DownloadURL string `json:"download_url,omitempty"`
+	SHA256      string `json:"sha256,omitempty"`
+}
+
+type RustDeskResult struct {
+	RequestID  string `json:"request_id"`
+	Operation  string `json:"operation"`
+	RustDeskID string `json:"rustdesk_id,omitempty"`
+	Error      string `json:"error,omitempty"`
+}
+
 type SignalMessage struct {
 	Type    string `json:"type"`
 	From    string `json:"from"`

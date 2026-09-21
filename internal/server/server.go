@@ -272,6 +272,8 @@ func (s *Server) ListenAndServe() error {
 	mux.HandleFunc("/api/agent/update", s.authMiddleware(s.handleAgentUpdate))
 	mux.HandleFunc("/api/agent/broadcast-update", s.authMiddleware(s.handleBroadcastAgentUpdate))
 	mux.HandleFunc("/api/agent/reconfigure", s.authMiddleware(s.handleReconfigureAgents))
+	mux.HandleFunc("/api/rustdesk/settings", s.authMiddleware(s.handleRustDeskSettings))
+	mux.HandleFunc("/api/rustdesk/manage", s.authMiddleware(s.handleRustDeskManage))
 	mux.HandleFunc("/api/users", s.authMiddleware(s.handleUsers))
 	mux.HandleFunc("/api/users/", s.authMiddleware(s.handleUserSubroute))
 	mux.HandleFunc("/api/logs/", s.authMiddleware(s.handleLogs))
@@ -1537,6 +1539,22 @@ func (s *Server) handleAgentMessage(c *Client, raw []byte) {
 		hb.ID = c.DeviceID
 		s.db.UpdateHeartbeat(&hb)
 
+	case "rustdesk_result":
+		var result models.RustDeskResult
+		if err := json.Unmarshal(msg.Data, &result); err != nil {
+			return
+		}
+		if result.RustDeskID != "" {
+			_ = s.db.UpdateDeviceRustDeskID(c.DeviceID, result.RustDeskID)
+		}
+		detail := fmt.Sprintf("operation=%s request=%s", result.Operation, result.RequestID)
+		if result.Error != "" {
+			detail += " failed=" + result.Error
+		} else {
+			detail += " success"
+		}
+		_ = s.db.AddLog(c.DeviceID, "rustdesk_manage", detail)
+
 	case "signal":
 		var sig models.SignalMessage
 		if err := json.Unmarshal(msg.Data, &sig); err != nil {
@@ -1844,6 +1862,106 @@ func (s *Server) handleAgentUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 	_ = s.db.RecordAuthLog(claims.Username, r.RemoteAddr, "agent_update", fmt.Sprintf("Update agent %s ke v%s: %s", req.DeviceID, s.cfg.Version, status), r.UserAgent())
 	jsonResp(w, map[string]interface{}{"status": status, "device_id": req.DeviceID, "version": s.cfg.Version}, http.StatusAccepted)
+}
+
+const rustDeskWindowsDownloadURL = "https://github.com/rustdesk/rustdesk/releases/download/1.4.6/rustdesk-1.4.6-x86_64.exe"
+const rustDeskWindowsSHA256 = "422ce31131e6537ea4f611ebf4a4d1804f28a6f58c83aa05065071c5958f1551"
+
+func (s *Server) handleRustDeskSettings(w http.ResponseWriter, r *http.Request) {
+	claims := getClaims(r)
+	if claims.Role != "admin" {
+		jsonError(w, "forbidden", http.StatusForbidden)
+		return
+	}
+	if r.Method == http.MethodGet {
+		jsonResp(w, map[string]bool{"configured": s.db.GetSystemSetting("rustdesk_config") != ""}, http.StatusOK)
+		return
+	}
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req struct {
+		Config string `json:"config"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonError(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+	config := strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(req.Config), `\`))
+	if len(config) < 40 || len(config) > 4096 || !strings.HasPrefix(config, "=") {
+		jsonError(w, "config RustDesk tidak valid", http.StatusBadRequest)
+		return
+	}
+	if err := s.db.SetSystemSetting("rustdesk_config", config); err != nil {
+		jsonError(w, "gagal menyimpan konfigurasi", http.StatusInternalServerError)
+		return
+	}
+	_ = s.db.RecordAuthLog(claims.Username, r.RemoteAddr, "rustdesk_config", "Konfigurasi deployment RustDesk diperbarui", r.UserAgent())
+	jsonResp(w, map[string]interface{}{"configured": true}, http.StatusOK)
+}
+
+func (s *Server) handleRustDeskManage(w http.ResponseWriter, r *http.Request) {
+	claims := getClaims(r)
+	if claims.Role != "admin" {
+		jsonError(w, "forbidden", http.StatusForbidden)
+		return
+	}
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req struct {
+		DeviceID  string `json:"device_id"`
+		Operation string `json:"operation"`
+		Password  string `json:"password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonError(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+	req.DeviceID = strings.TrimSpace(req.DeviceID)
+	if req.DeviceID == "" || (req.Operation != "install" && req.Operation != "set_password") {
+		jsonError(w, "device_id atau operation tidak valid", http.StatusBadRequest)
+		return
+	}
+	if len(req.Password) < 8 || len(req.Password) > 64 || strings.ContainsAny(req.Password, "\r\n\x00") {
+		jsonError(w, "password harus 8-64 karakter tanpa baris baru", http.StatusBadRequest)
+		return
+	}
+	if !s.hub.IsOnline(req.DeviceID) {
+		jsonError(w, "device sedang offline", http.StatusConflict)
+		return
+	}
+	command := models.RustDeskCommand{
+		RequestID: randomHex(12),
+		Operation: req.Operation,
+		Password:  req.Password,
+	}
+	if req.Operation == "install" {
+		command.Config = s.db.GetSystemSetting("rustdesk_config")
+		if command.Config == "" {
+			jsonError(w, "konfigurasi RustDesk self-host belum disimpan", http.StatusConflict)
+			return
+		}
+		command.DownloadURL = rustDeskWindowsDownloadURL
+		command.SHA256 = rustDeskWindowsSHA256
+	}
+	raw, err := json.Marshal(map[string]interface{}{"action": "rustdesk_manage", "data": command})
+	if err != nil || !s.hub.SendToAgent(req.DeviceID, raw) {
+		jsonError(w, "perintah RustDesk gagal dikirim", http.StatusConflict)
+		return
+	}
+	_ = s.db.RecordAuthLog(claims.Username, r.RemoteAddr, "rustdesk_manage", fmt.Sprintf("%s untuk device %s", req.Operation, req.DeviceID), r.UserAgent())
+	jsonResp(w, map[string]string{"status": "queued", "request_id": command.RequestID}, http.StatusAccepted)
+}
+
+func randomHex(byteCount int) string {
+	buf := make([]byte, byteCount)
+	if _, err := rand.Read(buf); err != nil {
+		return fmt.Sprintf("%d", time.Now().UnixNano())
+	}
+	return hex.EncodeToString(buf)
 }
 
 func (s *Server) queueAgentUpdate(deviceID, actor string) (string, error) {

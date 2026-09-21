@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/user/remote-desktop/internal/models"
 	"github.com/user/remote-desktop/internal/versioncmp"
 )
 
@@ -31,14 +32,16 @@ type AgentConfig struct {
 }
 
 type Agent struct {
-	cfg        AgentConfig
-	cfgPath    string
-	version    string
-	rustDeskID string
-	conn       *websocket.Conn
-	done       chan struct{}
-	updatingMu sync.Mutex
-	isUpdating bool
+	cfg         AgentConfig
+	cfgPath     string
+	version     string
+	rustDeskID  string
+	conn        *websocket.Conn
+	connWriteMu sync.Mutex
+	rustDeskMu  sync.RWMutex
+	done        chan struct{}
+	updatingMu  sync.Mutex
+	isUpdating  bool
 	// serviceManaged means the Windows service supervisor owns this worker's
 	// lifecycle. After replacing the binary, the worker exits and lets the
 	// supervisor start exactly one replacement process.
@@ -145,7 +148,7 @@ func (a *Agent) connect() error {
 
 func (a *Agent) register() {
 	info := CollectSystemInfo()
-	a.rustDeskID = info.RustDeskID
+	a.setRustDeskID(info.RustDeskID)
 	info.Version = a.version
 	info.Branch = a.cfg.Branch
 	data, _ := json.Marshal(info)
@@ -154,7 +157,7 @@ func (a *Agent) register() {
 		"data":   json.RawMessage(data),
 	}
 	raw, _ := json.Marshal(msg)
-	a.conn.WriteMessage(websocket.TextMessage, raw)
+	_ = a.writeTextMessage(raw)
 	log.Printf("[agent] registered: %s (%s/%s) v%s mem=%s disk=%s",
 		info.Hostname, info.OS, info.Arch, info.Version,
 		FormatBytes(info.MemoryTotal), FormatBytes(info.DiskTotal))
@@ -173,7 +176,7 @@ func (a *Agent) heartbeatLoop() {
 				"cpu_usage":   GetCPUUsage(),
 				"memory_used": memUsed,
 				"disk_used":   diskUsed,
-				"rustdesk_id": a.rustDeskID,
+				"rustdesk_id": a.getRustDeskID(),
 			}
 			data, _ := json.Marshal(hb)
 			msg := map[string]interface{}{
@@ -181,7 +184,7 @@ func (a *Agent) heartbeatLoop() {
 				"data":   json.RawMessage(data),
 			}
 			raw, _ := json.Marshal(msg)
-			if err := a.conn.WriteMessage(websocket.TextMessage, raw); err != nil {
+			if err := a.writeTextMessage(raw); err != nil {
 				return
 			}
 		case <-a.done:
@@ -366,14 +369,48 @@ func (a *Agent) handleMessage(raw []byte) {
 				}
 				data, _ := json.Marshal(result)
 				raw, _ := json.Marshal(map[string]interface{}{"action": "network_scan_result", "data": json.RawMessage(data)})
-				if err := a.conn.WriteMessage(websocket.TextMessage, raw); err != nil {
+				if err := a.writeTextMessage(raw); err != nil {
 					log.Printf("[agent] network scan result failed: %v", err)
 				}
 			}()
 		}
+	case "rustdesk_manage":
+		var command models.RustDeskCommand
+		if err := json.Unmarshal(msg.Data, &command); err != nil {
+			return
+		}
+		go func() {
+			result := ManageRustDesk(command)
+			if result.RustDeskID != "" {
+				a.setRustDeskID(result.RustDeskID)
+			}
+			data, _ := json.Marshal(result)
+			raw, _ := json.Marshal(map[string]interface{}{"action": "rustdesk_result", "data": json.RawMessage(data)})
+			if err := a.writeTextMessage(raw); err != nil {
+				log.Printf("[agent] failed to report RustDesk result: %v", err)
+			}
+		}()
 	case "command":
 		log.Printf("[agent] received command: %s", string(msg.Data))
 	}
+}
+
+func (a *Agent) writeTextMessage(raw []byte) error {
+	a.connWriteMu.Lock()
+	defer a.connWriteMu.Unlock()
+	return a.conn.WriteMessage(websocket.TextMessage, raw)
+}
+
+func (a *Agent) setRustDeskID(id string) {
+	a.rustDeskMu.Lock()
+	a.rustDeskID = id
+	a.rustDeskMu.Unlock()
+}
+
+func (a *Agent) getRustDeskID() string {
+	a.rustDeskMu.RLock()
+	defer a.rustDeskMu.RUnlock()
+	return a.rustDeskID
 }
 
 func (a *Agent) saveConfig() {

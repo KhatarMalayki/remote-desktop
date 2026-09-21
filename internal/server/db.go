@@ -251,6 +251,23 @@ func (d *DB) UpdateHeartbeat(hb *models.DeviceHeartbeat) error {
 	return err
 }
 
+func (d *DB) UpdateDeviceRustDeskID(id, rustDeskID string) error {
+	_, err := d.db.Exec(`UPDATE devices SET rustdesk_id=? WHERE id=?`, strings.TrimSpace(rustDeskID), id)
+	return err
+}
+
+func (d *DB) GetSystemSetting(key string) string {
+	var value string
+	_ = d.db.QueryRow(`SELECT value FROM system_settings WHERE key=?`, key).Scan(&value)
+	return value
+}
+
+func (d *DB) SetSystemSetting(key, value string) error {
+	_, err := d.db.Exec(`INSERT INTO system_settings (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)
+		ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=CURRENT_TIMESTAMP`, key, value)
+	return err
+}
+
 func (d *DB) GetDevice(id string) (*models.Device, error) {
 	row := d.db.QueryRow(`SELECT id, hostname, os, arch, ip, local_ip, cpu_model, cpu_cores,
 		memory_total, memory_used, disk_total, disk_used, version, rustdesk_id, status, tags, group_name,

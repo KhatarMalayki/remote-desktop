@@ -139,6 +139,8 @@ function updateUserUI() {
   if (navSec) navSec.style.display = currentUser.role === 'admin' ? 'flex' : 'none';
   const updateAllBtn = document.getElementById('updateOutdatedAgentsBtn');
   if (updateAllBtn) updateAllBtn.style.display = currentUser.role === 'admin' ? 'inline-flex' : 'none';
+  const rustDeskSettingsBtn = document.getElementById('rustDeskSettingsBtn');
+  if (rustDeskSettingsBtn) rustDeskSettingsBtn.style.display = currentUser.role === 'admin' ? 'inline-flex' : 'none';
   var adminHdr = document.getElementById('adminSectionHeader');
   if (adminHdr) adminHdr.style.display = currentUser.role === 'admin' ? 'block' : 'none';
   var bTitle = document.getElementById('branchBannerTitle');
@@ -799,7 +801,62 @@ async function openDeviceModal(id) {
   document.getElementById('modalTags').disabled = isAssetUser();
   document.getElementById('modalGroup').disabled = isAssetUser();
   document.querySelectorAll('#deviceModal [onclick="deleteDevice()"], #deviceModal [onclick="startNetworkScan()"]').forEach(function(el) { el.style.display = isAssetUser() ? 'none' : ''; });
+  var canManageRustDesk = currentUser && currentUser.role === 'admin';
+  document.getElementById('btnInstallRustDesk').style.display = canManageRustDesk ? 'inline-flex' : 'none';
+  document.getElementById('btnRustDeskPassword').style.display = canManageRustDesk && rustDeskID ? 'inline-flex' : 'none';
   document.getElementById('deviceModal').style.display = 'flex';
+}
+
+async function configureRustDesk() {
+  var config = prompt('Tempel Server Config String hasil Export Server Config dari RustDesk. Nilai ini tidak akan ditampilkan kembali:');
+  if (!config) return;
+  var result = await api('/api/rustdesk/settings', {method:'POST', body:JSON.stringify({config:config.trim()})});
+  config = '';
+  if (!result || result.error) { alert((result && result.error) || 'Konfigurasi RustDesk gagal disimpan'); return; }
+  showToast('Konfigurasi deployment RustDesk tersimpan');
+}
+
+function manageRustDesk(operation) {
+  if (!currentDevice) return;
+  if (!currentDevice.online) { alert('Agent harus online untuk mengelola RustDesk.'); return; }
+  document.getElementById('rustDeskOperation').value = operation;
+  document.getElementById('rustDeskManageTitle').textContent = operation === 'install' ? 'Install/Konfigurasi RustDesk' : 'Set/Reset Password RustDesk';
+  document.getElementById('rustDeskPassword').value = '';
+  document.getElementById('rustDeskPasswordConfirm').value = '';
+  document.getElementById('rustDeskManageError').style.display = 'none';
+  document.getElementById('rustDeskManageModal').style.display = 'flex';
+  document.getElementById('rustDeskPassword').focus();
+}
+
+function closeRustDeskManageModal() {
+  document.getElementById('rustDeskPassword').value = '';
+  document.getElementById('rustDeskPasswordConfirm').value = '';
+  document.getElementById('rustDeskManageModal').style.display = 'none';
+}
+
+async function submitRustDeskManage() {
+  if (!currentDevice) return;
+  var operation = document.getElementById('rustDeskOperation').value;
+  var password = document.getElementById('rustDeskPassword').value;
+  var confirmation = document.getElementById('rustDeskPasswordConfirm').value;
+  var errorBox = document.getElementById('rustDeskManageError');
+  if (password.length < 8 || password.length > 64 || /[\r\n]/.test(password)) {
+    errorBox.textContent = 'Password harus 8-64 karakter tanpa baris baru.'; errorBox.style.display = 'block';
+    return;
+  }
+  if (confirmation !== password) { errorBox.textContent = 'Konfirmasi password tidak sama.'; errorBox.style.display = 'block'; return; }
+  var result = await api('/api/rustdesk/manage', {
+    method:'POST',
+    body:JSON.stringify({device_id:currentDevice.id, operation:operation, password:password})
+  });
+  password = ''; confirmation = '';
+  document.getElementById('rustDeskPassword').value = '';
+  document.getElementById('rustDeskPasswordConfirm').value = '';
+  if (!result || result.error) { errorBox.textContent = (result && result.error) || 'Perintah RustDesk gagal dikirim'; errorBox.style.display = 'block'; return; }
+  closeRustDeskManageModal();
+  closeDeviceModal();
+  showToast(operation === 'install' ? 'Instalasi/konfigurasi RustDesk sedang diproses' : 'Perubahan password RustDesk sedang diproses');
+  setTimeout(loadDevices, 5000);
 }
 
 function closeDeviceModal() { document.getElementById('deviceModal').style.display = 'none'; currentDevice = null; }
