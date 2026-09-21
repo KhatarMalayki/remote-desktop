@@ -2554,11 +2554,11 @@ if (-not [string]::IsNullOrWhiteSpace($previousDeviceID)) {
 }
 $binPath = '"' + $exe + '" --system-service --config "' + $config + '"'
 if (Get-Service -Name $serviceName -ErrorAction SilentlyContinue) {
-	& sc.exe config $serviceName binPath= $binPath start= auto obj= LocalSystem | Out-Null
-    if ($LASTEXITCODE -ne 0) { throw "Konfigurasi Windows service gagal diperbarui" }
+	$scResult = & sc.exe config $serviceName binPath= $binPath start= auto 2>&1
+    if ($LASTEXITCODE -ne 0) { throw "Konfigurasi Windows service gagal diperbarui: $($scResult -join ' ')" }
 } else {
-	& sc.exe create $serviceName binPath= $binPath start= auto obj= LocalSystem | Out-Null
-    if ($LASTEXITCODE -ne 0) { throw "Windows service gagal dibuat" }
+	$scResult = & sc.exe create $serviceName binPath= $binPath start= auto 2>&1
+    if ($LASTEXITCODE -ne 0) { throw "Windows service gagal dibuat: $($scResult -join ' ')" }
 }
 & sc.exe description $serviceName "RemoteDesk secure desktop remote service" | Out-Null
 & sc.exe failure $serviceName reset= 86400 actions= restart/5000/restart/15000/restart/60000 | Out-Null
