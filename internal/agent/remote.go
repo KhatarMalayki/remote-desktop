@@ -61,6 +61,17 @@ func validRemoteSessionID(value string) bool {
 }
 
 func (a *Agent) startRemoteRelay(sessionID string) {
+	// SendInput is subject to UIPI and cannot cross from a process born on the
+	// normal desktop to Winlogon. Hand the relay to a LocalSystem child that was
+	// created directly on winsta0\\Winlogon instead.
+	if a.secureRelayStarter != nil && isSecureInputDesktop() {
+		if err := a.secureRelayStarter(sessionID); err == nil {
+			log.Printf("[remote] delegated locked-screen relay to Winlogon worker")
+			return
+		} else {
+			log.Printf("[remote] cannot start Winlogon relay worker: %v", err)
+		}
+	}
 	// A Windows desktop is bound to an OS thread, not a Go goroutine.  Keep the
 	// capture path on one thread for the complete relay lifetime so it remains
 	// attached when Windows switches Default <-> Winlogon on lock/unlock.
@@ -225,6 +236,10 @@ func (a *Agent) startRemoteRelay(sessionID string) {
 				_ = sendJSON(map[string]string{"type": "input_error", "message": inputErr.Error()})
 			}
 		case <-ticker.C:
+			if a.secureDesktopOnly && !isSecureInputDesktop() {
+				log.Printf("[remote] Winlogon desktop ended; secure relay worker exiting")
+				return
+			}
 			// On Windows this re-attaches the current OS thread to the desktop
 			// that is actually receiving input. A SYSTEM console worker can then
 			// follow Default <-> Winlogon transitions without dropping the relay.

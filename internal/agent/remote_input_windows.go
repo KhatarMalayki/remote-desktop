@@ -14,11 +14,12 @@ import (
 )
 
 var (
-	user32DLL            = syscall.NewLazyDLL("user32.dll")
-	setCursorPos         = user32DLL.NewProc("SetCursorPos")
-	openInputDesktopProc = user32DLL.NewProc("OpenInputDesktop")
-	setThreadDesktopProc = user32DLL.NewProc("SetThreadDesktop")
-	closeDesktopProc     = user32DLL.NewProc("CloseDesktop")
+	user32DLL             = syscall.NewLazyDLL("user32.dll")
+	setCursorPos          = user32DLL.NewProc("SetCursorPos")
+	openInputDesktopProc  = user32DLL.NewProc("OpenInputDesktop")
+	setThreadDesktopProc  = user32DLL.NewProc("SetThreadDesktop")
+	closeDesktopProc      = user32DLL.NewProc("CloseDesktop")
+	getUserObjectInfoProc = user32DLL.NewProc("GetUserObjectInformationW")
 )
 
 func handleRemoteInput(command remoteCommand, bounds image.Rectangle) error {
@@ -63,6 +64,30 @@ func handleRemoteInput(command remoteCommand, bounds image.Rectangle) error {
 	default:
 		return fmt.Errorf("unsupported command %q", command.Type)
 	}
+}
+
+// isSecureInputDesktop reports whether Windows has made the protected
+// Winlogon desktop active. A relay process must be created on that desktop to
+// inject input there; merely changing the desktop of an existing process is
+// blocked by UIPI.
+func isSecureInputDesktop() bool {
+	const desktopReadObjects = 0x0001
+	const userObjectName = 2
+	desktop, _, _ := openInputDesktopProc.Call(0, 0, desktopReadObjects)
+	if desktop == 0 {
+		return false
+	}
+	defer closeDesktopProc.Call(desktop)
+	var bytesNeeded uint32
+	getUserObjectInfoProc.Call(desktop, userObjectName, 0, 0, uintptr(unsafe.Pointer(&bytesNeeded)))
+	if bytesNeeded < 2 {
+		return false
+	}
+	name := make([]uint16, (bytesNeeded+1)/2)
+	if ok, _, _ := getUserObjectInfoProc.Call(desktop, userObjectName, uintptr(unsafe.Pointer(&name[0])), uintptr(bytesNeeded), uintptr(unsafe.Pointer(&bytesNeeded))); ok == 0 {
+		return false
+	}
+	return strings.EqualFold(syscall.UTF16ToString(name), "Winlogon")
 }
 
 // prepareRemoteDesktop binds the calling thread to whichever desktop Windows

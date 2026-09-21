@@ -153,6 +153,60 @@ func startConsoleSystemWorker(configPath string) error {
 	return nil
 }
 
+// startSecureDesktopRelay creates a short-lived child directly on Winlogon.
+// The normal worker is started on winsta0\\Default, so it cannot inject input
+// on the protected desktop even after OpenInputDesktop/SetThreadDesktop.
+func startSecureDesktopRelay(configPath, relayID string) error {
+	if relayID == "" {
+		return fmt.Errorf("missing relay ID")
+	}
+	exe, err := os.Executable()
+	if err != nil {
+		return err
+	}
+	exe, err = filepath.EvalSymlinks(exe)
+	if err != nil {
+		return err
+	}
+	var current windows.Token
+	if err := windows.OpenProcessToken(windows.CurrentProcess(), windows.TOKEN_ALL_ACCESS, &current); err != nil {
+		return fmt.Errorf("open LocalSystem worker token: %w", err)
+	}
+	defer current.Close()
+	var token windows.Token
+	if err := windows.DuplicateTokenEx(current, windows.TOKEN_ALL_ACCESS, nil, windows.SecurityImpersonation, windows.TokenPrimary, &token); err != nil {
+		return fmt.Errorf("duplicate LocalSystem worker token: %w", err)
+	}
+	defer token.Close()
+	desktop, err := windows.UTF16PtrFromString("winsta0\\Winlogon")
+	if err != nil {
+		return err
+	}
+	logPath := filepath.Join(filepath.Dir(configPath), "secure-relay.log")
+	command, err := windows.UTF16PtrFromString(fmt.Sprintf("\"%s\" --system-worker --secure-relay %s --config \"%s\" --log-file \"%s\"", exe, relayID, configPath, logPath))
+	if err != nil {
+		return err
+	}
+	workingDir, err := windows.UTF16PtrFromString(filepath.Dir(exe))
+	if err != nil {
+		return err
+	}
+	startup := &windows.StartupInfo{Cb: uint32(unsafe.Sizeof(windows.StartupInfo{})), Desktop: desktop}
+	var process windows.ProcessInformation
+	if err := windows.CreateProcessAsUser(token, exeToUTF16(exe), command, nil, nil, false, windows.CREATE_NO_WINDOW|windows.CREATE_UNICODE_ENVIRONMENT, nil, workingDir, startup, &process); err != nil {
+		return fmt.Errorf("create Winlogon relay worker: %w", err)
+	}
+	defer windows.CloseHandle(process.Thread)
+	defer windows.CloseHandle(process.Process)
+	writeServiceDiagnostic(configPath, fmt.Sprintf("Winlogon relay worker started for %s (pid %d)", relayID, process.ProcessId))
+	return nil
+}
+
+func exeToUTF16(value string) *uint16 {
+	result, _ := windows.UTF16PtrFromString(value)
+	return result
+}
+
 func writeServiceDiagnostic(configPath, message string) {
 	path := filepath.Join(filepath.Dir(configPath), "service.log")
 	if configPath == "" {

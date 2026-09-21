@@ -7,3 +7,7 @@ import "log"
 func runSystemService(_ string) {
 	log.Fatal("RemoteDesk system service is only supported on Windows")
 }
+
+func startSecureDesktopRelay(_, _ string) error {
+	return nil
+}

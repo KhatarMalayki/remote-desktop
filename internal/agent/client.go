@@ -41,12 +41,31 @@ type Agent struct {
 	// lifecycle. After replacing the binary, the worker exits and lets the
 	// supervisor start exactly one replacement process.
 	serviceManaged bool
-	remoteMu       sync.Mutex
-	remoteConn     *websocket.Conn
+	// secureRelayStarter is supplied only by the LocalSystem console worker on
+	// Windows. It starts a short-lived child directly on Winlogon when Windows
+	// has switched away from the normal desktop.
+	secureRelayStarter func(string) error
+	secureDesktopOnly  bool
+	remoteMu           sync.Mutex
+	remoteConn         *websocket.Conn
 }
 
 func (a *Agent) SetServiceManaged(managed bool) {
 	a.serviceManaged = managed
+}
+
+func (a *Agent) SetSecureRelayStarter(starter func(string) error) {
+	a.secureRelayStarter = starter
+}
+
+func (a *Agent) SetSecureDesktopOnly(secureOnly bool) {
+	a.secureDesktopOnly = secureOnly
+}
+
+// RunRemoteRelay is used by the short-lived Windows secure-desktop worker.
+// It deliberately does not register a second device connection.
+func (a *Agent) RunRemoteRelay(sessionID string) {
+	a.startRemoteRelay(sessionID)
 }
 
 func NewAgent(cfg AgentConfig, version, cfgPath string) *Agent {
