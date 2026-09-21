@@ -69,3 +69,15 @@ func TestRustDeskManageRejectsWeakPassword(t *testing.T) {
 		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
 	}
 }
+
+func TestRustDeskConfigFallsBackToDeploymentConfig(t *testing.T) {
+	db, err := NewDB(t.TempDir() + "/test.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	s := &Server{db: db, cfg: Config{RustDeskConfig: `\=deployment-config`}}
+	if got := s.rustDeskConfig(); got != "=deployment-config" {
+		t.Fatalf("rustDeskConfig()=%q", got)
+	}
+}

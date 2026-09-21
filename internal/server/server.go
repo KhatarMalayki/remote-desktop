@@ -27,14 +27,15 @@ import (
 )
 
 type Config struct {
-	Addr      string
-	DBPath    string
-	APIKey    string
-	AdminUser string
-	AdminPass string
-	JWTSecret string
-	Version   string
-	AgentsDir string
+	Addr           string
+	DBPath         string
+	APIKey         string
+	AdminUser      string
+	AdminPass      string
+	JWTSecret      string
+	Version        string
+	AgentsDir      string
+	RustDeskConfig string
 }
 
 type UserClaims struct {
@@ -1874,7 +1875,7 @@ func (s *Server) handleRustDeskSettings(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	if r.Method == http.MethodGet {
-		jsonResp(w, map[string]bool{"configured": s.db.GetSystemSetting("rustdesk_config") != ""}, http.StatusOK)
+		jsonResp(w, map[string]bool{"configured": s.rustDeskConfig() != ""}, http.StatusOK)
 		return
 	}
 	if r.Method != http.MethodPost {
@@ -1939,7 +1940,7 @@ func (s *Server) handleRustDeskManage(w http.ResponseWriter, r *http.Request) {
 		Password:  req.Password,
 	}
 	if req.Operation == "install" {
-		command.Config = s.db.GetSystemSetting("rustdesk_config")
+		command.Config = s.rustDeskConfig()
 		if command.Config == "" {
 			jsonError(w, "konfigurasi RustDesk self-host belum disimpan", http.StatusConflict)
 			return
@@ -1962,6 +1963,13 @@ func randomHex(byteCount int) string {
 		return fmt.Sprintf("%d", time.Now().UnixNano())
 	}
 	return hex.EncodeToString(buf)
+}
+
+func (s *Server) rustDeskConfig() string {
+	if configured := strings.TrimSpace(s.db.GetSystemSetting("rustdesk_config")); configured != "" {
+		return configured
+	}
+	return strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(s.cfg.RustDeskConfig), `\`))
 }
 
 func (s *Server) queueAgentUpdate(deviceID, actor string) (string, error) {
