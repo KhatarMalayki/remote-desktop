@@ -1552,8 +1552,16 @@ func (s *Server) handleAgentMessage(c *Client, raw []byte) {
 		detail := fmt.Sprintf("operation=%s request=%s", result.Operation, result.RequestID)
 		if result.Error != "" {
 			detail += " failed=" + result.Error
+			if result.Operation == "install" {
+				_ = s.db.SetSystemSetting(rustDeskBootstrapSetting(c.DeviceID), "")
+			}
 		} else {
 			detail += " success"
+			if result.Operation == "install" {
+				if device, err := s.db.GetDevice(c.DeviceID); err == nil {
+					_ = s.db.SetSystemSetting(rustDeskBootstrapSetting(c.DeviceID), device.Version)
+				}
+			}
 		}
 		_ = s.db.AddLog(c.DeviceID, "rustdesk_manage", detail)
 
@@ -1886,10 +1894,13 @@ func (s *Server) rustDeskInstallCommand(password string) models.RustDeskCommand 
 // install/configure command as soon as it registers. The permanent password is
 // intentionally left unset here and remains an explicit admin action.
 func (s *Server) queueRustDeskBootstrap(dev *models.Device) {
-	if dev == nil || !strings.HasPrefix(strings.ToLower(dev.OS), "windows") || strings.TrimSpace(dev.RustDeskID) != "" {
+	if dev == nil || !strings.HasPrefix(strings.ToLower(dev.OS), "windows") {
 		return
 	}
 	if versioncmp.IsNewer(rustDeskAutoInstallAgentVersion, dev.Version) {
+		return
+	}
+	if strings.TrimSpace(dev.RustDeskID) != "" && s.db.GetSystemSetting(rustDeskBootstrapSetting(dev.ID)) == dev.Version {
 		return
 	}
 	command := s.rustDeskInstallCommand("")
@@ -1903,6 +1914,10 @@ func (s *Server) queueRustDeskBootstrap(dev *models.Device) {
 		return
 	}
 	_ = s.db.AddLog(dev.ID, "rustdesk_bootstrap", "automatic install/configuration queued")
+}
+
+func rustDeskBootstrapSetting(deviceID string) string {
+	return "rustdesk_bootstrap:" + deviceID
 }
 
 func (s *Server) handleRustDeskSettings(w http.ResponseWriter, r *http.Request) {

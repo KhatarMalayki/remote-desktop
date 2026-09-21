@@ -132,6 +132,9 @@ func TestRegistrationDoesNotBootstrapRustDeskWhenAlreadyDetected(t *testing.T) {
 	hub := NewHub(db)
 	hub.agents["pc-1"] = &Client{DeviceID: "pc-1", Send: make(chan []byte, 1)}
 	s := &Server{db: db, hub: hub, cfg: Config{RustDeskConfig: "=deployment-config"}}
+	if err := db.SetSystemSetting(rustDeskBootstrapSetting("pc-1"), rustDeskAutoInstallAgentVersion); err != nil {
+		t.Fatal(err)
+	}
 
 	registration, _ := json.Marshal(models.Device{
 		Hostname:   "PC Epson",
@@ -146,6 +149,45 @@ func TestRegistrationDoesNotBootstrapRustDeskWhenAlreadyDetected(t *testing.T) {
 	case raw := <-hub.agents["pc-1"].Send:
 		t.Fatalf("unexpected bootstrap command: %s", raw)
 	default:
+	}
+}
+
+func TestRegistrationRepairsRustDeskOnceAfterAgentUpgrade(t *testing.T) {
+	db, err := NewDB(t.TempDir() + "/test.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	hub := NewHub(db)
+	hub.agents["pc-1"] = &Client{DeviceID: "pc-1", Send: make(chan []byte, 1)}
+	s := &Server{db: db, hub: hub, cfg: Config{RustDeskConfig: "=deployment-config"}}
+	if err := db.SetSystemSetting(rustDeskBootstrapSetting("pc-1"), "0.2.32"); err != nil {
+		t.Fatal(err)
+	}
+
+	registration, _ := json.Marshal(models.Device{
+		Hostname:   "PC Epson",
+		OS:         "windows",
+		Version:    "0.2.33",
+		RustDeskID: "278753871",
+	})
+	payload, _ := json.Marshal(map[string]interface{}{"action": "register", "data": json.RawMessage(registration)})
+	s.handleAgentMessage(hub.agents["pc-1"], payload)
+
+	select {
+	case raw := <-hub.agents["pc-1"].Send:
+		var envelope struct {
+			Action string                 `json:"action"`
+			Data   models.RustDeskCommand `json:"data"`
+		}
+		if err := json.Unmarshal(raw, &envelope); err != nil {
+			t.Fatal(err)
+		}
+		if envelope.Action != "rustdesk_manage" || envelope.Data.Operation != "install" {
+			t.Fatalf("unexpected repair command: %#v", envelope)
+		}
+	default:
+		t.Fatal("agent upgrade did not queue one-time RustDesk repair")
 	}
 }
 

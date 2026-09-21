@@ -17,6 +17,8 @@ import (
 	"time"
 
 	"github.com/user/remote-desktop/internal/models"
+	"golang.org/x/sys/windows/svc"
+	"golang.org/x/sys/windows/svc/mgr"
 )
 
 func ManageRustDesk(command models.RustDeskCommand) models.RustDeskResult {
@@ -33,6 +35,9 @@ func ManageRustDesk(command models.RustDeskCommand) models.RustDeskResult {
 	}
 	if err == nil && command.Config != "" {
 		err = runRustDeskAdmin(binary, "--config", command.Config)
+		if err == nil {
+			err = restartRustDeskService()
+		}
 	}
 	if err == nil && command.Password != "" {
 		err = runRustDeskAdmin(binary, "--password", command.Password)
@@ -43,6 +48,51 @@ func ManageRustDesk(command models.RustDeskCommand) models.RustDeskResult {
 	}
 	result.RustDeskID = getRustDeskID()
 	return result
+}
+
+func restartRustDeskService() error {
+	manager, err := mgr.Connect()
+	if err != nil {
+		return fmt.Errorf("membuka Windows service manager gagal: %w", err)
+	}
+	defer manager.Disconnect()
+	service, err := manager.OpenService("RustDesk")
+	if err != nil {
+		return fmt.Errorf("Windows service RustDesk tidak ditemukan: %w", err)
+	}
+	defer service.Close()
+
+	status, err := service.Query()
+	if err != nil {
+		return fmt.Errorf("membaca status service RustDesk gagal: %w", err)
+	}
+	if status.State != svc.Stopped {
+		_, _ = service.Control(svc.Stop)
+		if err := waitForRustDeskService(service, svc.Stopped, 30*time.Second); err != nil {
+			return err
+		}
+	}
+	if err := service.Start(); err != nil {
+		return fmt.Errorf("menyalakan service RustDesk gagal: %w", err)
+	}
+	if err := waitForRustDeskService(service, svc.Running, 30*time.Second); err != nil {
+		return err
+	}
+	// Give the mediator time to register the ID with the self-hosted hbbs.
+	time.Sleep(5 * time.Second)
+	return nil
+}
+
+func waitForRustDeskService(service *mgr.Service, expected svc.State, timeout time.Duration) error {
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		status, err := service.Query()
+		if err == nil && status.State == expected {
+			return nil
+		}
+		time.Sleep(500 * time.Millisecond)
+	}
+	return fmt.Errorf("service RustDesk tidak mencapai status %d", expected)
 }
 
 func findRustDeskBinary() string {
