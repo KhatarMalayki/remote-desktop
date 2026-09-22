@@ -263,3 +263,81 @@ func TestInitialAssignmentAttachmentAndTimeline(t *testing.T) {
 		t.Fatalf("unexpected relocated asset: %+v", moved)
 	}
 }
+
+func TestBranchADHAndHeadOfficeSPVHolderWorkflow(t *testing.T) {
+	db, err := NewDB(filepath.Join(t.TempDir(), "adh-spv.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	s := &Server{db: db}
+
+	if err := db.CreateUser("adh_surabaya", "hash", "adh", "Surabaya"); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.CreateUser("spv_it", "hash", "spv", "Pusat"); err != nil {
+		t.Fatal(err)
+	}
+
+	surabayaHolders, err := db.ListHolderOptions("Surabaya")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(surabayaHolders) != 1 || surabayaHolders[0].Username != "adh_surabaya" || surabayaHolders[0].Role != "adh" {
+		t.Fatalf("unexpected surabaya holders: %+v", surabayaHolders)
+	}
+
+	pusatHolders, err := db.ListHolderOptions("Pusat")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(pusatHolders) != 1 || pusatHolders[0].Username != "spv_it" || pusatHolders[0].Role != "spv" {
+		t.Fatalf("unexpected pusat holders: %+v", pusatHolders)
+	}
+	hoHolders, err := db.ListHolderOptions("HO-Bintaro")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(hoHolders) != 1 || hoHolders[0].Username != "spv_it" {
+		t.Fatalf("unexpected HO-Bintaro holders: %+v", hoHolders)
+	}
+
+	emptyHolders, err := db.ListHolderOptions("Medan")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if emptyHolders == nil || len(emptyHolders) != 0 {
+		t.Fatalf("expected empty non-nil slice, got: %#v", emptyHolders)
+	}
+
+	devSby := &models.Device{ID: "dev-sby", Hostname: "PC-SBY-01", Branch: "Surabaya", GroupName: "Surabaya"}
+	if err := db.UpsertDevice(devSby); err != nil {
+		t.Fatal(err)
+	}
+	adminClaims := &UserClaims{Username: "admin", Role: "admin"}
+	r1 := httptest.NewRequest("POST", "/api/assets/switch-requests", strings.NewReader(`{"asset_id":"dev-sby","asset_type":"device","to_owner":"adh_surabaya","reason":"Penetapan PIC Cabang Surabaya"}`))
+	w1 := httptest.NewRecorder()
+	s.handleSwitchRequests(w1, r1.WithContext(context.WithValue(r1.Context(), userClaimsKey, adminClaims)))
+	if w1.Code != 201 {
+		t.Fatalf("assign adh failed: %d %s", w1.Code, w1.Body.String())
+	}
+	savedSby, _ := db.GetDevice("dev-sby")
+	if savedSby.OwnerUsername != "adh_surabaya" {
+		t.Fatalf("expected owner adh_surabaya, got: %s", savedSby.OwnerUsername)
+	}
+
+	devHO := &models.Device{ID: "dev-ho", Hostname: "SS-HO-ITAPSSPT", Branch: "Pusat", GroupName: "Pusat"}
+	if err := db.UpsertDevice(devHO); err != nil {
+		t.Fatal(err)
+	}
+	r2 := httptest.NewRequest("POST", "/api/assets/switch-requests", strings.NewReader(`{"asset_id":"dev-ho","asset_type":"device","to_owner":"spv_it","reason":"Penetapan PIC SPV IT HO"}`))
+	w2 := httptest.NewRecorder()
+	s.handleSwitchRequests(w2, r2.WithContext(context.WithValue(r2.Context(), userClaimsKey, adminClaims)))
+	if w2.Code != 201 {
+		t.Fatalf("assign spv failed: %d %s", w2.Code, w2.Body.String())
+	}
+	savedHO, _ := db.GetDevice("dev-ho")
+	if savedHO.OwnerUsername != "spv_it" {
+		t.Fatalf("expected owner spv_it, got: %s", savedHO.OwnerUsername)
+	}
+}

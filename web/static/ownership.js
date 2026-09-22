@@ -1,7 +1,7 @@
 // Asset holder changes are always submitted through the audited server workflow.
 var responsibilityNotice = 'Aset perusahaan merupakan tanggung jawab pemegang yang tercatat. Sebelum serah terima, pastikan kondisi, kelengkapan, dan data pekerjaan telah diperiksa. Tanggung jawab berpindah setelah switch disetujui. Segera laporkan kehilangan atau kerusakan kepada ADH.';
 
-function isAssetUser() { return currentUser && currentUser.role === 'user'; }
+function isAssetUser() { return currentUser && (currentUser.role === 'user' || currentUser.role === 'spv'); }
 function mayReviewSwitch() { return currentUser && ['adh', 'admin', 'ga_pusat'].includes(currentUser.role); }
 var handoverDraft = null;
 
@@ -12,11 +12,21 @@ async function requestAssetSwitch(type, id) {
   var branch=asset.branch||asset.group||'Pusat';
   var users=await api('/api/assets/holder-options?branch='+encodeURIComponent(branch));
   if(!Array.isArray(users)){showToast((users&&users.error)||'Daftar PIC tidak dapat dimuat');return}
+  if(users.length === 0){
+    showToast('Belum ada akun PIC (ADH / SPV) di lokasi ' + branch + '. Silakan buat di menu Akun Cabang.');
+    return;
+  }
   handoverDraft={type:type,id:id,asset:asset,isAssignment:isAssignment};
   document.getElementById('handoverTitle').textContent=isAssignment?'Tetapkan PIC Awal':'Serah Terima / Switch PIC';
   document.getElementById('handoverAssetName').textContent=(asset.name||asset.hostname)+' · '+branch;
   document.getElementById('handoverCurrentOwner').textContent=asset.owner_username||'Belum ditugaskan';
-  var select=document.getElementById('handoverTarget');select.innerHTML='<option value="">Pilih akun PIC...</option>'+users.filter(function(u){return u.username!==asset.owner_username}).map(function(u){return '<option value="'+esc(u.username)+'">'+esc(u.username)+'</option>'}).join('');
+  var select=document.getElementById('handoverTarget');select.innerHTML='<option value="">Pilih akun PIC...</option>'+users.filter(function(u){return u.username!==asset.owner_username}).map(function(u){
+    var roleLabel = '';
+    if(u.role === 'adh') roleLabel = ' (ADH Cabang)';
+    else if(u.role === 'spv') roleLabel = ' (SPV Dept)';
+    else if(u.role === 'ga_pusat') roleLabel = ' (GA Pusat)';
+    return '<option value="'+esc(u.username)+'">'+esc(u.username)+roleLabel+'</option>';
+  }).join('');
   document.getElementById('handoverReasonLabel').textContent=isAssignment?'Dasar penetapan PIC awal':'Alasan serah terima';
   document.getElementById('handoverReason').value='';document.getElementById('handoverSwap').value='';document.getElementById('handoverSwapGroup').style.display=isAssignment?'none':'block';document.getElementById('handoverAttachment').value='';document.getElementById('handoverError').style.display='none';
   document.getElementById('handoverSubmit').textContent=mayReviewSwitch()?(isAssignment?'Tetapkan PIC':'Simpan Serah Terima'):'Ajukan Persetujuan';

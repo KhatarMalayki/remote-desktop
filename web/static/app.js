@@ -748,7 +748,7 @@ async function loadUsers() {
           actions.push('<button class="btn btn-ghost btn-sm" onclick="resetUserMFA('+u.id+', \''+esc(u.username)+'\')">Reset 2FA</button>');
         }
       }
-      return '<tr><td><strong>'+esc(u.username)+'</strong>'+(isSelf?' <small style="color:var(--accent)">(Anda)</small>':'')+(u.mfa_enabled?' <span class="badge-status verified" style="font-size:10px;padding:1px 6px">2FA ON</span>':'')+'</td><td><span class="user-badge '+u.role+'">'+esc(u.role)+'</span></td><td>'+esc(u.branch||'-')+'</td><td><div style="display:flex;gap:4px;flex-wrap:wrap">'+actions.join(' ')+'</div></td></tr>';
+      return '<tr><td><strong>'+esc(u.username)+'</strong>'+(isSelf?' <small style="color:var(--accent)">(Anda)</small>':'')+(u.mfa_enabled?' <span class="badge-status verified" style="font-size:10px;padding:1px 6px">2FA ON</span>':'')+'</td><td><span class="user-badge '+u.role+'">'+(u.role==='spv'?'SPV Dept':esc(u.role))+'</span></td><td>'+esc(u.branch||'-')+'</td><td><div style="display:flex;gap:4px;flex-wrap:wrap">'+actions.join(' ')+'</div></td></tr>';
     }).join('') + '</tbody></table>';
 }
 
@@ -758,7 +758,7 @@ async function createUser() {
   var role = document.getElementById('newUserRole').value;
   var branch = document.getElementById('newUserBranch').value.trim();
   if (!username || !password) { alert('Username dan Password wajib diisi'); return; }
-  if ((role === 'adh' || role === 'user') && !branch) { alert('Nama lokasi wajib diisi untuk ADH/User'); return; }
+  if ((role === 'adh' || role === 'user' || role === 'spv') && !branch) { alert('Nama lokasi wajib diisi untuk ADH/SPV/User'); return; }
 
   var res = await api('/api/users', { method:'POST', body:JSON.stringify({ username:username, password:password, role:role, branch:branch }) });
   if (res && res.status === 'created') {

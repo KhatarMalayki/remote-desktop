@@ -47,6 +47,31 @@ type UserClaims struct {
 func canDeleteAssets(role string) bool  { return role == "admin" || role == "ga_pusat" }
 func isCentralRole(role string) bool    { return role == "admin" || role == "ga_pusat" }
 func canApproveSwitch(role string) bool { return role == "adh" || isCentralRole(role) }
+
+func isHeadOfficeBranch(b string) bool {
+	s := strings.ToLower(strings.TrimSpace(b))
+	return s == "pusat" || s == "ho" || s == "ho-bintaro" || s == "ho bintaro" || s == "kantor pusat"
+}
+
+func isEligibleHolderRole(role string) bool {
+	return role == "adh" || role == "spv" || role == "user" || role == "ga_pusat"
+}
+
+func isAssetHolderRole(role string) bool {
+	return role == "user" || role == "spv"
+}
+
+func branchesMatch(a, b string) bool {
+	a = strings.TrimSpace(a)
+	b = strings.TrimSpace(b)
+	if strings.EqualFold(a, b) {
+		return true
+	}
+	if isHeadOfficeBranch(a) && isHeadOfficeBranch(b) {
+		return true
+	}
+	return false
+}
 func assetResponsibilityWarning() string {
 	return "Asset ini tercatat sebagai tanggung jawab pemegangnya. Pastikan kondisi, kelengkapan, dan data serah terima sudah benar sebelum melakukan switch."
 }
@@ -400,7 +425,7 @@ func (s *Server) handleDevices(w http.ResponseWriter, r *http.Request) {
 		var devices []*models.Device
 		var total int
 		var err error
-		if claims.Role == "user" {
+		if isAssetHolderRole(claims.Role) {
 			devices, total, err = s.db.ListDevicesForOwner(claims.Username, search, limit, offset)
 		} else {
 			devices, total, err = s.db.ListDevices(group, search, limit, offset)
@@ -457,7 +482,7 @@ func (s *Server) handleDevice(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	if claims.Role == "user" && dev.OwnerUsername != claims.Username {
+	if isAssetHolderRole(claims.Role) && dev.OwnerUsername != claims.Username {
 		jsonError(w, "forbidden: asset bukan milik user ini", 403)
 		return
 	}
@@ -487,12 +512,12 @@ func (s *Server) handleDevice(w http.ResponseWriter, r *http.Request) {
 		if claims.Role == "adh" && claims.Branch != "" {
 			req.Group, req.Tags = dev.GroupName, dev.Tags
 		}
-		if claims.Role == "user" {
+		if isAssetHolderRole(claims.Role) {
 			req.Group, req.Tags, req.OwnerUsername = dev.GroupName, dev.Tags, dev.OwnerUsername
 		}
 		// Ownership changes must go through the audited switch workflow.
 		req.OwnerUsername = dev.OwnerUsername
-		if req.AcquisitionYear != nil && claims.Role != "user" {
+		if req.AcquisitionYear != nil && !isAssetHolderRole(claims.Role) {
 			if *req.AcquisitionYear != 0 && (*req.AcquisitionYear < 1970 || *req.AcquisitionYear > time.Now().Year()) {
 				jsonError(w, "Tahun pengadaan tidak valid", 400)
 				return
@@ -510,7 +535,7 @@ func (s *Server) handleDevice(w http.ResponseWriter, r *http.Request) {
 		jsonResp(w, map[string]string{"status": "ok"}, 200)
 
 	case http.MethodDelete:
-		if claims.Role == "viewer" || claims.Role == "user" {
+		if claims.Role == "viewer" || isAssetHolderRole(claims.Role) {
 			jsonError(w, "forbidden", 403)
 			return
 		}
@@ -548,7 +573,7 @@ func (s *Server) handleNetworkScans(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	claims := getClaims(r)
-	if claims.Role == "viewer" || claims.Role == "user" {
+	if claims.Role == "viewer" || isAssetHolderRole(claims.Role) {
 		jsonError(w, "forbidden", 403)
 		return
 	}
@@ -615,7 +640,7 @@ func (s *Server) handleNetworkScan(w http.ResponseWriter, r *http.Request) {
 	if branch == "" {
 		branch = dev.GroupName
 	}
-	if claims.Role == "viewer" || claims.Role == "user" || (claims.Role == "adh" && claims.Branch != "" && branch != claims.Branch) {
+	if claims.Role == "viewer" || isAssetHolderRole(claims.Role) || (claims.Role == "adh" && claims.Branch != "" && branch != claims.Branch) {
 		jsonError(w, "forbidden", 403)
 		return
 	}
@@ -650,7 +675,7 @@ func (s *Server) handleGroups(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleBranches(w http.ResponseWriter, r *http.Request) {
-	if getClaims(r).Role == "user" {
+	if isAssetHolderRole(getClaims(r).Role) {
 		jsonResp(w, []string{}, 200)
 		return
 	}
@@ -806,7 +831,7 @@ func (s *Server) handleManualAssets(w http.ResponseWriter, r *http.Request) {
 
 		var assets []models.ManualAsset
 		var err error
-		if claims.Role == "user" {
+		if isAssetHolderRole(claims.Role) {
 			assets, err = s.db.ListManualAssetsForOwner(claims.Username, category, verificationStatus, search)
 		} else {
 			assets, err = s.db.ListManualAssets(branch, category, verificationStatus, search)
@@ -821,7 +846,7 @@ func (s *Server) handleManualAssets(w http.ResponseWriter, r *http.Request) {
 		jsonResp(w, assets, 200)
 
 	case http.MethodPost:
-		if claims.Role == "viewer" || claims.Role == "user" {
+		if claims.Role == "viewer" || isAssetHolderRole(claims.Role) {
 			jsonError(w, "forbidden", 403)
 			return
 		}
@@ -876,7 +901,7 @@ func (s *Server) handleManualAsset(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "forbidden: asset belongs to different branch", 403)
 		return
 	}
-	if claims.Role == "user" && existing.OwnerUsername != claims.Username {
+	if isAssetHolderRole(claims.Role) && existing.OwnerUsername != claims.Username {
 		jsonError(w, "forbidden: asset bukan milik user ini", 403)
 		return
 	}
@@ -897,7 +922,7 @@ func (s *Server) handleManualAsset(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		upd.ID = id
-		if claims.Role == "user" {
+		if isAssetHolderRole(claims.Role) {
 			upd.AssetTag = existing.AssetTag
 			upd.Name = existing.Name
 			upd.Category = existing.Category
@@ -938,7 +963,7 @@ func (s *Server) handleManualAsset(w http.ResponseWriter, r *http.Request) {
 		jsonResp(w, map[string]string{"status": "updated"}, 200)
 
 	case http.MethodDelete:
-		if claims.Role == "viewer" || claims.Role == "user" {
+		if claims.Role == "viewer" || isAssetHolderRole(claims.Role) {
 			jsonError(w, "forbidden", 403)
 			return
 		}
@@ -978,7 +1003,7 @@ func (s *Server) handleSwitchRequests(w http.ResponseWriter, r *http.Request) {
 		if claims.Role == "adh" && claims.Branch != "" {
 			branch = claims.Branch
 		}
-		if claims.Role == "user" {
+		if isAssetHolderRole(claims.Role) {
 			username = claims.Username
 		}
 		status := r.URL.Query().Get("status")
@@ -1032,7 +1057,7 @@ func (s *Server) handleSwitchRequests(w http.ResponseWriter, r *http.Request) {
 				jsonError(w, "forbidden: asset belongs to different branch", 403)
 				return
 			}
-			if claims.Role == "user" && asset.OwnerUsername != claims.Username {
+			if isAssetHolderRole(claims.Role) && asset.OwnerUsername != claims.Username {
 				jsonError(w, "forbidden: asset bukan milik user ini", 403)
 				return
 			}
@@ -1055,7 +1080,7 @@ func (s *Server) handleSwitchRequests(w http.ResponseWriter, r *http.Request) {
 				jsonError(w, "forbidden: perangkat milik cabang lain", 403)
 				return
 			}
-			if claims.Role == "user" && dev.OwnerUsername != claims.Username {
+			if isAssetHolderRole(claims.Role) && dev.OwnerUsername != claims.Username {
 				jsonError(w, "forbidden: asset bukan milik user ini", 403)
 				return
 			}
@@ -1066,13 +1091,13 @@ func (s *Server) handleSwitchRequests(w http.ResponseWriter, r *http.Request) {
 			sw.Recommendation = deviceRecommendation(dev)
 		}
 
-		if claims.Role != "user" && !canApproveSwitch(claims.Role) {
+		if !isAssetHolderRole(claims.Role) && !canApproveSwitch(claims.Role) {
 			jsonError(w, "forbidden", 403)
 			return
 		}
 		_, _, targetRole, targetBranch, targetErr := s.db.GetUser(req.ToOwner)
-		if targetErr != nil || targetRole != "user" || targetBranch != sw.Branch || sw.FromOwner == sw.ToOwner {
-			jsonError(w, "Pilih akun user lain yang terdaftar di lokasi aset", 400)
+		if targetErr != nil || !isEligibleHolderRole(targetRole) || !branchesMatch(targetBranch, sw.Branch) || sw.FromOwner == sw.ToOwner {
+			jsonError(w, "Pilih akun ADH, SPV, atau user yang terdaftar di lokasi aset", 400)
 			return
 		}
 		if strings.TrimSpace(req.SwapTag) != "" {
@@ -1190,7 +1215,7 @@ func (s *Server) handleVerifyAsset(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	claims := getClaims(r)
-	if claims.Role == "viewer" || claims.Role == "user" {
+	if claims.Role == "viewer" || isAssetHolderRole(claims.Role) {
 		jsonError(w, "forbidden", 403)
 		return
 	}
@@ -1347,11 +1372,11 @@ func (s *Server) handleUsers(w http.ResponseWriter, r *http.Request) {
 		}
 		req.Username = strings.TrimSpace(req.Username)
 		req.Branch = strings.TrimSpace(req.Branch)
-		if req.Role != "admin" && req.Role != "ga_pusat" && req.Role != "adh" && req.Role != "viewer" && req.Role != "user" {
+		if req.Role != "admin" && req.Role != "ga_pusat" && req.Role != "adh" && req.Role != "viewer" && req.Role != "user" && req.Role != "spv" {
 			jsonError(w, "invalid role", 400)
 			return
 		}
-		if (req.Role == "adh" || req.Role == "user") && strings.TrimSpace(req.Branch) == "" {
+		if (req.Role == "adh" || req.Role == "user" || req.Role == "spv") && strings.TrimSpace(req.Branch) == "" {
 			jsonError(w, "Lokasi wajib diisi", 400)
 			return
 		}
@@ -1485,7 +1510,7 @@ func (s *Server) handleRelayWS(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}
-		if claims.Role == "viewer" || claims.Role == "user" {
+		if claims.Role == "viewer" || isAssetHolderRole(claims.Role) {
 			http.Error(w, "remote access is not permitted for this role", http.StatusForbidden)
 			return
 		}

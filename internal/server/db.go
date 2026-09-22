@@ -1062,9 +1062,9 @@ func (d *DB) ReviewSwitchRequest(id int64, status, reviewedBy, note string) erro
 		return fmt.Errorf("request already reviewed")
 	}
 	if status == "approved" {
-		var targetBranch string
-		if err := tx.QueryRow(`SELECT branch FROM users WHERE username=? AND role='user'`, req.ToOwner).Scan(&targetBranch); err != nil || targetBranch != req.Branch {
-			return fmt.Errorf("pemegang tujuan harus akun user di lokasi aset")
+		var targetRole, targetBranch string
+		if err := tx.QueryRow(`SELECT role, branch FROM users WHERE username=?`, req.ToOwner).Scan(&targetRole, &targetBranch); err != nil || !isEligibleHolderRole(targetRole) || !branchesMatch(targetBranch, req.Branch) {
+			return fmt.Errorf("pemegang tujuan harus akun ADH/SPV/user di lokasi aset")
 		}
 		switch req.AssetType {
 		case "manual":
@@ -1084,7 +1084,8 @@ func (d *DB) ReviewSwitchRequest(id int64, status, reviewedBy, note string) erro
 			if req.FromOwner == "" {
 				return fmt.Errorf("aset awal belum memiliki pemegang")
 			}
-			if err := tx.QueryRow(`SELECT branch FROM users WHERE username=? AND role='user'`, req.FromOwner).Scan(&targetBranch); err != nil || targetBranch != req.Branch {
+			var fromRole, fromBranch string
+			if err := tx.QueryRow(`SELECT role, branch FROM users WHERE username=?`, req.FromOwner).Scan(&fromRole, &fromBranch); err != nil || !isEligibleHolderRole(fromRole) || !branchesMatch(fromBranch, req.Branch) {
 				return fmt.Errorf("pemegang awal tidak lagi valid")
 			}
 			switch req.SwapAssetType {

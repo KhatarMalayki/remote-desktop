@@ -464,6 +464,7 @@ select.filter-select {
 }
 .user-badge.admin { background: rgba(79,140,255,0.2); color: var(--accent); }
 .user-badge.adh { background: rgba(52,211,153,0.2); color: var(--green); }
+.user-badge.spv { background: rgba(168,85,247,0.2); color: #c084fc; }
 .user-badge.viewer { background: rgba(160,163,177,0.2); color: var(--fg2); }
 
 .badge-status {

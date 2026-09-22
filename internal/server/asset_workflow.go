@@ -57,12 +57,19 @@ func (d *DB) AddActivity(a *models.AssetActivity) error {
 }
 
 func (d *DB) ListHolderOptions(branch string) ([]models.User, error) {
-	rows, err := d.db.Query(`SELECT id,username,role,branch,mfa_enabled,created_at FROM users WHERE role='user' AND branch=? ORDER BY username`, branch)
+	branch = strings.TrimSpace(branch)
+	query := `SELECT id,username,role,branch,mfa_enabled,created_at FROM users WHERE role IN ('adh','spv','user','ga_pusat') AND LOWER(branch)=LOWER(?) ORDER BY username`
+	args := []interface{}{branch}
+	if isHeadOfficeBranch(branch) {
+		query = `SELECT id,username,role,branch,mfa_enabled,created_at FROM users WHERE role IN ('adh','spv','user','ga_pusat') AND (LOWER(branch) IN ('pusat','ho','ho-bintaro','ho bintaro','kantor pusat') OR branch='') ORDER BY username`
+		args = nil
+	}
+	rows, err := d.db.Query(query, args...)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var out []models.User
+	out := make([]models.User, 0)
 	for rows.Next() {
 		var u models.User
 		if err := rows.Scan(&u.ID, &u.Username, &u.Role, &u.Branch, &u.MFAEnabled, &u.CreatedAt); err != nil {
@@ -169,7 +176,7 @@ func (s *Server) handleActivities(w http.ResponseWriter, r *http.Request) {
 	c := getClaims(r)
 	branch := r.URL.Query().Get("branch")
 	assetID := r.URL.Query().Get("asset_id")
-	if c.Role == "user" {
+	if isAssetHolderRole(c.Role) {
 		if assetID == "" {
 			jsonError(w, "asset_id is required", 403)
 			return
@@ -186,7 +193,7 @@ func (s *Server) handleActivities(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	if c.Role == "adh" || c.Role == "user" {
+	if c.Role == "adh" || isAssetHolderRole(c.Role) {
 		branch = c.Branch
 	}
 	items, err := s.db.ListActivities(branch, assetID, r.URL.Query().Get("category"), r.URL.Query().Get("search"), r.URL.Query().Get("from"), r.URL.Query().Get("to"), 250)
@@ -204,12 +211,11 @@ func (s *Server) handleHolderOptions(w http.ResponseWriter, r *http.Request) {
 	}
 	c := getClaims(r)
 	branch := strings.TrimSpace(r.URL.Query().Get("branch"))
-	if c.Role == "adh" || c.Role == "user" {
+	if (c.Role == "adh" || isAssetHolderRole(c.Role)) && c.Branch != "" {
 		branch = c.Branch
 	}
 	if branch == "" {
-		jsonError(w, "branch is required", 400)
-		return
+		branch = "Pusat"
 	}
 	items, err := s.db.ListHolderOptions(branch)
 	if err != nil {
@@ -225,7 +231,7 @@ func (s *Server) handleRelocateAsset(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	c := getClaims(r)
-	if c.Role == "viewer" || c.Role == "user" {
+	if c.Role == "viewer" || isAssetHolderRole(c.Role) {
 		jsonError(w, "forbidden", 403)
 		return
 	}
