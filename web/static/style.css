@@ -463,9 +463,19 @@ select.filter-select {
   margin-top: 4px;
 }
 .user-badge.admin { background: rgba(79,140,255,0.2); color: var(--accent); }
+.user-badge.it_support { background: rgba(6,182,212,0.2); color: #22d3ee; }
+.user-badge.ga_pusat { background: rgba(245,158,11,0.2); color: #fbbf24; }
 .user-badge.adh { background: rgba(52,211,153,0.2); color: var(--green); }
 .user-badge.spv { background: rgba(168,85,247,0.2); color: #c084fc; }
+.user-badge.user { background: rgba(148,163,184,0.2); color: #cbd5e1; }
 .user-badge.viewer { background: rgba(160,163,177,0.2); color: var(--fg2); }
+
+.role-matrix-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 10px; }
+.role-matrix-table th, .role-matrix-table td { padding: 9px 12px; border-bottom: 1px solid var(--border); text-align: left; }
+.role-matrix-table th { background: var(--bg3); font-weight: 600; color: var(--fg); }
+.role-matrix-table tr:hover { background: rgba(255,255,255,0.02); }
+.perm-check { color: #34d399; font-weight: 700; }
+.perm-cross { color: #64748b; font-weight: 400; }
 
 .badge-status {
   display: inline-flex;

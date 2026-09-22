@@ -491,3 +491,55 @@ func TestServiceRequestAndAssignedToWorkflow(t *testing.T) {
 		t.Fatalf("expected assigned_to to be updated to Rian (Kasir Baru), got: %s", devFinal.AssignedTo)
 	}
 }
+
+func TestMasterRoleAndITSupportPermissions(t *testing.T) {
+	db, err := NewDB(filepath.Join(t.TempDir(), "it-support.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	s := &Server{db: db, hub: NewHub(db)}
+
+	adminClaims := &UserClaims{Username: "admin", Role: "admin"}
+	rRoles := httptest.NewRequest("GET", "/api/roles", nil)
+	wRoles := httptest.NewRecorder()
+	s.handleRoles(wRoles, rRoles.WithContext(context.WithValue(rRoles.Context(), userClaimsKey, adminClaims)))
+	if wRoles.Code != 200 {
+		t.Fatalf("expected 200 getting roles, got %d", wRoles.Code)
+	}
+
+	var roles []models.RoleDefinition
+	if err := json.Unmarshal(wRoles.Body.Bytes(), &roles); err != nil {
+		t.Fatal(err)
+	}
+	if len(roles) != 7 {
+		t.Fatalf("expected 7 roles, got %d", len(roles))
+	}
+	foundIT := false
+	for _, r := range roles {
+		if r.Role == "it_support" {
+			foundIT = true
+			if !r.Permissions["remote_desktop"] || !r.Permissions["service_manage"] || !r.Permissions["agent_update"] {
+				t.Fatalf("unexpected it_support permissions: %+v", r.Permissions)
+			}
+		}
+	}
+	if !foundIT {
+		t.Fatal("it_support role not found in master roles")
+	}
+
+	rCreate := httptest.NewRequest("POST", "/api/users", strings.NewReader(`{"username":"andi_it","password":"secretpassword","role":"it_support","branch":""}`))
+	wCreate := httptest.NewRecorder()
+	s.handleUsers(wCreate, rCreate.WithContext(context.WithValue(rCreate.Context(), userClaimsKey, adminClaims)))
+	if wCreate.Code != 201 {
+		t.Fatalf("expected 201 creating it_support user, got %d %s", wCreate.Code, wCreate.Body.String())
+	}
+
+	itClaims := &UserClaims{Username: "andi_it", Role: "it_support", Branch: ""}
+	rBcast := httptest.NewRequest("POST", "/api/agent/broadcast-update", nil)
+	wBcast := httptest.NewRecorder()
+	s.handleBroadcastAgentUpdate(wBcast, rBcast.WithContext(context.WithValue(rBcast.Context(), userClaimsKey, itClaims)))
+	if wBcast.Code != 200 {
+		t.Fatalf("expected 200 on broadcast update by it_support, got %d", wBcast.Code)
+	}
+}

@@ -58,7 +58,7 @@ func (d *DB) AddActivity(a *models.AssetActivity) error {
 
 func (d *DB) ListHolderOptions(branch string) ([]models.User, error) {
 	branch = strings.TrimSpace(branch)
-	rows, err := d.db.Query(`SELECT id,username,role,branch,mfa_enabled,created_at FROM users WHERE role IN ('adh','spv','user','ga_pusat') ORDER BY username`)
+	rows, err := d.db.Query(`SELECT id,username,role,branch,mfa_enabled,created_at FROM users WHERE role IN ('adh','spv','user','ga_pusat','it_support') ORDER BY username`)
 	if err != nil {
 		return nil, err
 	}

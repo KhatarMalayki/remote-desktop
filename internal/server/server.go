@@ -54,7 +54,7 @@ func isHeadOfficeBranch(b string) bool {
 }
 
 func isEligibleHolderRole(role string) bool {
-	return role == "adh" || role == "spv" || role == "user" || role == "ga_pusat"
+	return role == "adh" || role == "spv" || role == "user" || role == "ga_pusat" || role == "it_support"
 }
 
 func isAssetHolderRole(role string) bool {
@@ -345,6 +345,7 @@ func (s *Server) ListenAndServe() error {
 	mux.HandleFunc("/api/agent/reconfigure", s.authMiddleware(s.handleReconfigureAgents))
 	mux.HandleFunc("/api/rustdesk/settings", s.authMiddleware(s.handleRustDeskSettings))
 	mux.HandleFunc("/api/rustdesk/manage", s.authMiddleware(s.handleRustDeskManage))
+	mux.HandleFunc("/api/roles", s.authMiddleware(s.handleRoles))
 	mux.HandleFunc("/api/users", s.authMiddleware(s.handleUsers))
 	mux.HandleFunc("/api/users/", s.authMiddleware(s.handleUserSubroute))
 	mux.HandleFunc("/api/logs/", s.authMiddleware(s.handleLogs))
@@ -1453,7 +1454,7 @@ func (s *Server) handleUsers(w http.ResponseWriter, r *http.Request) {
 		}
 		req.Username = strings.TrimSpace(req.Username)
 		req.Branch = strings.TrimSpace(req.Branch)
-		if req.Role != "admin" && req.Role != "ga_pusat" && req.Role != "adh" && req.Role != "viewer" && req.Role != "user" && req.Role != "spv" {
+		if req.Role != "admin" && req.Role != "ga_pusat" && req.Role != "adh" && req.Role != "viewer" && req.Role != "user" && req.Role != "spv" && req.Role != "it_support" {
 			jsonError(w, "invalid role", 400)
 			return
 		}
@@ -1604,7 +1605,7 @@ func (s *Server) handleRelayWS(w http.ResponseWriter, r *http.Request) {
 		if deviceBranch == "" {
 			deviceBranch = dev.GroupName
 		}
-		if claims.Role == "adh" && claims.Branch != "" && !userAllowsBranch(claims.Branch, deviceBranch) {
+		if (claims.Role == "adh" || claims.Role == "it_support") && claims.Branch != "" && !userAllowsBranch(claims.Branch, deviceBranch) {
 			http.Error(w, "device is outside your location", http.StatusForbidden)
 			return
 		}
@@ -2003,7 +2004,7 @@ func (s *Server) handleAgentDownload(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleBroadcastAgentUpdate(w http.ResponseWriter, r *http.Request) {
 	claims := getClaims(r)
-	if claims.Role != "admin" {
+	if claims.Role != "admin" && claims.Role != "it_support" {
 		jsonError(w, "forbidden", 403)
 		return
 	}
@@ -2028,7 +2029,7 @@ func (s *Server) handleBroadcastAgentUpdate(w http.ResponseWriter, r *http.Reque
 
 func (s *Server) handleAgentUpdate(w http.ResponseWriter, r *http.Request) {
 	claims := getClaims(r)
-	if claims.Role != "admin" {
+	if claims.Role != "admin" && claims.Role != "it_support" {
 		jsonError(w, "forbidden", http.StatusForbidden)
 		return
 	}
@@ -2135,7 +2136,7 @@ func (s *Server) handleRustDeskSettings(w http.ResponseWriter, r *http.Request) 
 
 func (s *Server) handleRustDeskManage(w http.ResponseWriter, r *http.Request) {
 	claims := getClaims(r)
-	if claims.Role != "admin" {
+	if claims.Role != "admin" && claims.Role != "it_support" {
 		jsonError(w, "forbidden", http.StatusForbidden)
 		return
 	}
@@ -2386,7 +2387,7 @@ func (s *Server) handleUserUpdate(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "Username tidak boleh kosong", 400)
 		return
 	}
-	if req.Role != "admin" && req.Role != "ga_pusat" && req.Role != "adh" && req.Role != "viewer" && req.Role != "user" && req.Role != "spv" {
+	if req.Role != "admin" && req.Role != "ga_pusat" && req.Role != "adh" && req.Role != "viewer" && req.Role != "user" && req.Role != "spv" && req.Role != "it_support" {
 		jsonError(w, "invalid role", 400)
 		return
 	}
@@ -3261,7 +3262,7 @@ func (s *Server) handleAssetService(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if req.Action == "complete" {
-		if claims.Role != "admin" && claims.Role != "ga_pusat" && claims.Role != "adh" {
+		if claims.Role != "admin" && claims.Role != "ga_pusat" && claims.Role != "adh" && claims.Role != "it_support" {
 			jsonError(w, "hanya ADH, GA Pusat, atau Admin yang dapat menyelesaikan servis", 403)
 			return
 		}
@@ -3289,4 +3290,147 @@ func (s *Server) handleAssetService(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	jsonResp(w, map[string]string{"status": "service_requested"}, 200)
+}
+
+func (s *Server) handleRoles(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", 405)
+		return
+	}
+	roles := []models.RoleDefinition{
+		{
+			Role:        "admin",
+			Name:        "Administrator",
+			BadgeColor:  "blue",
+			Scope:       "Nasional / Seluruh Cabang",
+			Description: "Pengendali penuh seluruh sistem, manajemen akun pengguna, pengaturan keamanan global, master role, dan konfigurasi endpoint.",
+			Permissions: map[string]bool{
+				"remote_desktop":     true,
+				"rustdesk_manage":    true,
+				"service_manage":     true,
+				"agent_update":       true,
+				"network_scan":       true,
+				"asset_verification": true,
+				"asset_mutation":     true,
+				"asset_delete":       true,
+				"user_management":    true,
+				"security_settings":  true,
+			},
+		},
+		{
+			Role:        "it_support",
+			Name:        "IT Support / Teknisi",
+			BadgeColor:  "cyan",
+			Scope:       "Nasional / Multi-Cabang",
+			Description: "Troubleshooting teknis perangkat, Remote Desktop (Web & RustDesk), reset/restart RustDesk, permohonan & penyelesaian servis laptop, update agent massal, dan network scan LAN.",
+			Permissions: map[string]bool{
+				"remote_desktop":     true,
+				"rustdesk_manage":    true,
+				"service_manage":     true,
+				"agent_update":       true,
+				"network_scan":       true,
+				"asset_verification": true,
+				"asset_mutation":     true,
+				"asset_delete":       false,
+				"user_management":    false,
+				"security_settings":  false,
+			},
+		},
+		{
+			Role:        "ga_pusat",
+			Name:        "GA Pusat (General Affairs)",
+			BadgeColor:  "orange",
+			Scope:       "Nasional / Seluruh Cabang",
+			Description: "Pengawasan kepemilikan inventaris nasional, persetujuan mutasi antar cabang, penghapusan data aset lama, dan arsip berita acara serah terima.",
+			Permissions: map[string]bool{
+				"remote_desktop":     false,
+				"rustdesk_manage":    false,
+				"service_manage":     true,
+				"agent_update":       false,
+				"network_scan":       false,
+				"asset_verification": true,
+				"asset_mutation":     true,
+				"asset_delete":       true,
+				"user_management":    false,
+				"security_settings":  false,
+			},
+		},
+		{
+			Role:        "adh",
+			Name:        "ADH (Admin Cabang)",
+			BadgeColor:  "green",
+			Scope:       "Cabang Ditugaskan (Bisa Multi-Cabang)",
+			Description: "Pengelola operasional aset di cabang setempat, verifikasi fisik inventaris, mutasi titik lokasi lokal (meja/lantai), penugasan laptop ke karyawan baru, dan pengajuan servis unit.",
+			Permissions: map[string]bool{
+				"remote_desktop":     false,
+				"rustdesk_manage":    false,
+				"service_manage":     true,
+				"agent_update":       false,
+				"network_scan":       false,
+				"asset_verification": true,
+				"asset_mutation":     true,
+				"asset_delete":       false,
+				"user_management":    false,
+				"security_settings":  false,
+			},
+		},
+		{
+			Role:        "spv",
+			Name:        "SPV Department (HO / Bintaro)",
+			BadgeColor:  "purple",
+			Scope:       "Departemen Kantor Pusat",
+			Description: "Supervisor penanggung jawab aset kerja departemen di Kantor Pusat, pemegang PIC departemen, serah terima laptop anggota tim kerja.",
+			Permissions: map[string]bool{
+				"remote_desktop":     false,
+				"rustdesk_manage":    false,
+				"service_manage":     true,
+				"agent_update":       false,
+				"network_scan":       false,
+				"asset_verification": false,
+				"asset_mutation":     false,
+				"asset_delete":       false,
+				"user_management":    false,
+				"security_settings":  false,
+			},
+		},
+		{
+			Role:        "user",
+			Name:        "User Pemegang Aset",
+			BadgeColor:  "slate",
+			Scope:       "Aset Pribadi yang Ditugaskan",
+			Description: "Karyawan pemakai laptop / perangkat kerja; dapat melihat spesifikasi unit yang ditugaskan dan mengajukan serah terima.",
+			Permissions: map[string]bool{
+				"remote_desktop":     false,
+				"rustdesk_manage":    false,
+				"service_manage":     true,
+				"agent_update":       false,
+				"network_scan":       false,
+				"asset_verification": false,
+				"asset_mutation":     false,
+				"asset_delete":       false,
+				"user_management":    false,
+				"security_settings":  false,
+			},
+		},
+		{
+			Role:        "viewer",
+			Name:        "Viewer",
+			BadgeColor:  "gray",
+			Scope:       "Dashboard Publik / Read-Only",
+			Description: "Akses pantau hanya-baca tanpa izin remote control atau pengubahan data inventaris.",
+			Permissions: map[string]bool{
+				"remote_desktop":     false,
+				"rustdesk_manage":    false,
+				"service_manage":     false,
+				"agent_update":       false,
+				"network_scan":       false,
+				"asset_verification": false,
+				"asset_mutation":     false,
+				"asset_delete":       false,
+				"user_management":    false,
+				"security_settings":  false,
+			},
+		},
+	}
+	jsonResp(w, roles, 200)
 }

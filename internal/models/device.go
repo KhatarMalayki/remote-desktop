@@ -76,10 +76,19 @@ type AssetVerification struct {
 	CreatedAt  time.Time `json:"created_at"`
 }
 
+type RoleDefinition struct {
+	Role        string          `json:"role"`
+	Name        string          `json:"name"`
+	BadgeColor  string          `json:"badge_color"`
+	Scope       string          `json:"scope"`
+	Description string          `json:"description"`
+	Permissions map[string]bool `json:"permissions"`
+}
+
 type User struct {
 	ID         int64     `json:"id"`
 	Username   string    `json:"username"`
-	Role       string    `json:"role"` // admin, adh, spv, user, viewer, ga_pusat
+	Role       string    `json:"role"` // admin, it_support, ga_pusat, adh, spv, user, viewer
 	Branch     string    `json:"branch"`
 	MFAEnabled bool      `json:"mfa_enabled"`
 	CreatedAt  time.Time `json:"created_at"`

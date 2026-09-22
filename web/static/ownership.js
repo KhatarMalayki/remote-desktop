@@ -25,6 +25,7 @@ async function requestAssetSwitch(type, id) {
     var roleLabel = '';
     if(u.role === 'adh') roleLabel = ' (ADH Cabang)';
     else if(u.role === 'spv') roleLabel = ' (SPV Dept)';
+    else if(u.role === 'it_support') roleLabel = ' (IT Support)';
     else if(u.role === 'ga_pusat') roleLabel = ' (GA Pusat)';
     var isCur = (u.username === asset.owner_username);
     return '<option value="'+esc(u.username)+'"'+(isCur?' selected':'')+'>'+esc(u.username)+roleLabel+(isCur?' · Tetap':'')+'</option>';

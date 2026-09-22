@@ -122,6 +122,15 @@ function updateUserUI() {
     if (currentUser.role === 'admin') {
       badgeEl.textContent = 'Administrator';
       badgeEl.className = 'user-badge admin';
+    } else if (currentUser.role === 'it_support') {
+      badgeEl.textContent = 'IT Support' + (currentUser.branch ? ': ' + currentUser.branch : ' (Nasional)');
+      badgeEl.className = 'user-badge it_support';
+    } else if (currentUser.role === 'ga_pusat') {
+      badgeEl.textContent = 'GA Pusat';
+      badgeEl.className = 'user-badge ga_pusat';
+    } else if (currentUser.role === 'spv') {
+      badgeEl.textContent = 'SPV Dept: ' + (currentUser.branch || 'HO');
+      badgeEl.className = 'user-badge spv';
     } else if (currentUser.role === 'adh') {
       badgeEl.textContent = 'ADH: ' + (currentUser.branch || 'Cabang');
       badgeEl.className = 'user-badge adh';
@@ -137,12 +146,15 @@ function updateUserUI() {
   if (navReconf) navReconf.style.display = currentUser.role === 'admin' ? 'flex' : 'none';
   var navSec = document.getElementById('navSecurityLogs');
   if (navSec) navSec.style.display = currentUser.role === 'admin' ? 'flex' : 'none';
+  var isTech = (currentUser.role === 'admin' || currentUser.role === 'it_support');
   const updateAllBtn = document.getElementById('updateOutdatedAgentsBtn');
-  if (updateAllBtn) updateAllBtn.style.display = currentUser.role === 'admin' ? 'inline-flex' : 'none';
+  if (updateAllBtn) updateAllBtn.style.display = isTech ? 'inline-flex' : 'none';
   const rustDeskSettingsBtn = document.getElementById('rustDeskSettingsBtn');
-  if (rustDeskSettingsBtn) rustDeskSettingsBtn.style.display = currentUser.role === 'admin' ? 'inline-flex' : 'none';
+  if (rustDeskSettingsBtn) rustDeskSettingsBtn.style.display = isTech ? 'inline-flex' : 'none';
+  var navRoles = document.getElementById('navRoles');
+  if (navRoles) navRoles.style.display = (currentUser.role === 'admin' || currentUser.role === 'it_support' || currentUser.role === 'ga_pusat') ? 'flex' : 'none';
   var adminHdr = document.getElementById('adminSectionHeader');
-  if (adminHdr) adminHdr.style.display = currentUser.role === 'admin' ? 'block' : 'none';
+  if (adminHdr) adminHdr.style.display = (currentUser.role === 'admin' || currentUser.role === 'it_support' || currentUser.role === 'ga_pusat') ? 'block' : 'none';
   var bTitle = document.getElementById('branchBannerTitle');
   var bSub = document.getElementById('branchBannerSubtitle');
   if (currentUser.role === 'adh') {
@@ -326,7 +338,7 @@ function buildDeviceTable(list) {
         '<td><button class="btn btn-ghost btn-sm" onclick="openDeviceModal(\''+d.id+'\')">Details</button>' +
         (d.online ? ' <button class="btn btn-primary btn-sm" onclick="quickRemote(\''+d.id+'\')">Remote Web</button>' : '') +
         (rustDeskID ? ' <button class="btn btn-warning btn-sm" onclick="openRustDesk(\''+rustDeskID+'\')">RustDesk</button>' : '') +
-        (currentUser && currentUser.role === 'admin' && outdated ? ' <button class="btn btn-warning btn-sm" '+(!d.online||pending?'disabled':'')+' onclick="updateDeviceAgent(\''+d.id+'\')">Update</button>' : '') +
+        (currentUser && (currentUser.role === 'admin' || currentUser.role === 'it_support') && outdated ? ' <button class="btn btn-warning btn-sm" '+(!d.online||pending?'disabled':'')+' onclick="updateDeviceAgent(\''+d.id+'\')">Update</button>' : '') +
         '</td></tr>';
     }).join('') + '</tbody></table>';
 }
@@ -560,7 +572,7 @@ function renderBranchAssets() {
     function addAction(label, className, handler) {
       var button = document.createElement('button');
       button.className = className;
-      button.textContent = label;
+      button.innerHTML = label;
       button.onclick = handler;
       actions.appendChild(button);
     }
@@ -580,11 +592,11 @@ function renderBranchAssets() {
       if (!isAssetUser()) addAction('Mutasi Lokasi', 'btn-sm-action', function() { relocateAsset(item.isManual ? 'manual' : 'device', item.id); });
       if (asset.status === 'maintenance') {
         if (!isAssetUser() && currentUser.role !== 'viewer') {
-          addAction('&#9989; Selesai Servis', 'btn-sm-action', function() { openServiceModal(item.isManual ? 'manual' : 'device', item.id, 'complete'); });
+          addAction('✅ Selesai Servis', 'btn-sm-action', function() { openServiceModal(item.isManual ? 'manual' : 'device', item.id, 'complete'); });
         }
       } else {
         if (currentUser.role !== 'viewer') {
-          addAction('&#128295; Minta Servis', 'btn-sm-action', function() { openServiceModal(item.isManual ? 'manual' : 'device', item.id, 'request'); });
+          addAction('🔧 Minta Servis', 'btn-sm-action', function() { openServiceModal(item.isManual ? 'manual' : 'device', item.id, 'request'); });
         }
       }
       addAction('Riwayat', 'btn-sm-action', function() { openAssetTimeline(item.id); });
@@ -786,7 +798,7 @@ async function loadUsers() {
           actions.push('<button class="btn btn-ghost btn-sm" onclick="resetUserMFA('+u.id+', \''+esc(u.username)+'\')">Reset 2FA</button>');
         }
       }
-      return '<tr><td><strong>'+esc(u.username)+'</strong>'+(isSelf?' <small style="color:var(--accent)">(Anda)</small>':'')+(u.mfa_enabled?' <span class="badge-status verified" style="font-size:10px;padding:1px 6px">2FA ON</span>':'')+'</td><td><span class="user-badge '+u.role+'">'+(u.role==='spv'?'SPV Dept':esc(u.role))+'</span></td><td>'+esc(u.branch||'-')+'</td><td><div style="display:flex;gap:4px;flex-wrap:wrap">'+actions.join(' ')+'</div></td></tr>';
+      return '<tr><td><strong>'+esc(u.username)+'</strong>'+(isSelf?' <small style="color:var(--accent)">(Anda)</small>':'')+(u.mfa_enabled?' <span class="badge-status verified" style="font-size:10px;padding:1px 6px">2FA ON</span>':'')+'</td><td><span class="user-badge '+u.role+'">'+(u.role==='spv'?'SPV Dept':(u.role==='it_support'?'IT Support':(u.role==='ga_pusat'?'GA Pusat':(u.role==='adh'?'ADH Cabang':esc(u.role)))))+'</span></td><td>'+esc(u.branch||'-')+'</td><td><div style="display:flex;gap:4px;flex-wrap:wrap">'+actions.join(' ')+'</div></td></tr>';
     }).join('') + '</tbody></table>';
 }
 
@@ -938,7 +950,7 @@ async function openDeviceModal(id) {
   document.getElementById('modalTags').disabled = isAssetUser();
   document.getElementById('modalGroup').disabled = isAssetUser();
   document.querySelectorAll('#deviceModal [onclick="deleteDevice()"], #deviceModal [onclick="startNetworkScan()"]').forEach(function(el) { el.style.display = isAssetUser() ? 'none' : ''; });
-  var canManageRustDesk = currentUser && currentUser.role === 'admin';
+  var canManageRustDesk = currentUser && (currentUser.role === 'admin' || currentUser.role === 'it_support');
   document.getElementById('btnInstallRustDesk').style.display = canManageRustDesk ? 'inline-flex' : 'none';
   document.getElementById('btnRustDeskPassword').style.display = canManageRustDesk && rustDeskID ? 'inline-flex' : 'none';
   document.getElementById('deviceModal').style.display = 'flex';
@@ -2041,3 +2053,56 @@ function submitDownloadAgentPackage() {
   }, 1000);
 }
 
+
+// ==================== MASTER ROLE ====================
+
+async function openRolesModal() {
+  document.getElementById('rolesModal').style.display = 'flex';
+  await loadRoles();
+}
+
+function closeRolesModal() {
+  document.getElementById('rolesModal').style.display = 'none';
+}
+
+async function loadRoles() {
+  var container = document.getElementById('rolesTableContainer');
+  if (!container) return;
+  var roles = await api('/api/roles');
+  if (!Array.isArray(roles) || roles.length === 0) {
+    container.innerHTML = '<p style="color:var(--fg2);font-size:12px">Gagal memuat master role.</p>';
+    return;
+  }
+  var html = '<table class="role-matrix-table"><thead><tr>' +
+    '<th>Peran &amp; Cakupan</th>' +
+    '<th>Tanggung Jawab Utama</th>' +
+    '<th style="text-align:center">Remote</th>' +
+    '<th style="text-align:center">RustDesk</th>' +
+    '<th style="text-align:center">Servis Unit</th>' +
+    '<th style="text-align:center">Update Agent</th>' +
+    '<th style="text-align:center">Verifikasi</th>' +
+    '<th style="text-align:center">Mutasi/Hapus</th>' +
+    '<th style="text-align:center">Kelola User</th>' +
+    '</tr></thead><tbody>';
+
+  roles.forEach(function(r) {
+    var p = r.permissions || {};
+    var mark = function(val) {
+      return val ? '<span class="perm-check">✔</span>' : '<span class="perm-cross">-</span>';
+    };
+    html += '<tr>' +
+      '<td style="white-space:nowrap"><span class="user-badge ' + r.role + '">' + esc(r.name) + '</span><br><small style="color:var(--fg2);font-size:11px">📍 ' + esc(r.scope) + '</small></td>' +
+      '<td>' + esc(r.description) + '</td>' +
+      '<td style="text-align:center">' + mark(p.remote_desktop) + '</td>' +
+      '<td style="text-align:center">' + mark(p.rustdesk_manage) + '</td>' +
+      '<td style="text-align:center">' + mark(p.service_manage) + '</td>' +
+      '<td style="text-align:center">' + mark(p.agent_update) + '</td>' +
+      '<td style="text-align:center">' + mark(p.asset_verification) + '</td>' +
+      '<td style="text-align:center">' + mark(p.asset_mutation || p.asset_delete) + '</td>' +
+      '<td style="text-align:center">' + mark(p.user_management) + '</td>' +
+      '</tr>';
+  });
+
+  html += '</tbody></table>';
+  container.innerHTML = html;
+}
