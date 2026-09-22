@@ -58,13 +58,7 @@ func (d *DB) AddActivity(a *models.AssetActivity) error {
 
 func (d *DB) ListHolderOptions(branch string) ([]models.User, error) {
 	branch = strings.TrimSpace(branch)
-	query := `SELECT id,username,role,branch,mfa_enabled,created_at FROM users WHERE role IN ('adh','spv','user','ga_pusat') AND LOWER(branch)=LOWER(?) ORDER BY username`
-	args := []interface{}{branch}
-	if isHeadOfficeBranch(branch) {
-		query = `SELECT id,username,role,branch,mfa_enabled,created_at FROM users WHERE role IN ('adh','spv','user','ga_pusat') AND (LOWER(branch) IN ('pusat','ho','ho-bintaro','ho bintaro','kantor pusat') OR branch='') ORDER BY username`
-		args = nil
-	}
-	rows, err := d.db.Query(query, args...)
+	rows, err := d.db.Query(`SELECT id,username,role,branch,mfa_enabled,created_at FROM users WHERE role IN ('adh','spv','user','ga_pusat') ORDER BY username`)
 	if err != nil {
 		return nil, err
 	}
@@ -75,7 +69,9 @@ func (d *DB) ListHolderOptions(branch string) ([]models.User, error) {
 		if err := rows.Scan(&u.ID, &u.Username, &u.Role, &u.Branch, &u.MFAEnabled, &u.CreatedAt); err != nil {
 			return nil, err
 		}
-		out = append(out, u)
+		if userAllowsBranch(u.Branch, branch) {
+			out = append(out, u)
+		}
 	}
 	return out, rows.Err()
 }
@@ -84,8 +80,18 @@ func (d *DB) ListActivities(branch, assetID, category, search, fromDate, toDate 
 	where := "1=1"
 	var args []interface{}
 	if branch != "" {
-		where += " AND branch=?"
-		args = append(args, branch)
+		branches := splitBranches(branch)
+		if len(branches) == 1 {
+			where += " AND branch=?"
+			args = append(args, branches[0])
+		} else if len(branches) > 1 {
+			var orClauses []string
+			for _, b := range branches {
+				orClauses = append(orClauses, "branch=?")
+				args = append(args, b)
+			}
+			where += " AND (" + strings.Join(orClauses, " OR ") + ")"
+		}
 	}
 	if assetID != "" {
 		where += " AND asset_id=?"
@@ -163,7 +169,7 @@ func canAccessSwitch(claims *UserClaims, sw *models.AssetSwitchRequest) bool {
 		return true
 	}
 	if claims.Role == "adh" {
-		return claims.Branch != "" && claims.Branch == sw.Branch
+		return claims.Branch != "" && userAllowsBranch(claims.Branch, sw.Branch)
 	}
 	return claims.Username == sw.RequestedBy || claims.Username == sw.FromOwner || claims.Username == sw.ToOwner
 }
@@ -193,7 +199,15 @@ func (s *Server) handleActivities(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	if c.Role == "adh" || isAssetHolderRole(c.Role) {
+	if c.Role == "adh" && c.Branch != "" {
+		if branch != "" && !userAllowsBranch(c.Branch, branch) {
+			jsonError(w, "forbidden", 403)
+			return
+		}
+		if branch == "" {
+			branch = c.Branch
+		}
+	} else if isAssetHolderRole(c.Role) {
 		branch = c.Branch
 	}
 	items, err := s.db.ListActivities(branch, assetID, r.URL.Query().Get("category"), r.URL.Query().Get("search"), r.URL.Query().Get("from"), r.URL.Query().Get("to"), 250)
@@ -211,7 +225,15 @@ func (s *Server) handleHolderOptions(w http.ResponseWriter, r *http.Request) {
 	}
 	c := getClaims(r)
 	branch := strings.TrimSpace(r.URL.Query().Get("branch"))
-	if (c.Role == "adh" || isAssetHolderRole(c.Role)) && c.Branch != "" {
+	if c.Role == "adh" && c.Branch != "" {
+		if branch != "" && !userAllowsBranch(c.Branch, branch) {
+			jsonError(w, "forbidden: branch not assigned", 403)
+			return
+		}
+		if branch == "" {
+			branch = splitBranches(c.Branch)[0]
+		}
+	} else if isAssetHolderRole(c.Role) && c.Branch != "" {
 		branch = c.Branch
 	}
 	if branch == "" {

@@ -319,8 +319,18 @@ func (d *DB) ListDevices(group, search string, limit, offset int) ([]*models.Dev
 	where := "1=1"
 	args := []interface{}{}
 	if group != "" {
-		where += " AND (group_name=? OR branch=?)"
-		args = append(args, group, group)
+		branches := splitBranches(group)
+		if len(branches) == 1 {
+			where += " AND (group_name=? OR branch=?)"
+			args = append(args, branches[0], branches[0])
+		} else if len(branches) > 1 {
+			var orClauses []string
+			for _, b := range branches {
+				orClauses = append(orClauses, "(group_name=? OR branch=?)")
+				args = append(args, b, b)
+			}
+			where += " AND (" + strings.Join(orClauses, " OR ") + ")"
+		}
 	}
 	if search != "" {
 		where += " AND (hostname LIKE ? OR ip LIKE ? OR id LIKE ? OR branch LIKE ?)"
@@ -528,6 +538,82 @@ func (d *DB) CreateUser(username, passwordHash, role, branch string) error {
 		`INSERT INTO users (username, password_hash, role, branch) VALUES (?, ?, ?, ?)`,
 		username, passwordHash, role, branch)
 	return err
+}
+
+func (d *DB) GetUserByID(id int64) (*models.User, error) {
+	row := d.db.QueryRow(`SELECT id, username, role, branch, COALESCE(mfa_enabled, 0), created_at FROM users WHERE id=?`, id)
+	var u models.User
+	var mfaInt int
+	if err := row.Scan(&u.ID, &u.Username, &u.Role, &u.Branch, &mfaInt, &u.CreatedAt); err != nil {
+		return nil, err
+	}
+	u.MFAEnabled = mfaInt == 1
+	return &u, nil
+}
+
+func (d *DB) UpdateUser(id int64, newUsername, newPassword, newRole, newBranch string) error {
+	newUsername = strings.TrimSpace(newUsername)
+	newRole = strings.TrimSpace(newRole)
+	newBranch = strings.TrimSpace(newBranch)
+	if newUsername == "" {
+		return fmt.Errorf("username tidak boleh kosong")
+	}
+
+	var existingUsername, existingRole string
+	err := d.db.QueryRow(`SELECT username, role FROM users WHERE id=?`, id).Scan(&existingUsername, &existingRole)
+	if err != nil {
+		return fmt.Errorf("user tidak ditemukan")
+	}
+
+	if existingRole == "admin" && newRole != "admin" {
+		var adminCount int
+		_ = d.db.QueryRow(`SELECT COUNT(*) FROM users WHERE role='admin'`).Scan(&adminCount)
+		if adminCount <= 1 {
+			return fmt.Errorf("tidak dapat mengubah role administrator terakhir")
+		}
+	}
+
+	if newUsername != existingUsername {
+		var count int
+		_ = d.db.QueryRow(`SELECT COUNT(*) FROM users WHERE username=? AND id<>?`, newUsername, id).Scan(&count)
+		if count > 0 {
+			return fmt.Errorf("username '%s' sudah digunakan", newUsername)
+		}
+	}
+
+	tx, err := d.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	if newUsername != existingUsername {
+		for _, query := range []string{
+			`UPDATE devices SET owner_username=? WHERE owner_username=?`,
+			`UPDATE manual_assets SET owner_username=? WHERE owner_username=?`,
+			`UPDATE asset_switch_requests SET from_owner=? WHERE from_owner=? AND status='pending'`,
+			`UPDATE asset_switch_requests SET to_owner=? WHERE to_owner=? AND status='pending'`,
+			`UPDATE asset_switch_requests SET requested_by=? WHERE requested_by=? AND status='pending'`,
+		} {
+			if _, err := tx.Exec(query, newUsername, existingUsername); err != nil {
+				return err
+			}
+		}
+	}
+
+	if strings.TrimSpace(newPassword) != "" {
+		newHash := hashPassword(newPassword)
+		_, err = tx.Exec(`UPDATE users SET username=?, role=?, branch=?, password_hash=? WHERE id=?`,
+			newUsername, newRole, newBranch, newHash, id)
+	} else {
+		_, err = tx.Exec(`UPDATE users SET username=?, role=?, branch=? WHERE id=?`,
+			newUsername, newRole, newBranch, id)
+	}
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit()
 }
 
 func (d *DB) DeleteUser(id int64) error {
@@ -761,8 +847,18 @@ func (d *DB) ListManualAssets(branch, category, verificationStatus, search strin
 	where := "1=1"
 	var args []interface{}
 	if branch != "" {
-		where += " AND branch=?"
-		args = append(args, branch)
+		branches := splitBranches(branch)
+		if len(branches) == 1 {
+			where += " AND branch=?"
+			args = append(args, branches[0])
+		} else if len(branches) > 1 {
+			var orClauses []string
+			for _, b := range branches {
+				orClauses = append(orClauses, "branch=?")
+				args = append(args, b)
+			}
+			where += " AND (" + strings.Join(orClauses, " OR ") + ")"
+		}
 	}
 	if category != "" {
 		where += " AND category=?"
@@ -905,8 +1001,18 @@ func (d *DB) GetAssetVerificationsFiltered(assetID, branch, status, verifier, fr
 		args = append(args, assetID)
 	}
 	if branch != "" {
-		where += " AND branch=?"
-		args = append(args, branch)
+		branches := splitBranches(branch)
+		if len(branches) == 1 {
+			where += " AND branch=?"
+			args = append(args, branches[0])
+		} else if len(branches) > 1 {
+			var orClauses []string
+			for _, b := range branches {
+				orClauses = append(orClauses, "branch=?")
+				args = append(args, b)
+			}
+			where += " AND (" + strings.Join(orClauses, " OR ") + ")"
+		}
 	}
 	if status != "" {
 		where += " AND status=?"
@@ -979,8 +1085,18 @@ func (d *DB) ListSwitchRequests(branch, username, status string, limit int) ([]m
 	where := "1=1"
 	var args []interface{}
 	if branch != "" {
-		where += " AND branch=?"
-		args = append(args, branch)
+		branches := splitBranches(branch)
+		if len(branches) == 1 {
+			where += " AND branch=?"
+			args = append(args, branches[0])
+		} else if len(branches) > 1 {
+			var orClauses []string
+			for _, b := range branches {
+				orClauses = append(orClauses, "branch=?")
+				args = append(args, b)
+			}
+			where += " AND (" + strings.Join(orClauses, " OR ") + ")"
+		}
 	}
 	if username != "" {
 		where += " AND (requested_by=? OR from_owner=? OR to_owner=?)"
@@ -1063,7 +1179,7 @@ func (d *DB) ReviewSwitchRequest(id int64, status, reviewedBy, note string) erro
 	}
 	if status == "approved" {
 		var targetRole, targetBranch string
-		if err := tx.QueryRow(`SELECT role, branch FROM users WHERE username=?`, req.ToOwner).Scan(&targetRole, &targetBranch); err != nil || !isEligibleHolderRole(targetRole) || !branchesMatch(targetBranch, req.Branch) {
+		if err := tx.QueryRow(`SELECT role, branch FROM users WHERE username=?`, req.ToOwner).Scan(&targetRole, &targetBranch); err != nil || !isEligibleHolderRole(targetRole) || !userAllowsBranch(targetBranch, req.Branch) {
 			return fmt.Errorf("pemegang tujuan harus akun ADH/SPV/user di lokasi aset")
 		}
 		switch req.AssetType {
@@ -1085,7 +1201,7 @@ func (d *DB) ReviewSwitchRequest(id int64, status, reviewedBy, note string) erro
 				return fmt.Errorf("aset awal belum memiliki pemegang")
 			}
 			var fromRole, fromBranch string
-			if err := tx.QueryRow(`SELECT role, branch FROM users WHERE username=?`, req.FromOwner).Scan(&fromRole, &fromBranch); err != nil || !isEligibleHolderRole(fromRole) || !branchesMatch(fromBranch, req.Branch) {
+			if err := tx.QueryRow(`SELECT role, branch FROM users WHERE username=?`, req.FromOwner).Scan(&fromRole, &fromBranch); err != nil || !isEligibleHolderRole(fromRole) || !userAllowsBranch(fromBranch, req.Branch) {
 				return fmt.Errorf("pemegang awal tidak lagi valid")
 			}
 			switch req.SwapAssetType {
@@ -1112,10 +1228,23 @@ func (d *DB) GetBranchStats(branch string) (map[string]interface{}, error) {
 	whereDevice := "1=1"
 	var argsM, argsD []interface{}
 	if branch != "" {
-		whereManual += " AND branch=?"
-		argsM = append(argsM, branch)
-		whereDevice += " AND (branch=? OR group_name=?)"
-		argsD = append(argsD, branch, branch)
+		branches := splitBranches(branch)
+		if len(branches) == 1 {
+			whereManual += " AND branch=?"
+			argsM = append(argsM, branches[0])
+			whereDevice += " AND (branch=? OR group_name=?)"
+			argsD = append(argsD, branches[0], branches[0])
+		} else if len(branches) > 1 {
+			var orClausesM, orClausesD []string
+			for _, b := range branches {
+				orClausesM = append(orClausesM, "branch=?")
+				argsM = append(argsM, b)
+				orClausesD = append(orClausesD, "(branch=? OR group_name=?)")
+				argsD = append(argsD, b, b)
+			}
+			whereManual += " AND (" + strings.Join(orClausesM, " OR ") + ")"
+			whereDevice += " AND (" + strings.Join(orClausesD, " OR ") + ")"
+		}
 	}
 
 	var mTotal, mVerified, mDiscrepancy int

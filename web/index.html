@@ -451,7 +451,11 @@
             <option value="viewer">Viewer</option>
           </select>
         </div>
-        <div class="form-group"><label>Nama Lokasi (wajib untuk ADH/SPV/User)</label><input type="text" id="newUserBranch" placeholder="Contoh: Surabaya atau Pusat"></div>
+        <div class="form-group">
+          <label>Nama Lokasi (wajib untuk ADH/SPV/User)</label>
+          <input type="text" id="newUserBranch" placeholder="Contoh: Surabaya atau Surabaya, Malang">
+          <small style="color:var(--fg2);font-size:11px">Bisa isi 2 cabang atau lebih dipisah koma (contoh: <code>Surabaya, Malang</code>)</small>
+        </div>
       </div>
       <div style="text-align:right"><button class="btn btn-primary btn-sm" onclick="createUser()">+ Tambah Akun</button></div>
     </div>
@@ -459,6 +463,42 @@
     <div id="usersTableContainer" style="margin-top:10px"></div>
     <div class="modal-actions" style="margin-top:16px">
       <button class="btn btn-ghost" onclick="closeUsersModal()">Tutup</button>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT USER MODAL (ADMIN ONLY) -->
+<div id="editUserModal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeEditUserModal()">
+  <div class="modal" style="max-width:550px">
+    <h3>Edit Akun Pengguna</h3>
+    <p style="font-size:12px;color:var(--fg2);margin-bottom:14px">Perbarui data user, peran hak akses (role), atau lokasi cabang.</p>
+    <input type="hidden" id="editUserId">
+    <div style="background:var(--bg3);padding:14px;border-radius:var(--radius);margin-bottom:16px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="form-group"><label>Username</label><input type="text" id="editUserUsername"></div>
+        <div class="form-group"><label>Password Baru <span style="font-weight:400;color:var(--fg2)">(opsional)</span></label><input type="password" id="editUserPassword" placeholder="Biarkan kosong jika tidak ganti"></div>
+        <div class="form-group"><label>Role</label>
+          <select id="editUserRole">
+            <option value="adh">ADH (Admin / PIC Cabang)</option>
+            <option value="spv">SPV Department (HO / Bintaro)</option>
+            <option value="user">User Pemegang Aset</option>
+            <option value="ga_pusat">GA Pusat</option>
+            <option value="admin">Administrator (Pusat)</option>
+            <option value="viewer">Viewer</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Nama Lokasi / Cabang</label>
+          <input type="text" id="editUserBranch" placeholder="Contoh: Surabaya atau Surabaya, Malang">
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--fg2);margin-top:8px">
+        💡 <strong>Multi-Cabang:</strong> Jika akun memegang 2 cabang atau lebih, pisahkan nama cabang dengan koma (contoh: <code>Surabaya, Malang</code>). Akun akan otomatis terdaftar sebagai PIC dan dapat mengelola kedua cabang tersebut.
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeEditUserModal()">Batal</button>
+      <button class="btn btn-primary" onclick="submitEditUser()">Simpan Perubahan</button>
     </div>
   </div>
 </div>

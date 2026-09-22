@@ -341,3 +341,102 @@ func TestBranchADHAndHeadOfficeSPVHolderWorkflow(t *testing.T) {
 		t.Fatalf("expected owner spv_it, got: %s", savedHO.OwnerUsername)
 	}
 }
+
+func TestAdminEditUserAndMultiBranchADH(t *testing.T) {
+	db, err := NewDB(filepath.Join(t.TempDir(), "edit-multi.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	s := &Server{db: db, hub: NewHub(db)}
+
+	if err := db.CreateUser("budi", "hash1", "viewer", "Pusat"); err != nil {
+		t.Fatal(err)
+	}
+	users, _ := db.ListUsers()
+	var targetUser models.User
+	for _, u := range users {
+		if u.Username == "budi" {
+			targetUser = u
+			break
+		}
+	}
+	if targetUser.ID == 0 {
+		t.Fatal("target user budi not found")
+	}
+
+	adminClaims := &UserClaims{Username: "admin", Role: "admin"}
+	editURL := fmt.Sprintf("/api/users/%d", targetUser.ID)
+	putReq := httptest.NewRequest("PUT", editURL, strings.NewReader(`{"username":"budi_adh","role":"adh","branch":"Surabaya, Malang"}`))
+	wPut := httptest.NewRecorder()
+	s.handleUserSubroute(wPut, putReq.WithContext(context.WithValue(putReq.Context(), userClaimsKey, adminClaims)))
+	if wPut.Code != 200 {
+		t.Fatalf("expected 200 on edit user, got %d %s", wPut.Code, wPut.Body.String())
+	}
+
+	updatedUser, err := db.GetUserByID(targetUser.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updatedUser.Username != "budi_adh" || updatedUser.Role != "adh" || updatedUser.Branch != "Surabaya, Malang" {
+		t.Fatalf("unexpected user state: %+v", updatedUser)
+	}
+
+	sbyHolders, _ := db.ListHolderOptions("Surabaya")
+	foundSby := false
+	for _, h := range sbyHolders {
+		if h.Username == "budi_adh" {
+			foundSby = true
+		}
+	}
+	if !foundSby {
+		t.Fatal("multi-branch ADH not found in Surabaya holders")
+	}
+
+	mlgHolders, _ := db.ListHolderOptions("Malang")
+	foundMlg := false
+	for _, h := range mlgHolders {
+		if h.Username == "budi_adh" {
+			foundMlg = true
+		}
+	}
+	if !foundMlg {
+		t.Fatal("multi-branch ADH not found in Malang holders")
+	}
+
+	medanHolders, _ := db.ListHolderOptions("Medan")
+	for _, h := range medanHolders {
+		if h.Username == "budi_adh" {
+			t.Fatal("multi-branch ADH should not be in Medan holders")
+		}
+	}
+
+	adhClaims := &UserClaims{Username: "budi_adh", Role: "adh", Branch: "Surabaya, Malang"}
+	devSby := &models.Device{ID: "d-sby", Hostname: "PC-SBY", Branch: "Surabaya", GroupName: "Surabaya"}
+	devMlg := &models.Device{ID: "d-mlg", Hostname: "PC-MLG", Branch: "Malang", GroupName: "Malang"}
+	devMdn := &models.Device{ID: "d-mdn", Hostname: "PC-MDN", Branch: "Medan", GroupName: "Medan"}
+	_ = db.UpsertDevice(devSby)
+	_ = db.UpsertDevice(devMlg)
+	_ = db.UpsertDevice(devMdn)
+
+	rDevs := httptest.NewRequest("GET", "/api/devices", nil)
+	wDevs := httptest.NewRecorder()
+	s.handleDevices(wDevs, rDevs.WithContext(context.WithValue(rDevs.Context(), userClaimsKey, adhClaims)))
+	if wDevs.Code != 200 {
+		t.Fatalf("get devices failed: %d %s", wDevs.Code, wDevs.Body.String())
+	}
+	var devResp struct {
+		Devices []*models.Device `json:"devices"`
+	}
+	_ = json.Unmarshal(wDevs.Body.Bytes(), &devResp)
+	if len(devResp.Devices) != 2 {
+		t.Fatalf("expected 2 devices (Sby + Mlg), got %d", len(devResp.Devices))
+	}
+
+	rMdn := httptest.NewRequest("GET", "/api/devices/d-mdn", nil)
+	wMdn := httptest.NewRecorder()
+	s.handleDevice(wMdn, rMdn.WithContext(context.WithValue(rMdn.Context(), userClaimsKey, adhClaims)))
+	if wMdn.Code != 403 {
+		t.Fatalf("expected 403 accessing Medan device, got %d", wMdn.Code)
+	}
+}

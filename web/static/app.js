@@ -420,7 +420,24 @@ async function loadBranches() {
   var cur = sel.value;
   sel.innerHTML = currentUser && currentUser.role === 'adh' ? '' : '<option value="">Semua Cabang</option>';
   (branches || []).forEach(function(b) { sel.innerHTML += '<option value="'+esc(b)+'">'+esc(b)+'</option>'; });
-  if (currentUser && currentUser.role === 'adh' && currentUser.branch) { sel.value = currentUser.branch; sel.disabled = true; }
+  if (currentUser && currentUser.role === 'adh' && currentUser.branch) {
+    var userBranches = currentUser.branch.split(',').map(function(s){return s.trim();}).filter(Boolean);
+    if (userBranches.length === 1) {
+      sel.innerHTML = '<option value="' + esc(userBranches[0]) + '">' + esc(userBranches[0]) + '</option>';
+      sel.value = userBranches[0];
+      sel.disabled = true;
+    } else if (userBranches.length > 1) {
+      sel.innerHTML = '<option value="">Semua Cabang Saya (' + esc(userBranches.join(', ')) + ')</option>';
+      userBranches.forEach(function(b) {
+        sel.innerHTML += '<option value="' + esc(b) + '">' + esc(b) + '</option>';
+      });
+      sel.disabled = false;
+      if (cur && userBranches.indexOf(cur) !== -1) {
+        sel.value = cur;
+      }
+    }
+    return;
+  }
   else if (cur) { sel.value = cur; }
 }
 
@@ -437,7 +454,12 @@ function setAssetTab(tab) {
 
 async function loadBranchAssets() {
   var branch = (document.getElementById('branchSelectFilter')||{}).value || '';
-  if (currentUser && currentUser.role === 'adh' && currentUser.branch) branch = currentUser.branch;
+  if (currentUser && currentUser.role === 'adh' && currentUser.branch) {
+    var userBranches = currentUser.branch.split(',').map(function(s){return s.trim();}).filter(Boolean);
+    if (!branch) {
+      branch = userBranches.join(',');
+    }
+  }
   var cat = (document.getElementById('branchCategoryFilter')||{}).value || '';
   var vs = (document.getElementById('branchStatusFilter')||{}).value || '';
   var search = (document.getElementById('branchAssetSearch')||{}).value || '';
@@ -474,7 +496,9 @@ function renderBranchAssets() {
   var catFilter = (document.getElementById('branchCategoryFilter')||{}).value || '';
   var statusFilter = (document.getElementById('branchStatusFilter')||{}).value || '';
   var branchFilter = (document.getElementById('branchSelectFilter')||{}).value || '';
-  if (currentUser && currentUser.role === 'adh' && currentUser.branch) branchFilter = currentUser.branch;
+  var userBranches = (currentUser && currentUser.role === 'adh' && currentUser.branch)
+    ? currentUser.branch.split(',').map(function(s){return s.trim();}).filter(Boolean)
+    : [];
 
   var items = [];
   if (currentAssetTab === 'all' || currentAssetTab === 'manual') {
@@ -486,6 +510,7 @@ function renderBranchAssets() {
     devices.forEach(function(d) {
       var dBranch = d.branch || d.group || 'default';
       if (branchFilter && dBranch !== branchFilter) return;
+      if (userBranches.length > 0 && !branchFilter && userBranches.indexOf(dBranch) === -1) return;
       items.push({ isManual:false, id:d.id, tag:d.hostname, name:d.os+' '+d.arch+' ('+d.hostname+')', category:'pc', branch:dBranch, location:d.local_ip||d.ip, pic:d.note||'-', condition:d.online?'good':'fair', specs:d.cpu_model+' ('+d.cpu_cores+'c) | '+fmtBytes(d.memory_total), vStatus:d.verification_status||'unverified', vAt:d.verified_at, vBy:d.verified_by, vNote:d.verification_note });
     });
   }
@@ -730,8 +755,11 @@ function exportBranchAssetsCSV() {
 async function openUsersModal() { document.getElementById('usersModal').style.display = 'flex'; loadUsers(); }
 function closeUsersModal() { document.getElementById('usersModal').style.display = 'none'; }
 
+var cachedUsersList = [];
+
 async function loadUsers() {
   var users = await api('/api/users');
+  cachedUsersList = users || [];
   var container = document.getElementById('usersTableContainer');
   if (!container) return;
   if (!users || users.length === 0) { container.innerHTML = '<p style="color:var(--fg2);font-size:12px">Belum ada user terdaftar.</p>'; return; }
@@ -739,6 +767,7 @@ async function loadUsers() {
     users.map(function(u) {
       var isSelf = (currentUser && u.username === currentUser.username);
       var actions = [];
+      actions.push('<button class="btn btn-primary btn-sm" onclick="openEditUserModal('+u.id+')">Edit</button>');
       if (isSelf) {
         actions.push('<button class="btn btn-ghost btn-sm" onclick="openChangeUsernameModal()">Ganti Nama</button>');
       } else {
@@ -750,6 +779,54 @@ async function loadUsers() {
       }
       return '<tr><td><strong>'+esc(u.username)+'</strong>'+(isSelf?' <small style="color:var(--accent)">(Anda)</small>':'')+(u.mfa_enabled?' <span class="badge-status verified" style="font-size:10px;padding:1px 6px">2FA ON</span>':'')+'</td><td><span class="user-badge '+u.role+'">'+(u.role==='spv'?'SPV Dept':esc(u.role))+'</span></td><td>'+esc(u.branch||'-')+'</td><td><div style="display:flex;gap:4px;flex-wrap:wrap">'+actions.join(' ')+'</div></td></tr>';
     }).join('') + '</tbody></table>';
+}
+
+function openEditUserModal(id) {
+  var u = (cachedUsersList || []).find(function(user) { return user.id === id; });
+  if (!u) return;
+  document.getElementById('editUserId').value = u.id;
+  document.getElementById('editUserUsername').value = u.username;
+  document.getElementById('editUserPassword').value = '';
+  document.getElementById('editUserRole').value = u.role;
+  document.getElementById('editUserBranch').value = u.branch || '';
+  document.getElementById('editUserModal').style.display = 'flex';
+}
+
+function closeEditUserModal() {
+  document.getElementById('editUserModal').style.display = 'none';
+}
+
+async function submitEditUser() {
+  var id = document.getElementById('editUserId').value;
+  var username = document.getElementById('editUserUsername').value.trim();
+  var password = document.getElementById('editUserPassword').value.trim();
+  var role = document.getElementById('editUserRole').value;
+  var branch = document.getElementById('editUserBranch').value.trim();
+
+  if (!username) { alert('Username wajib diisi'); return; }
+  if ((role === 'adh' || role === 'user' || role === 'spv') && !branch) {
+    alert('Nama lokasi/cabang wajib diisi untuk ADH/SPV/User');
+    return;
+  }
+
+  var payload = { username: username, role: role, branch: branch };
+  if (password) payload.password = password;
+
+  var res = await api('/api/users/' + id, { method: 'PUT', body: JSON.stringify(payload) });
+  if (res && (res.status === 'updated' || res.status === 'success')) {
+    showToast('Akun ' + username + ' berhasil diperbarui');
+    closeEditUserModal();
+    loadUsers();
+    loadBranches();
+    if (currentUser && (currentUser.username === username || currentUser.id === parseInt(id, 10))) {
+      currentUser.username = username;
+      currentUser.role = role;
+      currentUser.branch = branch;
+      updateUserUI();
+    }
+  } else {
+    alert('Gagal memperbarui: ' + ((res && res.error) || 'Terjadi kesalahan'));
+  }
 }
 
 async function createUser() {
