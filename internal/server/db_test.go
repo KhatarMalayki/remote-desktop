@@ -102,6 +102,34 @@ func TestDBAndBranchVerification(t *testing.T) {
 	}
 }
 
+func TestAuditLogFilters(t *testing.T) {
+	db, err := NewDB(filepath.Join(t.TempDir(), "audit-filter.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	if err := db.RecordAuthLog("alice", "10.0.0.10", "success", "login ok", "test"); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.RecordAuthLog("bob", "10.0.0.20", "failed", "bad password", "test"); err != nil {
+		t.Fatal(err)
+	}
+	logs, err := db.GetAuthLogsFiltered("ali", "10.0.0.10", "success", time.Now().Format("2006-01-02"), time.Now().Format("2006-01-02"), 20)
+	if err != nil || len(logs) != 1 || logs[0].Username != "alice" {
+		t.Fatalf("unexpected filtered auth logs: logs=%+v err=%v", logs, err)
+	}
+
+	_, err = db.db.Exec(`INSERT INTO asset_verifications (asset_id, asset_type, asset_name, status, condition, verified_by, branch, notes) VALUES ('a1','manual','Printer','verified','good','ga.pusat','Pusat','ok'), ('a2','device','Kasir','discrepancy','fair','adh.cabang','Cabang A','cek ulang')`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	verifications, err := db.GetAssetVerificationsFiltered("", "Pusat", "verified", "ga.", time.Now().Format("2006-01-02"), time.Now().Format("2006-01-02"), 20)
+	if err != nil || len(verifications) != 1 || verifications[0].AssetID != "a1" {
+		t.Fatalf("unexpected filtered asset logs: logs=%+v err=%v", verifications, err)
+	}
+}
+
 func TestBranchManagement(t *testing.T) {
 	db, err := NewDB(filepath.Join(t.TempDir(), "test.db"))
 	if err != nil {

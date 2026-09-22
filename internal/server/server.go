@@ -1249,7 +1249,15 @@ func (s *Server) handleAssetVerifications(w http.ResponseWriter, r *http.Request
 		branch = claims.Branch
 	}
 	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
-	logs, err := s.db.GetAssetVerifications(assetID, branch, limit)
+	logs, err := s.db.GetAssetVerificationsFiltered(
+		assetID,
+		branch,
+		strings.TrimSpace(r.URL.Query().Get("status")),
+		strings.TrimSpace(r.URL.Query().Get("verifier")),
+		strings.TrimSpace(r.URL.Query().Get("from")),
+		strings.TrimSpace(r.URL.Query().Get("to")),
+		limit,
+	)
 	if err != nil {
 		jsonError(w, err.Error(), 500)
 		return
@@ -2451,7 +2459,14 @@ func (s *Server) handleAuthLogs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
-	logs, err := s.db.GetAuthLogs(limit)
+	logs, err := s.db.GetAuthLogsFiltered(
+		strings.TrimSpace(r.URL.Query().Get("username")),
+		strings.TrimSpace(r.URL.Query().Get("ip")),
+		strings.TrimSpace(r.URL.Query().Get("status")),
+		strings.TrimSpace(r.URL.Query().Get("from")),
+		strings.TrimSpace(r.URL.Query().Get("to")),
+		limit,
+	)
 	if err != nil {
 		jsonError(w, err.Error(), 500)
 		return

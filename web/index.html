@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>RemoteDesk - Device & Branch Asset Management</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%234f8cff'><rect x='2' y='3' width='20' height='14' rx='2' fill='%234f8cff'/><rect x='4' y='5' width='16' height='10' fill='%230f1117'/><rect x='8' y='19' width='8' height='2' rx='1' fill='%234f8cff'/><rect x='11' y='17' width='2' height='2' fill='%234f8cff'/></svg>">
-  <link rel="stylesheet" href="/static/style.css?v=0.2.34-ui1">
+  <link rel="stylesheet" href="/static/style.css?v=0.2.35-ui2">
   <script src="/static/qrcode.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 </head>
@@ -464,8 +464,15 @@
 
 <!-- AUDIT HISTORY MODAL -->
 <div id="historyModal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeHistoryModal()">
-  <div class="modal" style="max-width:700px">
+  <div class="modal" style="max-width:900px">
     <h3>Riwayat Audit & Verifikasi Lapangan</h3>
+    <div class="log-filter-bar">
+      <select id="historyStatusFilter" onchange="loadHistoryLogs()"><option value="">Semua Status</option><option value="verified">Terverifikasi</option><option value="discrepancy">Ada Masalah</option></select>
+      <input id="historyVerifierFilter" type="search" placeholder="Cari verifikator..." oninput="scheduleHistoryFilter()">
+      <label>Dari <input id="historyFromFilter" type="date" onchange="loadHistoryLogs()"></label>
+      <label>Sampai <input id="historyToFilter" type="date" onchange="loadHistoryLogs()"></label>
+      <button class="btn btn-ghost btn-sm" onclick="resetHistoryFilters()">Reset</button>
+    </div>
     <div id="historyTimeline" class="timeline-list" style="max-height:60vh;overflow-y:auto"></div>
     <div class="modal-actions" style="margin-top:16px">
       <button class="btn btn-ghost" onclick="closeHistoryModal()">Tutup</button>
@@ -621,6 +628,14 @@
         <p style="font-size:12px;color:var(--fg2);margin:0">Riwayat percobaan login real-time (berhasil, salah password, atau diblokir):</p>
         <button class="btn btn-ghost btn-sm" onclick="loadSecurityLogs()">&#8635; Segarkan</button>
       </div>
+      <div class="log-filter-bar">
+        <select id="securityLogStatus" onchange="loadSecurityLogs()"><option value="">Semua Status</option><option value="success">Login Berhasil</option><option value="failed">Login Gagal</option><option value="blocked">Diblokir</option><option value="mfa_failed">2FA Gagal</option><option value="remote_start">Remote Mulai</option><option value="remote_end">Remote Selesai</option></select>
+        <input id="securityLogUsername" type="search" placeholder="Username..." oninput="scheduleSecurityLogFilter()">
+        <input id="securityLogIP" type="search" placeholder="Alamat IP..." oninput="scheduleSecurityLogFilter()">
+        <label>Dari <input id="securityLogFrom" type="date" onchange="loadSecurityLogs()"></label>
+        <label>Sampai <input id="securityLogTo" type="date" onchange="loadSecurityLogs()"></label>
+        <button class="btn btn-ghost btn-sm" onclick="resetSecurityLogFilters()">Reset</button>
+      </div>
       <div id="securityLogsContainer" style="max-height:50vh;overflow-y:auto"></div>
     </div>
 
@@ -737,8 +752,8 @@
     <div class="modal-actions"><button class="btn btn-ghost" onclick="closeRustDeskManageModal()">Batal</button><button class="btn btn-primary" onclick="submitRustDeskManage()">Kirim ke Perangkat</button></div>
   </div>
 </div>
-<script src="/static/ownership.js?v=0.2.34-ui1"></script>
-<script src="/static/app.js?v=0.2.34-ui1"></script>
+<script src="/static/ownership.js?v=0.2.35-ui2"></script>
+<script src="/static/app.js?v=0.2.35-ui2"></script>
 </body>
 </html>
 

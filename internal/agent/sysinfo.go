@@ -58,6 +58,9 @@ func getCPUModel() string {
 			}
 		}
 	case "windows":
+		if out, err := runPowerShell("(Get-CimInstance Win32_Processor | Select-Object -First 1 -ExpandProperty Name)"); err == nil && strings.TrimSpace(out) != "" {
+			return strings.TrimSpace(out)
+		}
 		out, err := exec.Command("wmic", "cpu", "get", "name", "/format:list").Output()
 		if err == nil {
 			for _, line := range strings.Split(string(out), "\n") {
@@ -100,6 +103,16 @@ func getMemoryInfo() (total, used uint64) {
 		return memTotal, memTotal - memAvail
 
 	case "windows":
+		if out, err := runPowerShell("$o=Get-CimInstance Win32_OperatingSystem; '{0}|{1}' -f $o.TotalVisibleMemorySize,$o.FreePhysicalMemory"); err == nil {
+			parts := strings.Split(strings.TrimSpace(out), "|")
+			if len(parts) == 2 {
+				totalKB, totalErr := strconv.ParseUint(strings.TrimSpace(parts[0]), 10, 64)
+				freeKB, freeErr := strconv.ParseUint(strings.TrimSpace(parts[1]), 10, 64)
+				if totalErr == nil && freeErr == nil && totalKB >= freeKB {
+					return totalKB * 1024, (totalKB - freeKB) * 1024
+				}
+			}
+		}
 		out, err := exec.Command("wmic", "OS", "get", "FreePhysicalMemory,TotalVisibleMemorySize", "/format:list").Output()
 		if err != nil {
 			return 0, 0
@@ -140,6 +153,16 @@ func getDiskInfo() (total, used uint64) {
 			}
 		}
 	case "windows":
+		if out, err := runPowerShell("$d=Get-CimInstance Win32_LogicalDisk -Filter \"DeviceID='C:'\"; '{0}|{1}' -f $d.Size,$d.FreeSpace"); err == nil {
+			parts := strings.Split(strings.TrimSpace(out), "|")
+			if len(parts) == 2 {
+				size, sizeErr := strconv.ParseUint(strings.TrimSpace(parts[0]), 10, 64)
+				free, freeErr := strconv.ParseUint(strings.TrimSpace(parts[1]), 10, 64)
+				if sizeErr == nil && freeErr == nil && size >= free {
+					return size, size - free
+				}
+			}
+		}
 		out, err := exec.Command("wmic", "logicaldisk", "where", "DeviceID='C:'",
 			"get", "Size,FreeSpace", "/format:list").Output()
 		if err != nil {
@@ -158,6 +181,11 @@ func getDiskInfo() (total, used uint64) {
 		return size, size - free
 	}
 	return 0, 0
+}
+
+func runPowerShell(script string) (string, error) {
+	out, err := exec.Command("powershell.exe", "-NoLogo", "-NoProfile", "-NonInteractive", "-Command", script).Output()
+	return strings.TrimSpace(string(out)), err
 }
 
 func getLocalIP() string {

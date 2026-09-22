@@ -787,11 +787,33 @@ async function deleteUser(id, username) {
 
 async function openHistoryModal() {
   document.getElementById('historyModal').style.display = 'flex';
+  await loadHistoryLogs();
+}
+
+var historyFilterTimer;
+function scheduleHistoryFilter() { clearTimeout(historyFilterTimer); historyFilterTimer = setTimeout(loadHistoryLogs, 300); }
+
+function resetHistoryFilters() {
+  ['historyStatusFilter','historyVerifierFilter','historyFromFilter','historyToFilter'].forEach(function(id) { var el=document.getElementById(id); if(el) el.value=''; });
+  loadHistoryLogs();
+}
+
+async function loadHistoryLogs() {
   var branch = (document.getElementById('branchSelectFilter')||{}).value || '';
   if (currentUser && currentUser.role === 'adh') branch = currentUser.branch;
-  var logs = await api('/api/assets/verifications?branch=' + encodeURIComponent(branch) + '&limit=40');
+  var params = new URLSearchParams({branch:branch, limit:'100'});
+  var status = (document.getElementById('historyStatusFilter')||{}).value || '';
+  var verifier = (document.getElementById('historyVerifierFilter')||{}).value || '';
+  var from = (document.getElementById('historyFromFilter')||{}).value || '';
+  var to = (document.getElementById('historyToFilter')||{}).value || '';
+  if (status) params.set('status', status);
+  if (verifier) params.set('verifier', verifier.trim());
+  if (from) params.set('from', from);
+  if (to) params.set('to', to);
   var container = document.getElementById('historyTimeline');
   if (!container) return;
+  container.innerHTML = '<p style="color:var(--fg2);font-size:12px;padding:12px">Memuat riwayat...</p>';
+  var logs = await api('/api/assets/verifications?' + params.toString());
   if (!logs || logs.length === 0) { container.innerHTML = '<div class="empty-state"><p>Belum ada riwayat verifikasi fisik.</p></div>'; return; }
   container.innerHTML = logs.map(function(l) {
     var isV = l.status === 'verified';
@@ -1603,7 +1625,16 @@ async function loadSecurityLogs() {
   if (!container) return;
   container.innerHTML = '<p style="color:var(--fg2);font-size:12px;padding:12px">Memuat log audit...</p>';
 
-  var logs = await api('/api/auth/logs?limit=50');
+  var params = new URLSearchParams({limit:'200'});
+  var filters = {
+    status:(document.getElementById('securityLogStatus')||{}).value || '',
+    username:(document.getElementById('securityLogUsername')||{}).value || '',
+    ip:(document.getElementById('securityLogIP')||{}).value || '',
+    from:(document.getElementById('securityLogFrom')||{}).value || '',
+    to:(document.getElementById('securityLogTo')||{}).value || ''
+  };
+  Object.keys(filters).forEach(function(key) { if (filters[key]) params.set(key, filters[key].trim()); });
+  var logs = await api('/api/auth/logs?' + params.toString());
   if (!logs || logs.length === 0) {
     container.innerHTML = '<div class="empty-state"><p>Belum ada catatan aktivitas login.</p></div>';
     return;
@@ -1759,6 +1790,14 @@ async function openBranchesModal() {
   modal.style.display = 'flex';
   await loadBusinessUnits();
   await loadBranchesManagement();
+}
+
+var securityLogFilterTimer;
+function scheduleSecurityLogFilter() { clearTimeout(securityLogFilterTimer); securityLogFilterTimer = setTimeout(loadSecurityLogs, 300); }
+
+function resetSecurityLogFilters() {
+  ['securityLogStatus','securityLogUsername','securityLogIP','securityLogFrom','securityLogTo'].forEach(function(id) { var el=document.getElementById(id); if(el) el.value=''; });
+  loadSecurityLogs();
 }
 
 async function loadBusinessUnits(selected) {

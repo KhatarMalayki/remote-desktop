@@ -10,7 +10,7 @@ import (
 	"github.com/user/remote-desktop/internal/agent"
 )
 
-var version = "0.2.34"
+var version = "0.2.35"
 
 func main() {
 	serverURL := flag.String("server", envOr("RD_SERVER_URL", ""), "server URL")

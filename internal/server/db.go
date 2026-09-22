@@ -855,6 +855,10 @@ func (d *DB) VerifyDevice(id, status, condition, verifiedBy, notes string) error
 }
 
 func (d *DB) GetAssetVerifications(assetID, branch string, limit int) ([]models.AssetVerification, error) {
+	return d.GetAssetVerificationsFiltered(assetID, branch, "", "", "", "", limit)
+}
+
+func (d *DB) GetAssetVerificationsFiltered(assetID, branch, status, verifier, fromDate, toDate string, limit int) ([]models.AssetVerification, error) {
 	where := "1=1"
 	var args []interface{}
 	if assetID != "" {
@@ -864,6 +868,26 @@ func (d *DB) GetAssetVerifications(assetID, branch string, limit int) ([]models.
 	if branch != "" {
 		where += " AND branch=?"
 		args = append(args, branch)
+	}
+	if status != "" {
+		where += " AND status=?"
+		args = append(args, status)
+	}
+	if verifier != "" {
+		where += " AND verified_by LIKE ?"
+		args = append(args, "%"+verifier+"%")
+	}
+	if fromDate != "" {
+		where += " AND created_at>=?"
+		args = append(args, fromDate+" 00:00:00")
+	}
+	if toDate != "" {
+		where += " AND created_at<?"
+		if parsed, err := time.Parse("2006-01-02", toDate); err == nil {
+			args = append(args, parsed.AddDate(0, 0, 1).Format("2006-01-02")+" 00:00:00")
+		} else {
+			args = append(args, toDate+" 23:59:59")
+		}
 	}
 	if limit <= 0 {
 		limit = 50
@@ -1162,10 +1186,42 @@ func (d *DB) RecordAuthLog(username, ip, status, reason, userAgent string) error
 }
 
 func (d *DB) GetAuthLogs(limit int) ([]models.AuthLog, error) {
+	return d.GetAuthLogsFiltered("", "", "", "", "", limit)
+}
+
+func (d *DB) GetAuthLogsFiltered(username, ip, status, fromDate, toDate string, limit int) ([]models.AuthLog, error) {
 	if limit <= 0 || limit > 200 {
 		limit = 50
 	}
-	rows, err := d.db.Query(`SELECT id, username, ip, status, reason, user_agent, created_at FROM auth_logs ORDER BY created_at DESC LIMIT ?`, limit)
+	where := "1=1"
+	var args []interface{}
+	if username != "" {
+		where += " AND username LIKE ?"
+		args = append(args, "%"+username+"%")
+	}
+	if ip != "" {
+		where += " AND ip LIKE ?"
+		args = append(args, "%"+ip+"%")
+	}
+	if status != "" {
+		where += " AND status=?"
+		args = append(args, status)
+	}
+	if fromDate != "" {
+		where += " AND created_at>=?"
+		args = append(args, fromDate+" 00:00:00")
+	}
+	if toDate != "" {
+		where += " AND created_at<?"
+		if parsed, err := time.Parse("2006-01-02", toDate); err == nil {
+			args = append(args, parsed.AddDate(0, 0, 1).Format("2006-01-02")+" 00:00:00")
+		} else {
+			args = append(args, toDate+" 23:59:59")
+		}
+	}
+	query := fmt.Sprintf(`SELECT id, username, ip, status, reason, user_agent, created_at FROM auth_logs WHERE %s ORDER BY created_at DESC LIMIT ?`, where)
+	args = append(args, limit)
+	rows, err := d.db.Query(query, args...)
 	if err != nil {
 		return nil, err
 	}
