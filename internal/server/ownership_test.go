@@ -1,11 +1,14 @@
 package server
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -184,5 +187,79 @@ func TestHolderCannotAccessUnrelatedRoutes(t *testing.T) {
 		if w.Code != 403 {
 			t.Fatalf("%s: got %d", path, w.Code)
 		}
+	}
+}
+
+func TestInitialAssignmentAttachmentAndTimeline(t *testing.T) {
+	tmp := t.TempDir()
+	db, err := NewDB(filepath.Join(tmp, "workflow.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if err := db.CreateUser("holder", "hash", "user", "Bandung"); err != nil {
+		t.Fatal(err)
+	}
+	asset := &models.ManualAsset{AssetTag: "NEW-1", Name: "Laptop Baru", Category: "laptop", Branch: "Bandung"}
+	if err := db.CreateManualAsset(asset); err != nil {
+		t.Fatal(err)
+	}
+	s := &Server{db: db, attachmentsDir: filepath.Join(tmp, "attachments")}
+	if err := os.MkdirAll(s.attachmentsDir, 0700); err != nil {
+		t.Fatal(err)
+	}
+	adh := &UserClaims{Username: "adh", Role: "adh", Branch: "Bandung"}
+	r := httptest.NewRequest("POST", "/api/assets/switch-requests", strings.NewReader(fmt.Sprintf(`{"asset_id":%q,"asset_type":"manual","to_owner":"holder","reason":"Penyerahan perangkat baru"}`, asset.ID)))
+	w := httptest.NewRecorder()
+	s.handleSwitchRequests(w, r.WithContext(context.WithValue(r.Context(), userClaimsKey, adh)))
+	if w.Code != 201 {
+		t.Fatalf("create status=%d body=%s", w.Code, w.Body.String())
+	}
+	var sw models.AssetSwitchRequest
+	if err := json.Unmarshal(w.Body.Bytes(), &sw); err != nil {
+		t.Fatal(err)
+	}
+	if sw.Operation != "assignment" || sw.Status != "approved" {
+		t.Fatalf("unexpected workflow: %+v", sw)
+	}
+	var body bytes.Buffer
+	mw := multipart.NewWriter(&body)
+	part, _ := mw.CreateFormFile("file", "berita-acara.pdf")
+	part.Write([]byte("%PDF-1.4 test"))
+	mw.Close()
+	u := httptest.NewRequest("POST", fmt.Sprintf("/api/assets/switch-requests/%d/attachments", sw.ID), &body)
+	u.Header.Set("Content-Type", mw.FormDataContentType())
+	uw := httptest.NewRecorder()
+	s.handleSwitchRequestSubroute(uw, u.WithContext(context.WithValue(u.Context(), userClaimsKey, adh)))
+	if uw.Code != 201 {
+		t.Fatalf("upload status=%d body=%s", uw.Code, uw.Body.String())
+	}
+	files, err := db.ListAttachments("handover", sw.ID)
+	if err != nil || len(files) != 1 {
+		t.Fatalf("attachments=%v err=%v", files, err)
+	}
+	activities, err := db.ListActivities("Bandung", asset.ID, "", "", "", "", 20)
+	if err != nil || len(activities) < 3 {
+		t.Fatalf("activities=%v err=%v", activities, err)
+	}
+	other := &UserClaims{Username: "outsider", Role: "user", Branch: "Medan"}
+	download := httptest.NewRequest("GET", fmt.Sprintf("/api/assets/attachments/%d", files[0].ID), nil)
+	dw := httptest.NewRecorder()
+	s.handleAttachment(dw, download.WithContext(context.WithValue(download.Context(), userClaimsKey, other)))
+	if dw.Code != 403 {
+		t.Fatalf("outsider download=%d", dw.Code)
+	}
+	if _, err := db.db.Exec(`INSERT OR IGNORE INTO branches(name,type) VALUES('Jakarta','cabang')`); err != nil {
+		t.Fatal(err)
+	}
+	move := httptest.NewRequest("POST", "/api/assets/relocate", strings.NewReader(fmt.Sprintf(`{"asset_id":%q,"asset_type":"manual","to_branch":"Jakarta","to_location":"Lantai 2","reason":"Mutasi perangkat antar kantor"}`, asset.ID)))
+	movedResponse := httptest.NewRecorder()
+	s.handleRelocateAsset(movedResponse, move.WithContext(context.WithValue(move.Context(), userClaimsKey, &UserClaims{Username: "admin", Role: "admin"})))
+	if movedResponse.Code != 200 {
+		t.Fatalf("relocate=%d body=%s", movedResponse.Code, movedResponse.Body.String())
+	}
+	moved, _ := db.GetManualAsset(asset.ID)
+	if moved.Branch != "Jakarta" || moved.Location != "Lantai 2" || moved.OwnerUsername != "" {
+		t.Fatalf("unexpected relocated asset: %+v", moved)
 	}
 }

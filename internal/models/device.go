@@ -84,24 +84,54 @@ type User struct {
 }
 
 type AssetSwitchRequest struct {
-	SwapAssetID    string     `json:"swap_asset_id"`
-	SwapAssetType  string     `json:"swap_asset_type"`
-	ID             int64      `json:"id"`
-	AssetID        string     `json:"asset_id"`
-	AssetType      string     `json:"asset_type"`
-	AssetName      string     `json:"asset_name"`
-	Branch         string     `json:"branch"`
-	FromOwner      string     `json:"from_owner"`
-	ToOwner        string     `json:"to_owner"`
-	RequestedBy    string     `json:"requested_by"`
-	Reason         string     `json:"reason"`
-	Status         string     `json:"status"`
-	ReviewedBy     string     `json:"reviewed_by"`
-	ReviewedAt     *time.Time `json:"reviewed_at,omitempty"`
-	ReviewNote     string     `json:"review_note"`
-	Responsibility string     `json:"responsibility"`
-	Recommendation string     `json:"recommendation"`
-	CreatedAt      time.Time  `json:"created_at"`
+	SwapAssetID    string            `json:"swap_asset_id"`
+	SwapAssetType  string            `json:"swap_asset_type"`
+	ID             int64             `json:"id"`
+	AssetID        string            `json:"asset_id"`
+	AssetType      string            `json:"asset_type"`
+	AssetName      string            `json:"asset_name"`
+	Branch         string            `json:"branch"`
+	FromOwner      string            `json:"from_owner"`
+	ToOwner        string            `json:"to_owner"`
+	RequestedBy    string            `json:"requested_by"`
+	Reason         string            `json:"reason"`
+	Status         string            `json:"status"`
+	ReviewedBy     string            `json:"reviewed_by"`
+	ReviewedAt     *time.Time        `json:"reviewed_at,omitempty"`
+	ReviewNote     string            `json:"review_note"`
+	Responsibility string            `json:"responsibility"`
+	Recommendation string            `json:"recommendation"`
+	Operation      string            `json:"operation"` // assignment, handover
+	Attachments    []AssetAttachment `json:"attachments,omitempty"`
+	CreatedAt      time.Time         `json:"created_at"`
+}
+
+type AssetAttachment struct {
+	ID           int64     `json:"id"`
+	EntityType   string    `json:"entity_type"`
+	EntityID     int64     `json:"entity_id"`
+	AssetID      string    `json:"asset_id"`
+	OriginalName string    `json:"original_name"`
+	StoredName   string    `json:"-"`
+	ContentType  string    `json:"content_type"`
+	Size         int64     `json:"size"`
+	UploadedBy   string    `json:"uploaded_by"`
+	CreatedAt    time.Time `json:"created_at"`
+}
+
+type AssetActivity struct {
+	ID            int64     `json:"id"`
+	Category      string    `json:"category"`
+	Action        string    `json:"action"`
+	Actor         string    `json:"actor"`
+	Branch        string    `json:"branch"`
+	AssetID       string    `json:"asset_id"`
+	AssetType     string    `json:"asset_type"`
+	AssetName     string    `json:"asset_name"`
+	Detail        string    `json:"detail"`
+	ReferenceType string    `json:"reference_type"`
+	ReferenceID   int64     `json:"reference_id"`
+	CreatedAt     time.Time `json:"created_at"`
 }
 
 type AuthLog struct {

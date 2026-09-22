@@ -184,13 +184,14 @@ func recordLoginSuccess(ip string) {
 }
 
 type Server struct {
-	cfg      Config
-	db       *DB
-	hub      *Hub
-	upgrader websocket.Upgrader
-	webFS    fs.FS
-	scanMu   sync.RWMutex
-	scans    map[string]*models.NetworkScan
+	cfg            Config
+	db             *DB
+	hub            *Hub
+	upgrader       websocket.Upgrader
+	webFS          fs.FS
+	scanMu         sync.RWMutex
+	scans          map[string]*models.NetworkScan
+	attachmentsDir string
 }
 
 func New(cfg Config, webFS embed.FS) (*Server, error) {
@@ -221,16 +222,20 @@ func New(cfg Config, webFS embed.FS) (*Server, error) {
 	}
 
 	s := &Server{
-		cfg:   cfg,
-		db:    db,
-		hub:   NewHub(db),
-		webFS: sub,
-		scans: make(map[string]*models.NetworkScan),
+		cfg:            cfg,
+		db:             db,
+		hub:            NewHub(db),
+		webFS:          sub,
+		scans:          make(map[string]*models.NetworkScan),
+		attachmentsDir: filepath.Join(filepath.Dir(cfg.DBPath), "attachments"),
 		upgrader: websocket.Upgrader{
 			ReadBufferSize:  4096,
 			WriteBufferSize: 4096,
 			CheckOrigin:     func(r *http.Request) bool { return true },
 		},
+	}
+	if err := os.MkdirAll(s.attachmentsDir, 0700); err != nil {
+		return nil, fmt.Errorf("attachment storage: %w", err)
 	}
 	return s, nil
 }
@@ -267,6 +272,9 @@ func (s *Server) ListenAndServe() error {
 	mux.HandleFunc("/api/assets/verifications", s.authMiddleware(s.handleAssetVerifications))
 	mux.HandleFunc("/api/assets/switch-requests", s.authMiddleware(s.handleSwitchRequests))
 	mux.HandleFunc("/api/assets/switch-requests/", s.authMiddleware(s.handleSwitchRequestSubroute))
+	mux.HandleFunc("/api/assets/attachments/", s.authMiddleware(s.handleAttachment))
+	mux.HandleFunc("/api/assets/activities", s.authMiddleware(s.handleActivities))
+	mux.HandleFunc("/api/assets/relocate", s.authMiddleware(s.handleRelocateAsset))
 	mux.HandleFunc("/api/agent/version", s.handleAgentVersion)
 	mux.HandleFunc("/api/agent/download", s.handleAgentDownload)
 	mux.HandleFunc("/api/agent/package", s.authMiddleware(s.handleAgentPackageDownload))
@@ -842,6 +850,7 @@ func (s *Server) handleManualAssets(w http.ResponseWriter, r *http.Request) {
 			jsonError(w, fmt.Sprintf("failed to save asset: %v", err), 500)
 			return
 		}
+		_ = s.db.AddActivity(&models.AssetActivity{Category: "inventory", Action: "created", Actor: claims.Username, Branch: asset.Branch, AssetID: asset.ID, AssetType: "manual", AssetName: asset.Name, Detail: "Aset manual dicatat dengan tag " + asset.AssetTag})
 		jsonResp(w, asset, 201)
 
 	default:
@@ -924,6 +933,7 @@ func (s *Server) handleManualAsset(w http.ResponseWriter, r *http.Request) {
 			jsonError(w, err.Error(), 500)
 			return
 		}
+		_ = s.db.AddActivity(&models.AssetActivity{Category: "inventory", Action: "updated", Actor: claims.Username, Branch: upd.Branch, AssetID: id, AssetType: "manual", AssetName: upd.Name, Detail: "Data inventaris diperbarui"})
 		jsonResp(w, map[string]string{"status": "updated"}, 200)
 
 	case http.MethodDelete:
@@ -946,6 +956,7 @@ func (s *Server) handleManualAsset(w http.ResponseWriter, r *http.Request) {
 			jsonError(w, err.Error(), 500)
 			return
 		}
+		_ = s.db.AddActivity(&models.AssetActivity{Category: "deletion", Action: "deleted", Actor: claims.Username, Branch: existing.Branch, AssetID: id, AssetType: "manual", AssetName: existing.Name, Detail: strings.TrimSpace(req.Reason)})
 		jsonResp(w, map[string]string{"status": "deleted"}, 200)
 
 	default:
@@ -1007,6 +1018,7 @@ func (s *Server) handleSwitchRequests(w http.ResponseWriter, r *http.Request) {
 			Reason:         req.Reason,
 			Status:         "pending",
 			Responsibility: assetResponsibilityWarning(),
+			Operation:      "handover",
 		}
 
 		if req.AssetType == "manual" {
@@ -1024,6 +1036,9 @@ func (s *Server) handleSwitchRequests(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			sw.AssetName, sw.Branch, sw.FromOwner = asset.Name, asset.Branch, asset.OwnerUsername
+			if sw.FromOwner == "" {
+				sw.Operation = "assignment"
+			}
 			sw.Recommendation = manualAssetRecommendation(asset)
 		} else {
 			dev, err := s.db.GetDevice(req.AssetID)
@@ -1044,6 +1059,9 @@ func (s *Server) handleSwitchRequests(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			sw.AssetName, sw.Branch, sw.FromOwner = dev.Hostname, branch, dev.OwnerUsername
+			if sw.FromOwner == "" {
+				sw.Operation = "assignment"
+			}
 			sw.Recommendation = deviceRecommendation(dev)
 		}
 
@@ -1085,12 +1103,14 @@ func (s *Server) handleSwitchRequests(w http.ResponseWriter, r *http.Request) {
 			jsonError(w, err.Error(), 500)
 			return
 		}
+		s.recordSwitchActivity(sw, "requested", claims.Username, fmt.Sprintf("%s: %s → %s. %s", sw.Operation, sw.FromOwner, sw.ToOwner, sw.Reason))
 		if canApproveSwitch(claims.Role) {
 			if err := s.db.ReviewSwitchRequest(sw.ID, "approved", claims.Username, "Switch langsung oleh "+claims.Role); err != nil {
 				jsonError(w, err.Error(), 409)
 				return
 			}
 			sw, _ = s.db.GetSwitchRequest(sw.ID)
+			s.recordSwitchActivity(sw, "approved", claims.Username, "Disetujui langsung oleh "+claims.Role)
 		}
 		jsonResp(w, sw, http.StatusCreated)
 
@@ -1104,15 +1124,7 @@ func (s *Server) handleSwitchRequestSubroute(w http.ResponseWriter, r *http.Requ
 		jsonError(w, "ADH belum memiliki lokasi", 403)
 		return
 	}
-	if r.Method != http.MethodPost {
-		http.Error(w, "method not allowed", 405)
-		return
-	}
 	claims := getClaims(r)
-	if !canApproveSwitch(claims.Role) {
-		jsonError(w, "only ADH, GA Pusat, or admin can review switch requests", 403)
-		return
-	}
 	path := strings.TrimPrefix(r.URL.Path, "/api/assets/switch-requests/")
 	parts := strings.Split(strings.Trim(path, "/"), "/")
 	if len(parts) != 2 {
@@ -1124,17 +1136,33 @@ func (s *Server) handleSwitchRequestSubroute(w http.ResponseWriter, r *http.Requ
 		jsonError(w, "invalid switch request id", 400)
 		return
 	}
+	reqItem, err := s.db.GetSwitchRequest(id)
+	if err != nil {
+		jsonError(w, "switch request not found", 404)
+		return
+	}
+	if parts[1] == "attachments" {
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", 405)
+			return
+		}
+		s.handleSwitchAttachment(w, r, reqItem)
+		return
+	}
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", 405)
+		return
+	}
+	if !canApproveSwitch(claims.Role) {
+		jsonError(w, "only ADH, GA Pusat, or admin can review switch requests", 403)
+		return
+	}
 	action := parts[1]
 	status := "approved"
 	if action == "reject" {
 		status = "rejected"
 	} else if action != "approve" {
 		jsonError(w, "invalid switch action", 400)
-		return
-	}
-	reqItem, err := s.db.GetSwitchRequest(id)
-	if err != nil {
-		jsonError(w, "switch request not found", 404)
 		return
 	}
 	if claims.Role == "adh" && claims.Branch != "" && reqItem.Branch != claims.Branch {
@@ -1149,6 +1177,7 @@ func (s *Server) handleSwitchRequestSubroute(w http.ResponseWriter, r *http.Requ
 		jsonError(w, err.Error(), 409)
 		return
 	}
+	s.recordSwitchActivity(reqItem, status, claims.Username, strings.TrimSpace(body.Note))
 	jsonResp(w, map[string]string{"status": status}, 200)
 }
 
@@ -1229,6 +1258,20 @@ func (s *Server) handleVerifyAsset(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, fmt.Sprintf("failed to verify asset: %v", err), 500)
 		return
 	}
+	activityName, activityBranch := req.AssetID, claims.Branch
+	if req.AssetType == "manual" {
+		if a, e := s.db.GetManualAsset(req.AssetID); e == nil {
+			activityName, activityBranch = a.Name, a.Branch
+		}
+	} else {
+		if d, e := s.db.GetDevice(req.AssetID); e == nil {
+			activityName, activityBranch = d.Hostname, d.Branch
+			if activityBranch == "" {
+				activityBranch = d.GroupName
+			}
+		}
+	}
+	_ = s.db.AddActivity(&models.AssetActivity{Category: "verification", Action: req.Status, Actor: claims.Username, Branch: activityBranch, AssetID: req.AssetID, AssetType: req.AssetType, AssetName: activityName, Detail: req.Notes})
 
 	jsonResp(w, map[string]interface{}{
 		"status":      "success",
@@ -1534,8 +1577,28 @@ func (s *Server) handleAgentMessage(c *Client, raw []byte) {
 		} else if dev.GroupName == "" {
 			dev.GroupName = "default"
 		}
+		previous, previousErr := s.db.GetDevice(dev.ID)
 		s.db.UpsertDevice(&dev)
 		s.db.AddLog(dev.ID, "register", fmt.Sprintf("%s %s v%s", dev.Hostname, dev.OS, dev.Version))
+		if previousErr == nil {
+			var changes []string
+			if previous.CPUModel != "" && dev.CPUModel != "" && previous.CPUModel != dev.CPUModel {
+				changes = append(changes, "CPU: "+previous.CPUModel+" → "+dev.CPUModel)
+			}
+			if previous.MemoryTotal > 0 && dev.MemoryTotal > 0 && previous.MemoryTotal != dev.MemoryTotal {
+				changes = append(changes, fmt.Sprintf("RAM: %d → %d bytes", previous.MemoryTotal, dev.MemoryTotal))
+			}
+			if previous.DiskTotal > 0 && dev.DiskTotal > 0 && previous.DiskTotal != dev.DiskTotal {
+				changes = append(changes, fmt.Sprintf("Disk: %d → %d bytes", previous.DiskTotal, dev.DiskTotal))
+			}
+			if len(changes) > 0 {
+				branch := dev.Branch
+				if branch == "" {
+					branch = dev.GroupName
+				}
+				_ = s.db.AddActivity(&models.AssetActivity{Category: "hardware", Action: "changed", Actor: "agent", Branch: branch, AssetID: dev.ID, AssetType: "device", AssetName: dev.Hostname, Detail: strings.Join(changes, "; ")})
+			}
+		}
 		s.queueRustDeskBootstrap(&dev)
 
 		// Updates are intentionally not pushed during registration. Administrators
@@ -1633,7 +1696,7 @@ func (s *Server) authMiddleware(next http.HandlerFunc) http.HandlerFunc {
 				return
 			}
 			p := r.URL.Path
-			allowed := strings.HasPrefix(p, "/api/auth/") || p == "/api/devices" || strings.HasPrefix(p, "/api/devices/") || p == "/api/assets/manual" || strings.HasPrefix(p, "/api/assets/manual/") || strings.HasPrefix(p, "/api/assets/switch-requests") || p == "/api/assets/verifications" || p == "/api/stats" || p == "/api/groups" || p == "/api/branches" || p == "/api/branches/stats"
+			allowed := strings.HasPrefix(p, "/api/auth/") || p == "/api/devices" || strings.HasPrefix(p, "/api/devices/") || p == "/api/assets/manual" || strings.HasPrefix(p, "/api/assets/manual/") || strings.HasPrefix(p, "/api/assets/switch-requests") || strings.HasPrefix(p, "/api/assets/attachments/") || p == "/api/assets/activities" || p == "/api/assets/verifications" || p == "/api/stats" || p == "/api/groups" || p == "/api/branches" || p == "/api/branches/stats"
 			if !allowed {
 				jsonError(w, "forbidden", 403)
 				return

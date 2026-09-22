@@ -181,6 +181,36 @@ func migrate(db *sql.DB) error {
 	);
 	CREATE INDEX IF NOT EXISTS idx_switch_requests_status ON asset_switch_requests(status);
 	CREATE INDEX IF NOT EXISTS idx_switch_requests_branch ON asset_switch_requests(branch);
+	CREATE TABLE IF NOT EXISTS asset_attachments (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		entity_type TEXT NOT NULL,
+		entity_id INTEGER NOT NULL,
+		asset_id TEXT NOT NULL DEFAULT '',
+		original_name TEXT NOT NULL,
+		stored_name TEXT NOT NULL UNIQUE,
+		content_type TEXT NOT NULL,
+		size INTEGER NOT NULL,
+		uploaded_by TEXT NOT NULL,
+		created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+	);
+	CREATE INDEX IF NOT EXISTS idx_asset_attachments_entity ON asset_attachments(entity_type, entity_id);
+	CREATE TABLE IF NOT EXISTS asset_activities (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		category TEXT NOT NULL,
+		action TEXT NOT NULL,
+		actor TEXT NOT NULL DEFAULT '',
+		branch TEXT NOT NULL DEFAULT '',
+		asset_id TEXT NOT NULL DEFAULT '',
+		asset_type TEXT NOT NULL DEFAULT '',
+		asset_name TEXT NOT NULL DEFAULT '',
+		detail TEXT NOT NULL DEFAULT '',
+		reference_type TEXT NOT NULL DEFAULT '',
+		reference_id INTEGER NOT NULL DEFAULT 0,
+		created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+	);
+	CREATE INDEX IF NOT EXISTS idx_asset_activities_asset ON asset_activities(asset_id, created_at);
+	CREATE INDEX IF NOT EXISTS idx_asset_activities_branch ON asset_activities(branch, created_at);
+	CREATE UNIQUE INDEX IF NOT EXISTS idx_asset_activities_source ON asset_activities(reference_type, reference_id, action) WHERE reference_type != '';
 	`
 	if _, err := db.Exec(schema); err != nil {
 		return err
@@ -205,6 +235,7 @@ func migrate(db *sql.DB) error {
 		`ALTER TABLE devices ADD COLUMN acquisition_year INTEGER NOT NULL DEFAULT 0`,
 		`ALTER TABLE asset_switch_requests ADD COLUMN swap_asset_id TEXT NOT NULL DEFAULT ''`,
 		`ALTER TABLE asset_switch_requests ADD COLUMN swap_asset_type TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE asset_switch_requests ADD COLUMN operation TEXT NOT NULL DEFAULT 'handover'`,
 		`ALTER TABLE manual_assets ADD COLUMN acquisition_year INTEGER NOT NULL DEFAULT 0`,
 		`ALTER TABLE devices ADD COLUMN owner_username TEXT NOT NULL DEFAULT ''`,
 		`ALTER TABLE devices ADD COLUMN rustdesk_id TEXT NOT NULL DEFAULT ''`,
@@ -213,6 +244,14 @@ func migrate(db *sql.DB) error {
 	for _, q := range alters {
 		_, _ = db.Exec(q)
 	}
+	// Populate the unified timeline from historical audit tables once. The partial
+	// unique index keeps this migration idempotent across every server restart.
+	_, _ = db.Exec(`INSERT OR IGNORE INTO asset_activities(category,action,actor,branch,asset_id,asset_type,asset_name,detail,reference_type,reference_id,created_at)
+		SELECT 'verification',status,verified_by,branch,asset_id,asset_type,asset_name,notes,'verification',id,created_at FROM asset_verifications`)
+	_, _ = db.Exec(`INSERT OR IGNORE INTO asset_activities(category,action,actor,branch,asset_id,asset_type,asset_name,detail,reference_type,reference_id,created_at)
+		SELECT 'deletion','deleted',deleted_by,branch,asset_id,asset_type,asset_name,reason,'deletion',id,created_at FROM asset_deletion_logs`)
+	_, _ = db.Exec(`INSERT OR IGNORE INTO asset_activities(category,action,actor,branch,asset_id,asset_type,asset_name,detail,reference_type,reference_id,created_at)
+		SELECT 'handover','historical',requested_by,branch,asset_id,asset_type,asset_name,reason,'handover-history',id,created_at FROM asset_switch_requests`)
 
 	return nil
 }
@@ -917,13 +956,19 @@ func (d *DB) CreateSwitchRequest(req *models.AssetSwitchRequest) error {
 	if req.Status == "" {
 		req.Status = "pending"
 	}
+	if req.Operation == "" {
+		req.Operation = "handover"
+		if req.FromOwner == "" {
+			req.Operation = "assignment"
+		}
+	}
 	req.CreatedAt = time.Now()
 	result, err := d.db.Exec(`INSERT INTO asset_switch_requests (
 		asset_id, asset_type, asset_name, branch, from_owner, to_owner, requested_by,
-		reason, status, reviewed_by, reviewed_at, review_note, responsibility, recommendation, created_at, swap_asset_id, swap_asset_type
-	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		reason, status, reviewed_by, reviewed_at, review_note, responsibility, recommendation, created_at, swap_asset_id, swap_asset_type, operation
+	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		req.AssetID, req.AssetType, req.AssetName, req.Branch, req.FromOwner, req.ToOwner, req.RequestedBy,
-		req.Reason, req.Status, req.ReviewedBy, req.ReviewedAt, req.ReviewNote, req.Responsibility, req.Recommendation, req.CreatedAt, req.SwapAssetID, req.SwapAssetType)
+		req.Reason, req.Status, req.ReviewedBy, req.ReviewedAt, req.ReviewNote, req.Responsibility, req.Recommendation, req.CreatedAt, req.SwapAssetID, req.SwapAssetType, req.Operation)
 	if err == nil {
 		req.ID, err = result.LastInsertId()
 	}
@@ -949,7 +994,7 @@ func (d *DB) ListSwitchRequests(branch, username, status string, limit int) ([]m
 		limit = 80
 	}
 	query := fmt.Sprintf(`SELECT id, asset_id, asset_type, asset_name, branch, from_owner, to_owner,
-		requested_by, reason, status, reviewed_by, reviewed_at, review_note, responsibility, recommendation, created_at, swap_asset_id, swap_asset_type
+		requested_by, reason, status, reviewed_by, reviewed_at, review_note, responsibility, recommendation, created_at, swap_asset_id, swap_asset_type, operation
 		FROM asset_switch_requests WHERE %s ORDER BY created_at DESC LIMIT ?`, where)
 	args = append(args, limit)
 	rows, err := d.db.Query(query, args...)
@@ -962,12 +1007,13 @@ func (d *DB) ListSwitchRequests(branch, username, status string, limit int) ([]m
 		var req models.AssetSwitchRequest
 		var reviewedAt sql.NullTime
 		if err := rows.Scan(&req.ID, &req.AssetID, &req.AssetType, &req.AssetName, &req.Branch, &req.FromOwner, &req.ToOwner,
-			&req.RequestedBy, &req.Reason, &req.Status, &req.ReviewedBy, &reviewedAt, &req.ReviewNote, &req.Responsibility, &req.Recommendation, &req.CreatedAt, &req.SwapAssetID, &req.SwapAssetType); err != nil {
+			&req.RequestedBy, &req.Reason, &req.Status, &req.ReviewedBy, &reviewedAt, &req.ReviewNote, &req.Responsibility, &req.Recommendation, &req.CreatedAt, &req.SwapAssetID, &req.SwapAssetType, &req.Operation); err != nil {
 			return nil, err
 		}
 		if reviewedAt.Valid {
 			req.ReviewedAt = &reviewedAt.Time
 		}
+		req.Attachments, _ = d.ListAttachments("handover", req.ID)
 		list = append(list, req)
 	}
 	return list, rows.Err()
@@ -975,17 +1021,18 @@ func (d *DB) ListSwitchRequests(branch, username, status string, limit int) ([]m
 
 func (d *DB) GetSwitchRequest(id int64) (*models.AssetSwitchRequest, error) {
 	row := d.db.QueryRow(`SELECT id, asset_id, asset_type, asset_name, branch, from_owner, to_owner,
-		requested_by, reason, status, reviewed_by, reviewed_at, review_note, responsibility, recommendation, created_at, swap_asset_id, swap_asset_type
+		requested_by, reason, status, reviewed_by, reviewed_at, review_note, responsibility, recommendation, created_at, swap_asset_id, swap_asset_type, operation
 		FROM asset_switch_requests WHERE id=?`, id)
 	var req models.AssetSwitchRequest
 	var reviewedAt sql.NullTime
 	if err := row.Scan(&req.ID, &req.AssetID, &req.AssetType, &req.AssetName, &req.Branch, &req.FromOwner, &req.ToOwner,
-		&req.RequestedBy, &req.Reason, &req.Status, &req.ReviewedBy, &reviewedAt, &req.ReviewNote, &req.Responsibility, &req.Recommendation, &req.CreatedAt, &req.SwapAssetID, &req.SwapAssetType); err != nil {
+		&req.RequestedBy, &req.Reason, &req.Status, &req.ReviewedBy, &reviewedAt, &req.ReviewNote, &req.Responsibility, &req.Recommendation, &req.CreatedAt, &req.SwapAssetID, &req.SwapAssetType, &req.Operation); err != nil {
 		return nil, err
 	}
 	if reviewedAt.Valid {
 		req.ReviewedAt = &reviewedAt.Time
 	}
+	req.Attachments, _ = d.ListAttachments("handover", req.ID)
 	return &req, nil
 }
 

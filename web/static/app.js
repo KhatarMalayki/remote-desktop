@@ -551,7 +551,9 @@ function renderBranchAssets() {
         addAction('Edit', 'btn-sm-action', function() { openEditAssetModal(item.id); });
         addAction('Hapus', 'btn-sm-action btn-delete-asset', function() { deleteManualAsset(item.id); });
       }
-      addAction(isAssetUser() ? 'Ajukan Switch' : 'Switch / Tugaskan', 'btn-sm-action', function() { requestAssetSwitch(item.isManual ? 'manual' : 'device', item.id); });
+      addAction(asset.owner_username ? (isAssetUser() ? 'Ajukan Serah Terima' : 'Serah Terima / Switch') : 'Tetapkan PIC Awal', 'btn-sm-action', function() { requestAssetSwitch(item.isManual ? 'manual' : 'device', item.id); });
+      if (!isAssetUser()) addAction('Mutasi Lokasi', 'btn-sm-action', function() { relocateAsset(item.isManual ? 'manual' : 'device', item.id); });
+      addAction('Riwayat', 'btn-sm-action', function() { openAssetTimeline(item.id); });
     }
     if (asset.recommendation) {
       var advice = document.createElement('div');
@@ -975,22 +977,20 @@ async function deleteDevice() {
 
 function renderAssets() {
   var search = ((document.getElementById('assetSearch')||{}).value || '').toLowerCase();
-  var filtered = devices;
-  if (search) {
-    filtered = devices.filter(function(d){
-      return (d.hostname||'').toLowerCase().includes(search) || (d.id||'').toLowerCase().includes(search) || (d.cpu_model||'').toLowerCase().includes(search) || (d.os||'').toLowerCase().includes(search) || (d.tags||'').toLowerCase().includes(search);
-    });
-  }
+  var filtered = devices.map(function(d){return {source:'Agent',tag:d.hostname,id:d.id,name:d.hostname,category:'Komputer',branch:d.branch||d.group,location:d.local_ip||d.ip,pic:d.owner_username,specs:(d.cpu_model||'-')+' · '+fmtBytes(d.memory_total)+' RAM · '+fmtBytes(d.disk_total)+' disk',status:d.verification_status||'unverified'}})
+    .concat(manualAssets.map(function(a){return {source:'Manual',tag:a.asset_tag,id:a.id,name:a.name,category:a.category,branch:a.branch,location:a.location,pic:a.owner_username||a.assigned_to,specs:a.specs||a.serial_number,status:a.verification_status||'unverified'}}));
+  if (search) filtered = filtered.filter(function(a){return [a.tag,a.name,a.category,a.branch,a.location,a.pic,a.specs].join(' ').toLowerCase().includes(search)});
   if (filtered.length === 0) { document.getElementById('assetsTable').innerHTML = '<div class="empty-state"><p>No assets found</p></div>'; return; }
-  document.getElementById('assetsTable').innerHTML = '<table class="device-table"><thead><tr><th>Hostname</th><th>ID</th><th>OS</th><th>CPU</th><th>RAM</th><th>Disk</th><th>IP</th><th>Group</th><th>Tags</th><th>Registered</th></tr></thead><tbody>' +
-    filtered.map(function(d){
-      return '<tr><td>'+esc(d.hostname)+'</td><td><code style="font-size:11px">'+esc(d.id)+'</code></td><td>'+esc(d.os)+'</td><td>'+esc(d.cpu_model||'-')+'</td><td>'+fmtBytes(d.memory_total)+'</td><td>'+fmtBytes(d.disk_total)+'</td><td>'+esc(d.ip)+'</td><td><span class="tag">'+esc(d.group||'default')+'</span></td><td>'+(d.tags||'')+'</td><td>'+new Date(d.registered_at).toLocaleDateString()+'</td></tr>';
+  document.getElementById('assetsTable').innerHTML = '<table class="device-table"><thead><tr><th>Sumber</th><th>Tag / Hostname</th><th>Nama</th><th>Kategori</th><th>Cabang & Lokasi</th><th>PIC</th><th>Spesifikasi</th><th>Status Audit</th></tr></thead><tbody>' +
+    filtered.map(function(a){
+      return '<tr><td><span class="tag">'+esc(a.source)+'</span></td><td>'+esc(a.tag||'-')+'</td><td>'+esc(a.name||'-')+'</td><td>'+esc(a.category||'-')+'</td><td>'+esc(a.branch||'-')+'<br><small>'+esc(a.location||'-')+'</small></td><td>'+esc(a.pic||'Belum ditugaskan')+'</td><td>'+esc(a.specs||'-')+'</td><td>'+esc(a.status)+'</td></tr>';
     }).join('') + '</tbody></table>';
 }
 
 function exportAssets() {
-  var rows = [['Hostname','ID','OS','Arch','CPU Model','RAM Total','Disk Total','IP','Group','Registered At']];
-  devices.forEach(function(d){ rows.push([d.hostname, d.id, d.os, d.arch, d.cpu_model, fmtBytes(d.memory_total), fmtBytes(d.disk_total), d.ip, d.group, d.registered_at]); });
+  var rows = [['Sumber','Tag/Hostname','ID','Nama','Kategori','Cabang','Lokasi','PIC','Spesifikasi','Status Verifikasi']];
+  devices.forEach(function(d){ rows.push(['Agent',d.hostname,d.id,d.hostname,'Komputer',d.branch||d.group,d.local_ip||d.ip,d.owner_username,(d.cpu_model||'')+'; RAM '+fmtBytes(d.memory_total)+'; Disk '+fmtBytes(d.disk_total),d.verification_status]); });
+  manualAssets.forEach(function(a){ rows.push(['Manual',a.asset_tag,a.id,a.name,a.category,a.branch,a.location,a.owner_username||a.assigned_to,a.specs||a.serial_number,a.verification_status]); });
   var csv = '';
   rows.forEach(function(r){ csv += r.map(function(v){ return '\"'+String(v||'').replace(/\"/g, '\"\"')+'\"'; }).join(',') + '\n'; });
   var blob = new Blob([csv], { type: 'text/csv' });

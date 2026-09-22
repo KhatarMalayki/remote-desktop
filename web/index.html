@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>RemoteDesk - Device & Branch Asset Management</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%234f8cff'><rect x='2' y='3' width='20' height='14' rx='2' fill='%234f8cff'/><rect x='4' y='5' width='16' height='10' fill='%230f1117'/><rect x='8' y='19' width='8' height='2' rx='1' fill='%234f8cff'/><rect x='11' y='17' width='2' height='2' fill='%234f8cff'/></svg>">
-  <link rel="stylesheet" href="/static/style.css?v=0.2.35-ui2">
+  <link rel="stylesheet" href="/static/style.css?v=0.2.36-ui1">
   <script src="/static/qrcode.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 </head>
@@ -72,7 +72,7 @@
     </div>
     <div class="nav-item" data-page="assets" onclick="showPage('assets')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 7h-9l-2-2H4a2 2 0 00-2 2v10a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z"/></svg>
-      Asset Inventory
+      Laporan Inventaris
     </div>
     <div class="nav-item" data-page="remote" onclick="showPage('remote')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4M10 17l5-5-5-5M13.8 12H3"/></svg>
@@ -181,9 +181,9 @@
           <p id="branchBannerSubtitle">Kelola aset inventaris fisik manual dan lakukan audit verifikasi berkala.</p>
         </div>
         <div class="branch-header-actions">
-          <button class="btn btn-ghost" onclick="openHistoryModal()">&#128221; Log Audit</button>
+          <button class="btn btn-ghost" onclick="openAssetTimeline('')">&#128221; Pusat Aktivitas</button>
           <button class="btn btn-ghost" onclick="openDownloadAgentModal()" style="border-color:var(--accent);color:var(--accent)">&#128229; Download Agent</button>
-          <button class="btn btn-ghost" onclick="openSwitchHistory()">Switch & Approval</button>
+          <button class="btn btn-ghost" onclick="openSwitchHistory()">Serah Terima & Approval</button>
           <button class="btn btn-primary" id="btnAddManualAsset" onclick="openAddAssetModal()">+ Input Aset Manual</button>
         </div>
       </div>
@@ -255,9 +255,9 @@
 
     <!-- ASSET INVENTORY PAGE -->
     <div id="page-assets" class="page">
-      <div class="header"><h2>Asset Inventory</h2></div>
+      <div class="header"><h2>Laporan Inventaris Terpadu</h2></div>
       <div class="toolbar">
-        <input class="search-input" id="assetSearch" placeholder="Search assets..." oninput="searchAssets()">
+        <input class="search-input" id="assetSearch" placeholder="Cari tag, aset, PIC, lokasi, atau spesifikasi..." oninput="searchAssets()">
         <button class="btn btn-primary" onclick="exportAssets()">&#128230; Export CSV</button>
       </div>
       <div id="assetsTable"></div>
@@ -738,7 +738,11 @@
 </div>
 
 <div id="switchHistoryModal" class="modal-overlay" style="display:none" onclick="if(event.target===this)this.style.display='none'">
-  <div class="modal" style="max-width:850px"><h3>Switch Aset & Approval</h3><p class="asset-advice">Perubahan pemegang dari user berlaku setelah disetujui ADH. Riwayat serah terima tersimpan di sini.</p><div id="switchHistoryContent"></div><div class="modal-actions"><button class="btn btn-ghost" onclick="document.getElementById('switchHistoryModal').style.display='none'">Tutup</button></div></div>
+  <div class="modal" style="max-width:850px"><h3>Serah Terima Aset & Approval</h3><p class="asset-advice">Penetapan PIC awal dibedakan dari pergantian PIC. Scan berita acara dapat dilampirkan sebagai bukti digital.</p><div id="switchHistoryContent"></div><div class="modal-actions"><button class="btn btn-ghost" onclick="document.getElementById('switchHistoryModal').style.display='none'">Tutup</button></div></div>
+</div>
+
+<div id="activityModal" class="modal-overlay" style="display:none" onclick="if(event.target===this)this.style.display='none'">
+  <div class="modal" style="max-width:900px"><h3>Pusat Aktivitas & Timeline Aset</h3><div class="toolbar"><input id="activityAssetFilter" class="search-input" placeholder="ID aset / hostname"><select id="activityCategoryFilter" class="filter-select"><option value="">Semua kategori</option><option value="inventory">Inventaris</option><option value="handover">Serah terima</option><option value="verification">Verifikasi</option><option value="location">Mutasi lokasi</option><option value="hardware">Perubahan hardware</option><option value="deletion">Penghapusan</option></select><input id="activitySearch" class="search-input" placeholder="Cari pelaku atau detail"><input id="activityFrom" type="date" class="filter-select" title="Dari tanggal"><input id="activityTo" type="date" class="filter-select" title="Sampai tanggal"><button class="btn btn-primary" onclick="loadAssetActivities()">Filter</button></div><div id="activityContent"></div><div class="modal-actions"><button class="btn btn-ghost" onclick="document.getElementById('activityModal').style.display='none'">Tutup</button></div></div>
 </div>
 
 <div id="rustDeskManageModal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeRustDeskManageModal()">
@@ -752,8 +756,8 @@
     <div class="modal-actions"><button class="btn btn-ghost" onclick="closeRustDeskManageModal()">Batal</button><button class="btn btn-primary" onclick="submitRustDeskManage()">Kirim ke Perangkat</button></div>
   </div>
 </div>
-<script src="/static/ownership.js?v=0.2.35-ui2"></script>
-<script src="/static/app.js?v=0.2.35-ui2"></script>
+<script src="/static/ownership.js?v=0.2.36-ui1"></script>
+<script src="/static/app.js?v=0.2.36-ui1"></script>
 </body>
 </html>
 
