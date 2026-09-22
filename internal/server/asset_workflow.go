@@ -56,6 +56,23 @@ func (d *DB) AddActivity(a *models.AssetActivity) error {
 	return err
 }
 
+func (d *DB) ListHolderOptions(branch string) ([]models.User, error) {
+	rows, err := d.db.Query(`SELECT id,username,role,branch,mfa_enabled,created_at FROM users WHERE role='user' AND branch=? ORDER BY username`, branch)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []models.User
+	for rows.Next() {
+		var u models.User
+		if err := rows.Scan(&u.ID, &u.Username, &u.Role, &u.Branch, &u.MFAEnabled, &u.CreatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, u)
+	}
+	return out, rows.Err()
+}
+
 func (d *DB) ListActivities(branch, assetID, category, search, fromDate, toDate string, limit int) ([]models.AssetActivity, error) {
 	where := "1=1"
 	var args []interface{}
@@ -173,6 +190,28 @@ func (s *Server) handleActivities(w http.ResponseWriter, r *http.Request) {
 		branch = c.Branch
 	}
 	items, err := s.db.ListActivities(branch, assetID, r.URL.Query().Get("category"), r.URL.Query().Get("search"), r.URL.Query().Get("from"), r.URL.Query().Get("to"), 250)
+	if err != nil {
+		jsonError(w, err.Error(), 500)
+		return
+	}
+	jsonResp(w, items, 200)
+}
+
+func (s *Server) handleHolderOptions(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", 405)
+		return
+	}
+	c := getClaims(r)
+	branch := strings.TrimSpace(r.URL.Query().Get("branch"))
+	if c.Role == "adh" || c.Role == "user" {
+		branch = c.Branch
+	}
+	if branch == "" {
+		jsonError(w, "branch is required", 400)
+		return
+	}
+	items, err := s.db.ListHolderOptions(branch)
 	if err != nil {
 		jsonError(w, err.Error(), 500)
 		return

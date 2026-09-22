@@ -274,6 +274,7 @@ func (s *Server) ListenAndServe() error {
 	mux.HandleFunc("/api/assets/switch-requests/", s.authMiddleware(s.handleSwitchRequestSubroute))
 	mux.HandleFunc("/api/assets/attachments/", s.authMiddleware(s.handleAttachment))
 	mux.HandleFunc("/api/assets/activities", s.authMiddleware(s.handleActivities))
+	mux.HandleFunc("/api/assets/holder-options", s.authMiddleware(s.handleHolderOptions))
 	mux.HandleFunc("/api/assets/relocate", s.authMiddleware(s.handleRelocateAsset))
 	mux.HandleFunc("/api/agent/version", s.handleAgentVersion)
 	mux.HandleFunc("/api/agent/download", s.handleAgentDownload)
@@ -1696,7 +1697,7 @@ func (s *Server) authMiddleware(next http.HandlerFunc) http.HandlerFunc {
 				return
 			}
 			p := r.URL.Path
-			allowed := strings.HasPrefix(p, "/api/auth/") || p == "/api/devices" || strings.HasPrefix(p, "/api/devices/") || p == "/api/assets/manual" || strings.HasPrefix(p, "/api/assets/manual/") || strings.HasPrefix(p, "/api/assets/switch-requests") || strings.HasPrefix(p, "/api/assets/attachments/") || p == "/api/assets/activities" || p == "/api/assets/verifications" || p == "/api/stats" || p == "/api/groups" || p == "/api/branches" || p == "/api/branches/stats"
+			allowed := strings.HasPrefix(p, "/api/auth/") || p == "/api/devices" || strings.HasPrefix(p, "/api/devices/") || p == "/api/assets/manual" || strings.HasPrefix(p, "/api/assets/manual/") || strings.HasPrefix(p, "/api/assets/switch-requests") || strings.HasPrefix(p, "/api/assets/attachments/") || p == "/api/assets/activities" || p == "/api/assets/holder-options" || p == "/api/assets/verifications" || p == "/api/stats" || p == "/api/groups" || p == "/api/branches" || p == "/api/branches/stats"
 			if !allowed {
 				jsonError(w, "forbidden", 403)
 				return
@@ -1764,6 +1765,7 @@ func getClaims(r *http.Request) *UserClaims {
 
 func jsonResp(w http.ResponseWriter, data interface{}, status int) {
 	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-store")
 	w.WriteHeader(status)
 	json.NewEncoder(w).Encode(data)
 }

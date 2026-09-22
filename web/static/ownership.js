@@ -3,39 +3,42 @@ var responsibilityNotice = 'Aset perusahaan merupakan tanggung jawab pemegang ya
 
 function isAssetUser() { return currentUser && currentUser.role === 'user'; }
 function mayReviewSwitch() { return currentUser && ['adh', 'admin', 'ga_pusat'].includes(currentUser.role); }
+var handoverDraft = null;
 
 async function requestAssetSwitch(type, id) {
   var asset = type === 'manual' ? manualAssets.find(function(a) { return a.id === id; }) : devices.find(function(a) { return a.id === id; });
   if (!asset) return;
   var isAssignment = !asset.owner_username;
-  var target = prompt((isAssignment ? 'Tetapkan PIC awal. ' : 'Serah terima aset. ') + 'Masukkan username akun pemegang baru di lokasi yang sama:');
-  if (!target || !target.trim()) return;
-  var swapTag = asset.owner_username ? prompt('Untuk tukar dua aset: masukkan tag inventaris / hostname laptop yang diterima sebagai pengganti. Kosongkan jika hanya memindahkan pemegang.', '') : '';
-  if (swapTag === null) return;
-  var reason = prompt((isAssignment ? 'Dasar penetapan PIC awal' : 'Alasan switch / serah terima') + ' (minimal 10 karakter):');
-  if (!reason || reason.trim().length < 10) { alert('Alasan harus jelas, minimal 10 karakter.'); return; }
-  var direct = mayReviewSwitch();
-  var attachment = await chooseHandoverAttachment();
-  if (!confirm(responsibilityNotice + '\n\nAset: ' + (asset.name || asset.hostname) + '\nPemegang: ' + (asset.owner_username || 'Belum ditugaskan') + ' → ' + target.trim() + '\nLampiran: ' + (attachment ? attachment.name : 'Tidak ada') + '\n\n' + (direct ? 'Konfirmasi dan langsung pindahkan tanggung jawab?' : 'Kirim permintaan untuk persetujuan ADH?'))) return;
-  if (swapTag.trim() && !confirm('Tukar dua aset sekaligus dengan ' + swapTag.trim() + '? Kedua pemegang akan berubah setelah approval.')) return;
-  var result = await api('/api/assets/switch-requests', {method:'POST', body:JSON.stringify({asset_id:id, asset_type:type, to_owner:target.trim(), reason:reason.trim(), swap_tag:swapTag.trim()})});
-  if (!result || result.error) { alert((result && result.error) || 'Gagal mengirim switch'); return; }
-  if (attachment) {
-    var uploaded = await uploadHandoverAttachment(result.id, attachment);
-    if (!uploaded || uploaded.error) alert('Proses tersimpan, tetapi lampiran gagal diunggah: ' + ((uploaded && uploaded.error) || 'kesalahan jaringan'));
-  }
-  showToast(result.status === 'approved' ? (isAssignment ? 'PIC awal berhasil ditetapkan' : 'Serah terima berhasil dicatat') : 'Permintaan menunggu persetujuan ADH');
-  await loadBranchAssets();
-  await openSwitchHistory();
+  var branch=asset.branch||asset.group||'Pusat';
+  var users=await api('/api/assets/holder-options?branch='+encodeURIComponent(branch));
+  if(!Array.isArray(users)){showToast((users&&users.error)||'Daftar PIC tidak dapat dimuat');return}
+  handoverDraft={type:type,id:id,asset:asset,isAssignment:isAssignment};
+  document.getElementById('handoverTitle').textContent=isAssignment?'Tetapkan PIC Awal':'Serah Terima / Switch PIC';
+  document.getElementById('handoverAssetName').textContent=(asset.name||asset.hostname)+' · '+branch;
+  document.getElementById('handoverCurrentOwner').textContent=asset.owner_username||'Belum ditugaskan';
+  var select=document.getElementById('handoverTarget');select.innerHTML='<option value="">Pilih akun PIC...</option>'+users.filter(function(u){return u.username!==asset.owner_username}).map(function(u){return '<option value="'+esc(u.username)+'">'+esc(u.username)+'</option>'}).join('');
+  document.getElementById('handoverReasonLabel').textContent=isAssignment?'Dasar penetapan PIC awal':'Alasan serah terima';
+  document.getElementById('handoverReason').value='';document.getElementById('handoverSwap').value='';document.getElementById('handoverSwapGroup').style.display=isAssignment?'none':'block';document.getElementById('handoverAttachment').value='';document.getElementById('handoverError').style.display='none';
+  document.getElementById('handoverSubmit').textContent=mayReviewSwitch()?(isAssignment?'Tetapkan PIC':'Simpan Serah Terima'):'Ajukan Persetujuan';
+  document.getElementById('handoverModal').style.display='flex';
 }
 
-function chooseHandoverAttachment() {
-  return new Promise(function(resolve) {
-    var input = document.createElement('input'); input.type='file'; input.accept='.pdf,.jpg,.jpeg,.png';
-    input.onchange=function(){ var f=input.files&&input.files[0]; if(f&&f.size>10*1024*1024){alert('Lampiran maksimal 10 MB.');resolve(null);return} resolve(f||null); };
-    if (!confirm('Apakah ingin melampirkan scan/foto berita acara serah terima?\n\nOK = pilih file PDF/JPG/PNG. Cancel = lanjut tanpa lampiran.')) { resolve(null); return; }
-    input.click();
-  });
+function closeHandoverModal(){document.getElementById('handoverModal').style.display='none';handoverDraft=null}
+
+async function submitHandover() {
+  if(!handoverDraft)return;var target=document.getElementById('handoverTarget').value;var reason=document.getElementById('handoverReason').value.trim();var swapTag=document.getElementById('handoverSwap').value.trim();var attachment=document.getElementById('handoverAttachment').files[0];var error=document.getElementById('handoverError');
+  if(!target){error.textContent='Pilih akun PIC tujuan.';error.style.display='block';return}if(reason.length<10){error.textContent='Alasan harus jelas, minimal 10 karakter.';error.style.display='block';return}if(attachment&&attachment.size>10*1024*1024){error.textContent='Lampiran maksimal 10 MB.';error.style.display='block';return}
+  var button=document.getElementById('handoverSubmit');button.disabled=true;button.textContent='Menyimpan...';
+  var result=await api('/api/assets/switch-requests',{method:'POST',body:JSON.stringify({asset_id:handoverDraft.id,asset_type:handoverDraft.type,to_owner:target,reason:reason,swap_tag:swapTag})});
+  if(!result||result.error){error.textContent=(result&&result.error)||'Gagal menyimpan perubahan.';error.style.display='block';button.disabled=false;button.textContent='Coba Lagi';return}
+  if (attachment) {
+    var uploaded = await uploadHandoverAttachment(result.id, attachment);
+    if (!uploaded || uploaded.error) showToast('PIC tersimpan, tetapi lampiran gagal: '+((uploaded&&uploaded.error)||'kesalahan jaringan'));
+  }
+  if(result.status==='approved')handoverDraft.asset.owner_username=target;
+  var wasAssignment=handoverDraft.isAssignment;closeHandoverModal();renderBranchAssets();
+  showToast(result.status === 'approved' ? (wasAssignment ? 'PIC awal berhasil ditetapkan' : 'Serah terima berhasil dicatat') : 'Permintaan menunggu persetujuan ADH');
+  await loadBranchAssets();
 }
 
 async function uploadHandoverAttachment(id, file) {

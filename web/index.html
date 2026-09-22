@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>RemoteDesk - Device & Branch Asset Management</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%234f8cff'><rect x='2' y='3' width='20' height='14' rx='2' fill='%234f8cff'/><rect x='4' y='5' width='16' height='10' fill='%230f1117'/><rect x='8' y='19' width='8' height='2' rx='1' fill='%234f8cff'/><rect x='11' y='17' width='2' height='2' fill='%234f8cff'/></svg>">
-  <link rel="stylesheet" href="/static/style.css?v=0.2.36-ui1">
+  <link rel="stylesheet" href="/static/style.css?v=0.2.37-ui1">
   <script src="/static/qrcode.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 </head>
@@ -741,6 +741,19 @@
   <div class="modal" style="max-width:850px"><h3>Serah Terima Aset & Approval</h3><p class="asset-advice">Penetapan PIC awal dibedakan dari pergantian PIC. Scan berita acara dapat dilampirkan sebagai bukti digital.</p><div id="switchHistoryContent"></div><div class="modal-actions"><button class="btn btn-ghost" onclick="document.getElementById('switchHistoryModal').style.display='none'">Tutup</button></div></div>
 </div>
 
+<div id="handoverModal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeHandoverModal()">
+  <div class="modal handover-modal">
+    <div class="handover-heading"><div class="handover-icon">&#8644;</div><div><h3 id="handoverTitle">Tetapkan PIC Awal</h3><p id="handoverAssetName"></p></div></div>
+    <div class="handover-owner-row"><div><span>Pemegang saat ini</span><strong id="handoverCurrentOwner">Belum ditugaskan</strong></div><div class="handover-arrow">&#8594;</div><div><label for="handoverTarget">PIC tujuan</label><select id="handoverTarget"><option value="">Pilih akun PIC...</option></select></div></div>
+    <div class="form-group"><label id="handoverReasonLabel" for="handoverReason">Dasar penetapan PIC awal</label><textarea id="handoverReason" rows="3" placeholder="Contoh: Penugasan perangkat kerja untuk kebutuhan operasional harian"></textarea><small>Minimal 10 karakter. Keterangan ini akan masuk ke riwayat audit.</small></div>
+    <div class="form-group" id="handoverSwapGroup"><label for="handoverSwap">Tukar dengan aset lain <span class="optional-label">opsional</span></label><input id="handoverSwap" placeholder="Tag inventaris atau hostname aset pengganti"><small>Kosongkan bila hanya memindahkan pemegang aset ini.</small></div>
+    <div class="form-group"><label for="handoverAttachment">Lampiran berita acara <span class="optional-label">opsional</span></label><input id="handoverAttachment" type="file" accept=".pdf,.jpg,.jpeg,.png"><small>PDF, JPG, atau PNG, maksimal 10 MB.</small></div>
+    <p class="handover-notice">Tanggung jawab aset berpindah setelah proses disetujui. Pastikan kondisi dan kelengkapannya sudah diperiksa.</p>
+    <p id="handoverError" class="form-error" style="display:none"></p>
+    <div class="modal-actions"><button class="btn btn-ghost" onclick="closeHandoverModal()">Batal</button><button class="btn btn-primary" id="handoverSubmit" onclick="submitHandover()">Simpan</button></div>
+  </div>
+</div>
+
 <div id="activityModal" class="modal-overlay" style="display:none" onclick="if(event.target===this)this.style.display='none'">
   <div class="modal" style="max-width:900px"><h3>Pusat Aktivitas & Timeline Aset</h3><div class="toolbar"><input id="activityAssetFilter" class="search-input" placeholder="ID aset / hostname"><select id="activityCategoryFilter" class="filter-select"><option value="">Semua kategori</option><option value="inventory">Inventaris</option><option value="handover">Serah terima</option><option value="verification">Verifikasi</option><option value="location">Mutasi lokasi</option><option value="hardware">Perubahan hardware</option><option value="deletion">Penghapusan</option></select><input id="activitySearch" class="search-input" placeholder="Cari pelaku atau detail"><input id="activityFrom" type="date" class="filter-select" title="Dari tanggal"><input id="activityTo" type="date" class="filter-select" title="Sampai tanggal"><button class="btn btn-primary" onclick="loadAssetActivities()">Filter</button></div><div id="activityContent"></div><div class="modal-actions"><button class="btn btn-ghost" onclick="document.getElementById('activityModal').style.display='none'">Tutup</button></div></div>
 </div>
@@ -756,8 +769,8 @@
     <div class="modal-actions"><button class="btn btn-ghost" onclick="closeRustDeskManageModal()">Batal</button><button class="btn btn-primary" onclick="submitRustDeskManage()">Kirim ke Perangkat</button></div>
   </div>
 </div>
-<script src="/static/ownership.js?v=0.2.36-ui1"></script>
-<script src="/static/app.js?v=0.2.36-ui1"></script>
+<script src="/static/ownership.js?v=0.2.37-ui1"></script>
+<script src="/static/app.js?v=0.2.37-ui1"></script>
 </body>
 </html>
 
