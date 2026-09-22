@@ -336,6 +336,7 @@ func (s *Server) ListenAndServe() error {
 	mux.HandleFunc("/api/assets/activities", s.authMiddleware(s.handleActivities))
 	mux.HandleFunc("/api/assets/holder-options", s.authMiddleware(s.handleHolderOptions))
 	mux.HandleFunc("/api/assets/relocate", s.authMiddleware(s.handleRelocateAsset))
+	mux.HandleFunc("/api/assets/service", s.authMiddleware(s.handleAssetService))
 	mux.HandleFunc("/api/agent/version", s.handleAgentVersion)
 	mux.HandleFunc("/api/agent/download", s.handleAgentDownload)
 	mux.HandleFunc("/api/agent/package", s.authMiddleware(s.handleAgentPackageDownload))
@@ -1084,11 +1085,12 @@ func (s *Server) handleSwitchRequests(w http.ResponseWriter, r *http.Request) {
 
 	case http.MethodPost:
 		var req struct {
-			AssetID   string `json:"asset_id"`
-			AssetType string `json:"asset_type"`
-			ToOwner   string `json:"to_owner"`
-			Reason    string `json:"reason"`
-			SwapTag   string `json:"swap_tag"`
+			AssetID    string `json:"asset_id"`
+			AssetType  string `json:"asset_type"`
+			ToOwner    string `json:"to_owner"`
+			AssignedTo string `json:"assigned_to"`
+			Reason     string `json:"reason"`
+			SwapTag    string `json:"swap_tag"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			jsonError(w, "invalid request body", 400)
@@ -1107,6 +1109,7 @@ func (s *Server) handleSwitchRequests(w http.ResponseWriter, r *http.Request) {
 			AssetID:        req.AssetID,
 			AssetType:      req.AssetType,
 			ToOwner:        req.ToOwner,
+			AssignedTo:     strings.TrimSpace(req.AssignedTo),
 			RequestedBy:    claims.Username,
 			Reason:         req.Reason,
 			Status:         "pending",
@@ -1163,7 +1166,7 @@ func (s *Server) handleSwitchRequests(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		_, _, targetRole, targetBranch, targetErr := s.db.GetUser(req.ToOwner)
-		if targetErr != nil || !isEligibleHolderRole(targetRole) || !userAllowsBranch(targetBranch, sw.Branch) || sw.FromOwner == sw.ToOwner {
+		if targetErr != nil || !isEligibleHolderRole(targetRole) || !userAllowsBranch(targetBranch, sw.Branch) || (sw.FromOwner == sw.ToOwner && strings.TrimSpace(req.AssignedTo) == "") {
 			jsonError(w, "Pilih akun ADH, SPV, atau user yang terdaftar di lokasi aset", 400)
 			return
 		}
@@ -1196,7 +1199,12 @@ func (s *Server) handleSwitchRequests(w http.ResponseWriter, r *http.Request) {
 			jsonError(w, err.Error(), 500)
 			return
 		}
-		s.recordSwitchActivity(sw, "requested", claims.Username, fmt.Sprintf("%s: %s → %s. %s", sw.Operation, sw.FromOwner, sw.ToOwner, sw.Reason))
+		detail := fmt.Sprintf("%s: %s → %s", sw.Operation, sw.FromOwner, sw.ToOwner)
+		if sw.AssignedTo != "" {
+			detail += fmt.Sprintf(" (Karyawan/Pemakai: %s)", sw.AssignedTo)
+		}
+		detail += fmt.Sprintf(". %s", sw.Reason)
+		s.recordSwitchActivity(sw, "requested", claims.Username, detail)
 		if canApproveSwitch(claims.Role) {
 			if err := s.db.ReviewSwitchRequest(sw.ID, "approved", claims.Username, "Switch langsung oleh "+claims.Role); err != nil {
 				jsonError(w, err.Error(), 409)
@@ -3194,4 +3202,91 @@ func (s *Server) handleBranchSubroute(w http.ResponseWriter, r *http.Request) {
 	default:
 		http.Error(w, "method not allowed", 405)
 	}
+}
+
+func (s *Server) handleAssetService(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", 405)
+		return
+	}
+	claims := getClaims(r)
+	if claims.Role == "viewer" {
+		jsonError(w, "forbidden", 403)
+		return
+	}
+	var req struct {
+		AssetID   string `json:"asset_id"`
+		AssetType string `json:"asset_type"`
+		Action    string `json:"action"`
+		Condition string `json:"condition"`
+		Urgency   string `json:"urgency"`
+		Issue     string `json:"issue"`
+		Notes     string `json:"notes"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonError(w, "invalid request body", 400)
+		return
+	}
+	req.AssetID = strings.TrimSpace(req.AssetID)
+	req.AssetType = strings.TrimSpace(req.AssetType)
+	req.Action = strings.TrimSpace(req.Action)
+	if req.AssetID == "" || (req.AssetType != "manual" && req.AssetType != "device") {
+		jsonError(w, "asset_id and valid asset_type are required", 400)
+		return
+	}
+
+	var branch string
+	if req.AssetType == "manual" {
+		a, err := s.db.GetManualAsset(req.AssetID)
+		if err != nil {
+			jsonError(w, "asset not found", 404)
+			return
+		}
+		branch = a.Branch
+	} else {
+		d, err := s.db.GetDevice(req.AssetID)
+		if err != nil {
+			jsonError(w, "device not found", 404)
+			return
+		}
+		branch = d.Branch
+		if branch == "" {
+			branch = d.GroupName
+		}
+	}
+
+	if claims.Role == "adh" && claims.Branch != "" && !userAllowsBranch(claims.Branch, branch) {
+		jsonError(w, "forbidden: asset belongs to different branch", 403)
+		return
+	}
+
+	if req.Action == "complete" {
+		if claims.Role != "admin" && claims.Role != "ga_pusat" && claims.Role != "adh" {
+			jsonError(w, "hanya ADH, GA Pusat, atau Admin yang dapat menyelesaikan servis", 403)
+			return
+		}
+		if err := s.db.CompleteAssetService(req.AssetType, req.AssetID, claims.Username, req.Notes); err != nil {
+			jsonError(w, err.Error(), 500)
+			return
+		}
+		jsonResp(w, map[string]string{"status": "completed"}, 200)
+		return
+	}
+
+	if strings.TrimSpace(req.Issue) == "" {
+		jsonError(w, "Keluhan kerusakan harus diisi", 400)
+		return
+	}
+	cond := strings.TrimSpace(req.Condition)
+	if cond == "" {
+		cond = strings.TrimSpace(req.Urgency)
+	}
+	if cond == "" {
+		cond = "fair"
+	}
+	if err := s.db.RequestAssetService(req.AssetType, req.AssetID, cond, claims.Username, req.Issue, req.Notes); err != nil {
+		jsonError(w, err.Error(), 500)
+		return
+	}
+	jsonResp(w, map[string]string{"status": "service_requested"}, 200)
 }

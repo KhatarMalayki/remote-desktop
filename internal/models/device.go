@@ -31,6 +31,8 @@ type Device struct {
 	Note               string     `json:"note"`
 	AcquisitionYear    int        `json:"acquisition_year"`
 	OwnerUsername      string     `json:"owner_username"`
+	AssignedTo         string     `json:"assigned_to"`
+	Condition          string     `json:"condition"`
 	Recommendation     string     `json:"recommendation"`
 	LastSeen           time.Time  `json:"last_seen"`
 	RegisteredAt       time.Time  `json:"registered_at"`
@@ -93,6 +95,7 @@ type AssetSwitchRequest struct {
 	Branch         string            `json:"branch"`
 	FromOwner      string            `json:"from_owner"`
 	ToOwner        string            `json:"to_owner"`
+	AssignedTo     string            `json:"assigned_to"`
 	RequestedBy    string            `json:"requested_by"`
 	Reason         string            `json:"reason"`
 	Status         string            `json:"status"`

@@ -503,7 +503,7 @@ function renderBranchAssets() {
   var items = [];
   if (currentAssetTab === 'all' || currentAssetTab === 'manual') {
     manualAssets.forEach(function(a) {
-      items.push({ isManual:true, id:a.id, tag:a.asset_tag, name:a.name, category:a.category, branch:a.branch, location:a.location, pic:a.assigned_to, condition:a.condition, specs:a.specs||a.serial_number, vStatus:a.verification_status||'unverified', vAt:a.verified_at, vBy:a.verified_by, vNote:a.verification_note });
+      items.push({ isManual:true, id:a.id, tag:a.asset_tag, name:a.name, category:a.category, branch:a.branch, location:a.location, pic:a.assigned_to, condition:a.condition, status:a.status||'active', specs:a.specs||a.serial_number, vStatus:a.verification_status||'unverified', vAt:a.verified_at, vBy:a.verified_by, vNote:a.verification_note });
     });
   }
   if (currentAssetTab === 'all' || currentAssetTab === 'device') {
@@ -511,7 +511,7 @@ function renderBranchAssets() {
       var dBranch = d.branch || d.group || 'default';
       if (branchFilter && dBranch !== branchFilter) return;
       if (userBranches.length > 0 && !branchFilter && userBranches.indexOf(dBranch) === -1) return;
-      items.push({ isManual:false, id:d.id, tag:d.hostname, name:d.os+' '+d.arch+' ('+d.hostname+')', category:'pc', branch:dBranch, location:d.local_ip||d.ip, pic:d.note||'-', condition:d.online?'good':'fair', specs:d.cpu_model+' ('+d.cpu_cores+'c) | '+fmtBytes(d.memory_total), vStatus:d.verification_status||'unverified', vAt:d.verified_at, vBy:d.verified_by, vNote:d.verification_note });
+      items.push({ isManual:false, id:d.id, tag:d.hostname, name:d.os+' '+d.arch+' ('+d.hostname+')', category:'pc', branch:dBranch, location:d.local_ip||d.ip, pic:d.assigned_to||d.note||'-', condition:d.condition||(d.online?'good':'fair'), status:d.status||'active', specs:d.cpu_model+' ('+d.cpu_cores+'c) | '+fmtBytes(d.memory_total), vStatus:d.verification_status||'unverified', vAt:d.verified_at, vBy:d.verified_by, vNote:d.verification_note });
     });
   }
 
@@ -539,12 +539,12 @@ function renderBranchAssets() {
             '<div class="asset-record-title">'+esc(it.name)+'</div>' +
             '<div class="asset-record-subtitle"><span>'+esc(it.tag)+'</span><span class="asset-source">'+(it.isManual?'Manual':'Agent')+'</span><span class="tag">'+esc(it.category.toUpperCase())+'</span></div>' +
           '</div></div>' +
-          '<div class="asset-record-badges"><span class="badge-cond '+condClass+'">'+condLabel+'</span><span class="badge-status '+vBadge+'">'+vLabel+'</span></div>' +
+          '<div class="asset-record-badges">'+(it.status==='maintenance'?'<span class="badge-status" style="background:rgba(245,158,11,0.2);color:#fbbf24;border:1px solid rgba(245,158,11,0.4)">&#128295; Dalam Servis</span>':'')+'<span class="badge-cond '+condClass+'">'+condLabel+'</span><span class="badge-status '+vBadge+'">'+vLabel+'</span></div>' +
         '</div>' +
         '<div class="asset-record-details">' +
           '<div class="asset-detail"><span>Spesifikasi</span><strong>'+esc(it.specs||'Belum tersedia')+'</strong></div>' +
           '<div class="asset-detail"><span>Cabang & lokasi</span><strong>'+esc(it.branch||'-')+'</strong><small>'+esc(it.location||'Lokasi belum diisi')+'</small></div>' +
-          '<div class="asset-detail"><span>Pemegang aset</span><strong class="asset-holder">Belum ditugaskan</strong><small>'+esc(it.pic&&it.pic!=='-'?it.pic:'PIC belum diisi')+'</small></div>' +
+          '<div class="asset-detail"><span>Pemegang aset</span><strong class="asset-holder">Belum ditugaskan</strong><small>'+(it.pic&&it.pic!=='-'?'&#128100; Pemakai: '+esc(it.pic):'Pemakai belum diisi')+'</small></div>' +
           '<div class="asset-detail asset-verifier"><span>Verifikator</span>'+verifiedMeta+'</div>' +
         '</div>' +
         '<div class="asset-recommendation-slot"></div>' +
@@ -578,6 +578,15 @@ function renderBranchAssets() {
       }
       addAction(asset.owner_username ? (isAssetUser() ? 'Ajukan Serah Terima' : 'Serah Terima / Switch') : 'Tetapkan PIC Awal', 'btn-sm-action', function() { requestAssetSwitch(item.isManual ? 'manual' : 'device', item.id); });
       if (!isAssetUser()) addAction('Mutasi Lokasi', 'btn-sm-action', function() { relocateAsset(item.isManual ? 'manual' : 'device', item.id); });
+      if (asset.status === 'maintenance') {
+        if (!isAssetUser() && currentUser.role !== 'viewer') {
+          addAction('&#9989; Selesai Servis', 'btn-sm-action', function() { openServiceModal(item.isManual ? 'manual' : 'device', item.id, 'complete'); });
+        }
+      } else {
+        if (currentUser.role !== 'viewer') {
+          addAction('&#128295; Minta Servis', 'btn-sm-action', function() { openServiceModal(item.isManual ? 'manual' : 'device', item.id, 'request'); });
+        }
+      }
       addAction('Riwayat', 'btn-sm-action', function() { openAssetTimeline(item.id); });
     }
     if (asset.recommendation) {

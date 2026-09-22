@@ -287,8 +287,8 @@ func (s *Server) handleRelocateAsset(w http.ResponseWriter, r *http.Request) {
 			fromBranch = d.GroupName
 		}
 	}
-	if c.Role == "adh" && (c.Branch == "" || fromBranch != c.Branch || req.ToBranch != c.Branch) {
-		jsonError(w, "ADH hanya dapat mengubah titik lokasi di cabangnya; mutasi antar cabang dilakukan GA Pusat/admin", 403)
+	if c.Role == "adh" && (c.Branch == "" || !userAllowsBranch(c.Branch, fromBranch) || !userAllowsBranch(c.Branch, req.ToBranch)) {
+		jsonError(w, "ADH hanya dapat mengubah titik lokasi di cabang yang ditugaskan kepadanya; mutasi antar cabang dilakukan GA Pusat/admin", 403)
 		return
 	}
 	if err := s.db.RelocateAsset(req.AssetType, req.AssetID, strings.TrimSpace(req.ToBranch), strings.TrimSpace(req.ToLocation)); err != nil {

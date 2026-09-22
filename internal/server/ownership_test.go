@@ -440,3 +440,54 @@ func TestAdminEditUserAndMultiBranchADH(t *testing.T) {
 		t.Fatalf("expected 403 accessing Medan device, got %d", wMdn.Code)
 	}
 }
+
+func TestServiceRequestAndAssignedToWorkflow(t *testing.T) {
+	db, err := NewDB(filepath.Join(t.TempDir(), "service.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	s := &Server{db: db, hub: NewHub(db)}
+
+	_ = db.CreateUser("adh_sby", "hash", "adh", "Surabaya")
+	dev := &models.Device{ID: "dev-lap-01", Hostname: "LAP-SBY-01", Branch: "Surabaya", GroupName: "Surabaya", OwnerUsername: "adh_sby", AssignedTo: "Budi Lama"}
+	_ = db.UpsertDevice(dev)
+	_ = db.UpdateDeviceOwner(dev.ID, "adh_sby")
+
+	adhClaims := &UserClaims{Username: "adh_sby", Role: "adh", Branch: "Surabaya"}
+	rReq := httptest.NewRequest("POST", "/api/assets/service", strings.NewReader(`{"asset_id":"dev-lap-01","asset_type":"device","action":"request","issue":"Baterai kembung dan mati mendadak","urgency":"damaged","notes":"Kirim ke vendor Asus"}`))
+	wReq := httptest.NewRecorder()
+	s.handleAssetService(wReq, rReq.WithContext(context.WithValue(rReq.Context(), userClaimsKey, adhClaims)))
+	if wReq.Code != 200 {
+		t.Fatalf("expected 200 requesting service, got %d %s", wReq.Code, wReq.Body.String())
+	}
+
+	savedDev, _ := db.GetDevice("dev-lap-01")
+	if savedDev.Status != "maintenance" || savedDev.Condition != "damaged" {
+		t.Fatalf("expected status=maintenance condition=damaged, got status=%s condition=%s", savedDev.Status, savedDev.Condition)
+	}
+
+	rComp := httptest.NewRequest("POST", "/api/assets/service", strings.NewReader(`{"asset_id":"dev-lap-01","asset_type":"device","action":"complete","notes":"Baterai sudah diganti baru, lulus tes charging"}`))
+	wComp := httptest.NewRecorder()
+	s.handleAssetService(wComp, rComp.WithContext(context.WithValue(rComp.Context(), userClaimsKey, adhClaims)))
+	if wComp.Code != 200 {
+		t.Fatalf("expected 200 completing service, got %d %s", wComp.Code, wComp.Body.String())
+	}
+
+	savedDevAfter, _ := db.GetDevice("dev-lap-01")
+	if savedDevAfter.Status != "active" || savedDevAfter.Condition != "good" {
+		t.Fatalf("expected status=active condition=good, got status=%s condition=%s", savedDevAfter.Status, savedDevAfter.Condition)
+	}
+
+	rSwitch := httptest.NewRequest("POST", "/api/assets/switch-requests", strings.NewReader(`{"asset_id":"dev-lap-01","asset_type":"device","to_owner":"adh_sby","assigned_to":"Rian (Kasir Baru)","reason":"Serah terima laptop ke karyawan baru cabang"}`))
+	wSwitch := httptest.NewRecorder()
+	s.handleSwitchRequests(wSwitch, rSwitch.WithContext(context.WithValue(rSwitch.Context(), userClaimsKey, adhClaims)))
+	if wSwitch.Code != 201 {
+		t.Fatalf("expected 201 on handover with assigned_to, got %d %s", wSwitch.Code, wSwitch.Body.String())
+	}
+
+	devFinal, _ := db.GetDevice("dev-lap-01")
+	if devFinal.AssignedTo != "Rian (Kasir Baru)" {
+		t.Fatalf("expected assigned_to to be updated to Rian (Kasir Baru), got: %s", devFinal.AssignedTo)
+	}
+}

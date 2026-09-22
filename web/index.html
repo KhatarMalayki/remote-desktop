@@ -785,13 +785,91 @@
 <div id="handoverModal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeHandoverModal()">
   <div class="modal handover-modal">
     <div class="handover-heading"><div class="handover-icon">&#8644;</div><div><h3 id="handoverTitle">Tetapkan PIC Awal</h3><p id="handoverAssetName"></p></div></div>
-    <div class="handover-owner-row"><div><span>Pemegang saat ini</span><strong id="handoverCurrentOwner">Belum ditugaskan</strong></div><div class="handover-arrow">&#8594;</div><div><label for="handoverTarget">PIC tujuan</label><select id="handoverTarget"><option value="">Pilih akun PIC...</option></select></div></div>
+    <div class="handover-owner-row"><div><span>Pemegang saat ini</span><strong id="handoverCurrentOwner">Belum ditugaskan</strong></div><div class="handover-arrow">&#8594;</div><div><label for="handoverTarget">PIC tujuan (ADH / SPV)</label><select id="handoverTarget"><option value="">Pilih akun PIC...</option></select></div></div>
+    <div class="form-group"><label for="handoverAssignedTo">Nama Karyawan / Pemakai Fisik (End-User)</label><input id="handoverAssignedTo" placeholder="Contoh: Budi Santoso (Kasir 1) / Karyawan Baru"><small>Nama karyawan pengguna laptop ini di lapangan.</small></div>
     <div class="form-group"><label id="handoverReasonLabel" for="handoverReason">Dasar penetapan PIC awal</label><textarea id="handoverReason" rows="3" placeholder="Contoh: Penugasan perangkat kerja untuk kebutuhan operasional harian"></textarea><small>Minimal 10 karakter. Keterangan ini akan masuk ke riwayat audit.</small></div>
     <div class="form-group" id="handoverSwapGroup"><label for="handoverSwap">Tukar dengan aset lain <span class="optional-label">opsional</span></label><input id="handoverSwap" placeholder="Tag inventaris atau hostname aset pengganti"><small>Kosongkan bila hanya memindahkan pemegang aset ini.</small></div>
     <div class="form-group"><label for="handoverAttachment">Lampiran berita acara <span class="optional-label">opsional</span></label><input id="handoverAttachment" type="file" accept=".pdf,.jpg,.jpeg,.png"><small>PDF, JPG, atau PNG, maksimal 10 MB.</small></div>
     <p class="handover-notice">Tanggung jawab aset berpindah setelah proses disetujui. Pastikan kondisi dan kelengkapannya sudah diperiksa.</p>
     <p id="handoverError" class="form-error" style="display:none"></p>
     <div class="modal-actions"><button class="btn btn-ghost" onclick="closeHandoverModal()">Batal</button><button class="btn btn-primary" id="handoverSubmit" onclick="submitHandover()">Simpan</button></div>
+  </div>
+</div>
+
+<!-- RELOCATE ASSET MODAL -->
+<div id="relocateModal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeRelocateModal()">
+  <div class="modal" style="max-width:520px">
+    <h3>Mutasi Lokasi Aset</h3>
+    <p style="font-size:12px;color:var(--fg2);margin-bottom:14px">Pindahkan aset ke cabang atau titik lokasi baru.</p>
+    <input type="hidden" id="relocateAssetId">
+    <input type="hidden" id="relocateAssetType">
+    <div style="background:var(--bg3);padding:12px 14px;border-radius:var(--radius);margin-bottom:14px">
+      <div style="font-size:11px;color:var(--fg2)">Aset Terpilih:</div>
+      <strong id="relocateAssetName" style="font-size:14px">-</strong>
+    </div>
+    <div class="form-group">
+      <label>Cabang / Lokasi Tujuan</label>
+      <select id="relocateToBranch"></select>
+    </div>
+    <div class="form-group">
+      <label>Titik Lokasi Baru (Ruang / Meja / Lantai)</label>
+      <input type="text" id="relocateToLocation" placeholder="Contoh: Meja Kasir 1 / Lantai 2">
+    </div>
+    <div class="form-group">
+      <label>Alasan Mutasi Lokasi (minimal 10 karakter)</label>
+      <textarea id="relocateReason" rows="3" placeholder="Jelaskan alasan pemindahan lokasi aset..."></textarea>
+      <small style="color:var(--fg2);font-size:11px">Keterangan mutasi ini akan tercatat dalam riwayat audit aset.</small>
+    </div>
+    <div id="relocateError" class="form-error" style="display:none;margin-bottom:10px"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeRelocateModal()">Batal</button>
+      <button class="btn btn-primary" id="relocateSubmit" onclick="submitRelocateModal()">Simpan Mutasi Lokasi</button>
+    </div>
+  </div>
+</div>
+
+<!-- SERVICE REQUEST / COMPLETE MODAL -->
+<div id="serviceModal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeServiceModal()">
+  <div class="modal" style="max-width:540px">
+    <h3 id="serviceModalTitle">Permohonan Servis / Perbaikan</h3>
+    <p style="font-size:12px;color:var(--fg2);margin-bottom:14px">Catat kerusakan atau perbaikan unit untuk pelacakan operasional dan GA.</p>
+    <input type="hidden" id="serviceAssetId">
+    <input type="hidden" id="serviceAssetType">
+    <input type="hidden" id="serviceAction" value="request">
+    <div style="background:var(--bg3);padding:12px 14px;border-radius:var(--radius);margin-bottom:14px">
+      <div style="font-size:11px;color:var(--fg2)">Aset:</div>
+      <strong id="serviceAssetName" style="font-size:14px">-</strong>
+    </div>
+    <div id="serviceRequestFields">
+      <div class="form-group">
+        <label>Kondisi Saat Ini</label>
+        <select id="serviceCondition">
+          <option value="fair">Perlu Servis / Rusak Ringan</option>
+          <option value="damaged">Rusak Berat / Mati Total</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Gejala / Keluhan Kerusakan</label>
+        <textarea id="serviceIssue" rows="3" placeholder="Contoh: Layar bergaris, tombol keyboard tidak merespons, baterai kembung..."></textarea>
+        <small style="color:var(--fg2);font-size:11px">Minimal 5 karakter agar tim GA dan teknisi dapat memahami kendalanya.</small>
+      </div>
+      <div class="form-group">
+        <label>Keterangan Tambahan / Vendor (opsional)</label>
+        <input type="text" id="serviceNotes" placeholder="Contoh: Dibawa ke service center resmi Asus Surabaya">
+      </div>
+    </div>
+    <div id="serviceCompleteFields" style="display:none">
+      <div class="form-group">
+        <label>Catatan Hasil Perbaikan / Servis Selesai</label>
+        <textarea id="serviceCompleteNotes" rows="3" placeholder="Contoh: Baterai & keyboard telah diganti baru, unit siap digunakan kembali."></textarea>
+        <small style="color:var(--fg2);font-size:11px">Aset akan otomatis kembali ke status aktif dan kondisi baik.</small>
+      </div>
+    </div>
+    <div id="serviceError" class="form-error" style="display:none;margin-bottom:10px"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeServiceModal()">Batal</button>
+      <button class="btn btn-primary" id="serviceSubmit" onclick="submitServiceModal()">Kirim Permohonan Servis</button>
+    </div>
   </div>
 </div>
 
