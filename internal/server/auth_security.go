@@ -101,6 +101,9 @@ func (s *Server) issueCredentialToken(username, kind string) string {
 	if kind != "session" {
 		ttl = 15 * time.Minute
 	}
+	if kind == "mfa-manage" {
+		ttl = 5 * time.Minute
+	}
 	payload, _ := json.Marshal(credentialToken{username, kind, state, time.Now().Add(ttl).Unix()})
 	mac := hmac.New(sha256.New, []byte(s.cfg.JWTSecret))
 	mac.Write(payload)

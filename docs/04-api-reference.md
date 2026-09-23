@@ -254,6 +254,18 @@ fi
 
 ## Error yang Mungkin Muncul
 
+### Pengelolaan MFA
+
+- Browser yang diingat hanya melewati MFA login, bukan pengelolaan authenticator.
+- Untuk akun dengan MFA aktif, kirim kode authenticator saat ini ke `POST /api/auth/mfa/verify` dengan body `{"code":"123456"}` dan token sesi biasa.
+- Respons `management_ticket` berlaku lima menit. Kirim melalui header `X-MFA-Management` bersama token sesi pada `POST /api/auth/mfa/setup` dan `POST /api/auth/mfa/enable`. Tiket ini bukan token login.
+- Setup menghasilkan rahasia baru, tidak menampilkan rahasia lama. Konfirmasi kode authenticator baru melalui endpoint enable. MFA lama tetap aktif jika dibatalkan atau kode salah.
+- Penggantian berhasil membatalkan sesi dan kepercayaan browser lama melalui perubahan status kredensial. Gunakan token sesi baru dari respons enable.
+- Tiket hilang dari UI saat modal ditutup; membuka menu kembali meminta kode ulang. Tiket kedaluwarsa memerlukan verifikasi ulang.
+- Belum mendukung beberapa authenticator independen atau recovery code. Kehilangan HP tetap melalui reset admin.
+
+### Status HTTP
+
 | HTTP Status | Artinya |
 |-------------|---------|
 | 200 | Sukses |

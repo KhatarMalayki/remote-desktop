@@ -1701,28 +1701,71 @@ function cancelMFA() {
 }
 
 let currentMFASetupSecret = '';
+let mfaManagementTicket = '';
+let mfaModalGeneration = 0;
 
 async function openMFAModal(isForced) {
   const modal = document.getElementById('mfaModal');
   if (!modal) return;
   modal.style.display = 'flex';
   window.isMFAForced = !!isForced;
+  const generation = ++mfaModalGeneration;
+  mfaManagementTicket = '';
+  currentMFASetupSecret = '';
+  document.getElementById('mfaSecretText').textContent = '';
+  document.getElementById('mfaQRCode').innerHTML = '';
+  for (const id of ['mfaActiveSection', 'mfaSetupSection', 'mfaReauthSection']) document.getElementById(id).style.display = 'none';
+  document.getElementById('mfaCloseAction').style.display = isForced ? 'none' : 'flex';
 
   const status = await api('/api/auth/mfa/status');
+  if (generation !== mfaModalGeneration) return;
+  if (!status || status.error) {
+    showToast('Gagal memuat status MFA');
+    return;
+  }
   if (status && status.mfa_enabled) {
-    document.getElementById('mfaActiveSection').style.display = 'block';
+    document.getElementById('mfaReauthSection').style.display = 'block';
+    document.getElementById('mfaReauthCode').value = '';
+    document.getElementById('mfaReauthError').textContent = '';
+    document.getElementById('mfaReauthCode').focus();
     document.getElementById('mfaSetupSection').style.display = 'none';
     document.getElementById('mfaCloseAction').style.display = 'flex';
 
   } else {
+    await startMFASetup();
+  }
+}
+
+async function verifyMFAManagement() {
+  const generation = mfaModalGeneration;
+  const code = document.getElementById('mfaReauthCode').value.trim();
+  const result = await api('/api/auth/mfa/verify', { method: 'POST', body: JSON.stringify({ code }) });
+  if (generation !== mfaModalGeneration) return;
+  document.getElementById('mfaReauthCode').value = '';
+  if (!result || !result.management_ticket) {
+    document.getElementById('mfaReauthError').textContent = (result && result.error) || 'Verifikasi gagal';
+    return;
+  }
+  mfaManagementTicket = result.management_ticket;
+  document.getElementById('mfaReauthSection').style.display = 'none';
+  document.getElementById('mfaActiveSection').style.display = 'block';
+}
+
+async function startMFASetup() {
+    const generation = mfaModalGeneration;
+    const setup = await api('/api/auth/mfa/setup', { method: 'POST', headers: { 'X-MFA-Management': mfaManagementTicket } });
+    if (generation !== mfaModalGeneration) return;
+    if (!setup || !setup.secret) {
+      showToast((setup && setup.error) || 'Gagal menyiapkan MFA');
+      return;
+    }
     document.getElementById('mfaActiveSection').style.display = 'none';
     document.getElementById('mfaSetupSection').style.display = 'block';
-    document.getElementById('mfaCloseAction').style.display = 'none';
+    document.getElementById('mfaCloseAction').style.display = window.isMFAForced ? 'none' : 'flex';
     document.getElementById('mfaVerifyCode').value = '';
     const errEl = document.getElementById('mfaError');
     if (errEl) errEl.style.display = 'none';
 
-    const setup = await api('/api/auth/mfa/setup', { method: 'POST' });
     if (setup && setup.secret) {
       currentMFASetupSecret = setup.secret;
       document.getElementById('mfaSecretText').textContent = setup.secret;
@@ -1741,7 +1784,6 @@ async function openMFAModal(isForced) {
         qrEl.innerHTML = '<p style="color:#111;font-size:11px;padding:10px">Gunakan kunci manual di bawah untuk memasukkan ke Authenticator.</p>';
       }
     }
-  }
 }
 
 function closeMFAModal() {
@@ -1751,6 +1793,11 @@ function closeMFAModal() {
   }
   const modal = document.getElementById('mfaModal');
   if (modal) modal.style.display = 'none';
+  ++mfaModalGeneration;
+  mfaManagementTicket = '';
+  currentMFASetupSecret = '';
+  document.getElementById('mfaSecretText').textContent = '';
+  document.getElementById('mfaQRCode').innerHTML = '';
 }
 
 function copyMFASecret() {
@@ -1775,6 +1822,7 @@ async function submitEnableMFA() {
 
   const res = await api('/api/auth/mfa/enable', {
     method: 'POST',
+    headers: { 'X-MFA-Management': mfaManagementTicket },
     body: JSON.stringify({ secret: currentMFASetupSecret, code: code })
   });
 

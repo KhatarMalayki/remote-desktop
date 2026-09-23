@@ -809,3 +809,38 @@ func TestQueueAgentUpdateOnlyForOnlineOutdatedDevice(t *testing.T) {
 		t.Fatalf("up-to-date agent status=%q err=%v", status, err)
 	}
 }
+
+func TestPusatDoesNotReappearAfterDeletion(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "reappear.db")
+	db, err := NewDB(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := db.CreateUser("testadmin", "hash", "admin", ""); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.CreateBranch("Bintaro", "ho", "Mitra"); err != nil {
+		t.Fatal(err)
+	}
+	var pusatID int64
+	if err := db.db.QueryRow("SELECT id FROM branches WHERE name='Pusat'").Scan(&pusatID); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.DeleteBranch(pusatID); err != nil {
+		t.Fatalf("delete Pusat failed: %v", err)
+	}
+	db.Close()
+
+	// Reopen DB (simulating server restart)
+	db2, err := NewDB(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db2.Close()
+
+	var count int
+	_ = db2.db.QueryRow("SELECT COUNT(*) FROM branches WHERE name='Pusat'").Scan(&count)
+	if count != 0 {
+		t.Fatal("Pusat branch reappeared after server restart!")
+	}
+}

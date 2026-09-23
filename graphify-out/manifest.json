@@ -30,8 +30,8 @@
     "semantic_hash": ""
   },
   "internal/server/db.go": {
-    "mtime": 1790147667.047577,
-    "ast_hash": "6df5085d587750a0d4d1c86f278f9fd0",
+    "mtime": 1790156681.5908577,
+    "ast_hash": "6ba4e73c12f589961e28b217e180bc27",
     "semantic_hash": ""
   },
   "internal/server/hub.go": {
@@ -45,8 +45,8 @@
     "semantic_hash": ""
   },
   "internal/server/server.go": {
-    "mtime": 1790147974.5265863,
-    "ast_hash": "bf23e5873bc5c39174fd85fe6d60d3e6",
+    "mtime": 1790156553.4376967,
+    "ast_hash": "e59b20490e1ba9fd2233b6dd3c41fe4c",
     "semantic_hash": ""
   },
   "scripts/build.ps1": {
@@ -65,8 +65,8 @@
     "semantic_hash": "8c9cb5d1b967f64d6abc8c1ca0fe3e90"
   },
   "web/static/app.js": {
-    "mtime": 1790148093.7552404,
-    "ast_hash": "4e65b17a75aecc413a01f8f33ee1700d",
+    "mtime": 1790156745.4226513,
+    "ast_hash": "52785ab0501fd05fe2090c6aeaeb16f3",
     "semantic_hash": ""
   },
   ".codex/hooks.json": {
@@ -75,8 +75,8 @@
     "semantic_hash": ""
   },
   "internal/server/db_test.go": {
-    "mtime": 1790147974.478988,
-    "ast_hash": "c7efb5f7f045eb99431e90b1b5ff1eaa",
+    "mtime": 1790156721.3174636,
+    "ast_hash": "30c99fcb10bb25ad92d8df5c389296da",
     "semantic_hash": ""
   },
   "AGENTS.md": {
@@ -110,8 +110,8 @@
     "semantic_hash": ""
   },
   "docs/04-api-reference.md": {
-    "mtime": 1787558700.780877,
-    "ast_hash": "bc6559203bb4e9d78957031f425a61a3",
+    "mtime": 1790150866.0859203,
+    "ast_hash": "21b84e1ad0cbcb339dcbae9b59c0f61c",
     "semantic_hash": ""
   },
   "docs/05-architecture.md": {
@@ -125,8 +125,8 @@
     "semantic_hash": ""
   },
   "web/index.html": {
-    "mtime": 1790148093.7594326,
-    "ast_hash": "96d2cd50b7244147bb9caffc8fc8e441",
+    "mtime": 1790156553.43479,
+    "ast_hash": "8a73d59547cc3106cc64f5aedfb94060",
     "semantic_hash": ""
   },
   "scripts/update-server.sh": {
@@ -640,18 +640,28 @@
     "semantic_hash": ""
   },
   "internal/server/auth_security.go": {
-    "mtime": 1790147667.0139198,
-    "ast_hash": "10207e2d28ea1c77a37f0cad5eb292f8",
+    "mtime": 1790150618.8807497,
+    "ast_hash": "7db323820987f83302ad14e078985ba3",
     "semantic_hash": ""
   },
   "internal/server/auth_security_test.go": {
-    "mtime": 1790148093.9310334,
-    "ast_hash": "7700350a6f696c429e76e6e80a75e060",
+    "mtime": 1790150783.4417143,
+    "ast_hash": "4db31bb8474f12f0db35c941e5de3138",
     "semantic_hash": ""
   },
   "docs/authentication.md": {
     "mtime": 1790147974.3416069,
     "ast_hash": "e14cfbce942bfceb426ba184195748ba",
+    "semantic_hash": ""
+  },
+  "internal/server/mfa_management.go": {
+    "mtime": 1790150661.2778063,
+    "ast_hash": "090b5804eb86bfdaa8e243d259418e15",
+    "semantic_hash": ""
+  },
+  "internal/server/mfa_management_test.go": {
+    "mtime": 1790156610.675374,
+    "ast_hash": "42d0a0436edc4da44ba6b517c9b58cb7",
     "semantic_hash": ""
   }
 }

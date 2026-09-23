@@ -328,6 +328,7 @@ func (s *Server) ListenAndServe() error {
 	mux.HandleFunc("/api/auth/change-password", s.authMiddleware(s.handleChangePassword))
 	mux.HandleFunc("/api/auth/change-username", s.authMiddleware(s.handleChangeUsername))
 	mux.HandleFunc("/api/auth/mfa/status", s.authMiddleware(s.handleMFAStatus))
+	mux.HandleFunc("/api/auth/mfa/verify", s.authMiddleware(s.handleMFAVerify))
 	mux.HandleFunc("/api/auth/mfa/setup", s.authMiddleware(s.handleMFASetup))
 	mux.HandleFunc("/api/auth/mfa/enable", s.authMiddleware(s.handleMFAEnable))
 	mux.HandleFunc("/api/auth/mfa/disable", s.authMiddleware(s.handleMFADisable))
@@ -438,8 +439,10 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	trusted := false
-	if c, err := r.Cookie("rd_trusted_device"); err == nil {
-		trusted = s.db.IsTrustedDevice(req.Username, s.trustedDeviceDigest(req.Username, c.Value))
+	if role != "admin" {
+		if c, err := r.Cookie("rd_trusted_device"); err == nil {
+			trusted = s.db.IsTrustedDevice(req.Username, s.trustedDeviceDigest(req.Username, c.Value))
+		}
 	}
 	if mfaEnabled && !trusted {
 		if req.Code == "" {
@@ -464,7 +467,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	_ = s.db.RecordAuthLog(req.Username, ip, "success", "Login berhasil", r.UserAgent())
 	log.Printf("[security] LOGIN SUCCESS ip=%s username=%s role=%s", ip, req.Username, role)
 	// Only verified MFA or enrollment gets a credential token.
-	if req.RememberDevice && mfaEnabled {
+	if req.RememberDevice && mfaEnabled && role != "admin" {
 		s.setTrustedDeviceCookie(w, req.Username)
 	}
 	s.writeSession(w, req.Username)
@@ -2479,7 +2482,7 @@ func (s *Server) handleLoginMFA(w http.ResponseWriter, r *http.Request) {
 	_ = s.db.RecordAuthLog(claims.Username, ip, "success", "Login 2FA berhasil", r.UserAgent())
 	log.Printf("[security] MFA LOGIN SUCCESS ip=%s username=%s role=%s", ip, claims.Username, claims.Role)
 	// MFA verified; issue a fresh account-bound session.
-	if req.RememberDevice {
+	if req.RememberDevice && claims.Role != "admin" {
 		s.setTrustedDeviceCookie(w, claims.Username)
 	}
 	s.writeSession(w, claims.Username)
@@ -2509,18 +2512,22 @@ func (s *Server) handleMFAStatus(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleMFASetup(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "no-store")
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", 405)
 		return
 	}
 	claims := getClaims(r)
 	enabled, _, err := s.db.GetUserMFA(claims.Username)
-	if err != nil || enabled {
+	if err != nil {
 		jsonError(w, "MFA sudah aktif atau akun tidak tersedia", 409)
 		return
 	}
+	if enabled && !s.requireMFAManagement(w, r) {
+		return
+	}
 	secret := GenerateTOTPSecret()
-	if _, err := s.db.db.Exec(`UPDATE users SET mfa_pending_secret=? WHERE username=? AND mfa_enabled=0`, secret, claims.Username); err != nil {
+	if _, err := s.db.db.Exec(`UPDATE users SET mfa_pending_secret=? WHERE username=?`, secret, claims.Username); err != nil {
 		jsonError(w, "Gagal menyiapkan MFA", 500)
 		return
 	}
@@ -2532,11 +2539,20 @@ func (s *Server) handleMFASetup(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleMFAEnable(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "no-store")
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", 405)
 		return
 	}
 	claims := getClaims(r)
+	enabled, oldSecret, err := s.db.GetUserMFA(claims.Username)
+	if err != nil {
+		jsonError(w, "Akun tidak tersedia", 409)
+		return
+	}
+	if enabled && !s.requireMFAManagement(w, r) {
+		return
+	}
 
 	var req struct {
 		Secret string `json:"secret"`
@@ -2548,7 +2564,7 @@ func (s *Server) handleMFAEnable(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var pending string
-	if err := s.db.db.QueryRow(`SELECT mfa_pending_secret FROM users WHERE username=? AND mfa_enabled=0`, claims.Username).Scan(&pending); err != nil || pending == "" {
+	if err := s.db.db.QueryRow(`SELECT mfa_pending_secret FROM users WHERE username=?`, claims.Username).Scan(&pending); err != nil || pending == "" {
 		jsonError(w, "Mulai setup MFA terlebih dahulu", 409)
 		return
 	}
@@ -2562,7 +2578,7 @@ func (s *Server) handleMFAEnable(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := s.db.db.Exec(`UPDATE users SET mfa_enabled=1, mfa_secret=?, mfa_pending_secret='' WHERE username=? AND mfa_enabled=0 AND mfa_pending_secret=?`, pending, claims.Username, pending)
+	result, err := s.db.db.Exec(`UPDATE users SET mfa_enabled=1, mfa_secret=?, mfa_pending_secret='' WHERE username=? AND mfa_enabled=? AND mfa_secret=? AND mfa_pending_secret=?`, pending, claims.Username, enabled, oldSecret, pending)
 	if err != nil {
 		jsonError(w, err.Error(), 500)
 		return
@@ -2573,6 +2589,9 @@ func (s *Server) handleMFAEnable(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	recordLoginSuccess("mfa-setup:" + claims.Username)
+	if enabled {
+		_ = s.db.RecordAuthLog(claims.Username, r.RemoteAddr, "mfa_replaced", "Authenticator diganti setelah verifikasi MFA lama dan baru", r.UserAgent())
+	}
 	log.Printf("[mfa] user %s enabled 2FA / MFA", claims.Username)
 	jsonResp(w, map[string]string{"status": "success", "message": "2FA / MFA berhasil diaktifkan", "token": s.issueCredentialToken(claims.Username, "session")}, 200)
 }

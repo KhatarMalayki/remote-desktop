@@ -216,7 +216,14 @@ func migrate(db *sql.DB) error {
 	if _, err := db.Exec(schema); err != nil {
 		return err
 	}
-	_, _ = db.Exec(`INSERT OR IGNORE INTO branches (name, type) VALUES ('Pusat', 'pusat')`)
+	var branchCount int
+	if err := db.QueryRow("SELECT COUNT(*) FROM branches").Scan(&branchCount); err == nil && branchCount == 0 {
+		var schemaInitialized int
+		_ = db.QueryRow("SELECT COUNT(*) FROM users").Scan(&schemaInitialized)
+		if schemaInitialized == 0 {
+			_, _ = db.Exec("INSERT INTO branches (name, type) VALUES ('Pusat', 'pusat')")
+		}
+	}
 	// Role Kacab has been replaced by ADH; preserve every existing account and scope.
 	_, _ = db.Exec(`UPDATE users SET role='adh' WHERE role='kacab'`)
 	_, _ = db.Exec(`INSERT OR IGNORE INTO business_units(name) SELECT business_unit FROM branches WHERE TRIM(business_unit) != ''`)

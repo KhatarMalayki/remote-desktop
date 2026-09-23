@@ -50,6 +50,9 @@
   "48": "README.md",
   "49": "Pasang Server di VPS Linux (Tanpa Docker)",
   "50": "3. Halaman Devices",
-  "51": "Masalah Server",
-  "53": "rustdesk_other.go"
+  "51": "authentication.md",
+  "52": "4. Halaman Asset Inventory",
+  "53": "rustdesk_other.go",
+  "54": "Tips",
+  "55": "mfa_management.go"
 }
