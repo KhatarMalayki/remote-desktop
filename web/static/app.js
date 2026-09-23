@@ -424,33 +424,85 @@ async function loadGroups() {
 
 // ==================== BRANCH ASSETS & VERIFICATION ====================
 
+function populateSelectById(id, branches, selectedVal) {
+  var sel = document.getElementById(id);
+  if (!sel) return;
+  var cur = sel.value;
+  sel.innerHTML = '<option value="">-- Pilih Lokasi --</option>';
+  (branches || []).forEach(function(b) { 
+    var opt = document.createElement('option');
+    opt.value = b;
+    opt.textContent = b;
+    if (b === selectedVal) opt.selected = true;
+    sel.appendChild(opt); 
+  });
+}
+
+// Global cache for master branches
+var cachedMasterBranches = [];
+
+function getSelectValues(sel) {
+  var result = [];
+  var options = sel && sel.options;
+  for (var i = 0; i < options.length; i++) {
+    if (options[i].selected) {
+      result.push(options[i].value);
+    }
+  }
+  return result.filter(Boolean);
+}
+
+
 async function loadBranches() {
   if (isAssetUser()) { document.getElementById('branchSelectFilter').innerHTML = '<option value="">Aset Saya</option>'; return; }
   var branches = await api('/api/branches');
+  cachedMasterBranches = branches || [];
+  
+  // 1. Update Filter Select
   var sel = document.getElementById('branchSelectFilter');
-  if (!sel) return;
-  var cur = sel.value;
-  sel.innerHTML = currentUser && currentUser.role === 'adh' ? '' : '<option value="">Semua Cabang</option>';
-  (branches || []).forEach(function(b) { sel.innerHTML += '<option value="'+esc(b)+'">'+esc(b)+'</option>'; });
-  if (currentUser && currentUser.role === 'adh' && currentUser.branch) {
-    var userBranches = currentUser.branch.split(',').map(function(s){return s.trim();}).filter(Boolean);
-    if (userBranches.length === 1) {
-      sel.innerHTML = '<option value="' + esc(userBranches[0]) + '">' + esc(userBranches[0]) + '</option>';
-      sel.value = userBranches[0];
-      sel.disabled = true;
-    } else if (userBranches.length > 1) {
-      sel.innerHTML = '<option value="">Semua Cabang Saya (' + esc(userBranches.join(', ')) + ')</option>';
-      userBranches.forEach(function(b) {
-        sel.innerHTML += '<option value="' + esc(b) + '">' + esc(b) + '</option>';
-      });
-      sel.disabled = false;
-      if (cur && userBranches.indexOf(cur) !== -1) {
-        sel.value = cur;
+  if (sel) {
+      var cur = sel.value;
+      sel.innerHTML = currentUser && currentUser.role === 'adh' ? '' : '<option value="">Semua Cabang</option>';
+      (branches || []).forEach(function(b) { sel.innerHTML += '<option value="'+esc(b)+'">'+esc(b)+'</option>'; });
+      
+      if (currentUser && currentUser.role === 'adh' && currentUser.branch) {
+          var userBranches = currentUser.branch.split(',').map(function(s){return s.trim();}).filter(Boolean);
+          if (userBranches.length === 1) {
+              sel.innerHTML = '<option value="' + esc(userBranches[0]) + '">' + esc(userBranches[0]) + '</option>';
+              sel.value = userBranches[0];
+              sel.disabled = true;
+          } else if (userBranches.length > 1) {
+              sel.innerHTML = '<option value="">Semua Cabang Saya (' + esc(userBranches.join(', ')) + ')</option>';
+              userBranches.forEach(function(b) {
+                  sel.innerHTML += '<option value="' + esc(b) + '">' + esc(b) + '</option>';
+              });
+              if (cur && userBranches.indexOf(cur) !== -1) sel.value = cur;
+          }
+      } else if (cur) {
+          sel.value = cur;
       }
-    }
-    return;
   }
-  else if (cur) { sel.value = cur; }
+  
+  // 2. Update User Creation Select
+  var newUserSel = document.getElementById('newUserBranch');
+  if (newUserSel) {
+      newUserSel.innerHTML = '<option value="">-- Pilih Lokasi --</option>';
+      (branches || []).forEach(function(b) {
+          newUserSel.innerHTML += '<option value="'+esc(b)+'">'+esc(b)+'</option>';
+      });
+  }
+  
+  // 3. Update Manual Asset Select
+  var assetBranchSel = document.getElementById('assetBranchInput');
+  if (assetBranchSel) {
+      assetBranchSel.innerHTML = '<option value="">-- Pilih Lokasi --</option>';
+      (branches || []).forEach(function(b) {
+          assetBranchSel.innerHTML += '<option value="'+esc(b)+'">'+esc(b)+'</option>';
+      });
+      if (!assetBranchSel.value && branches && branches.length > 0) {
+           assetBranchSel.value = (currentUser && currentUser.branch) ? currentUser.branch.split(',')[0].trim() : ((document.getElementById('branchSelectFilter')||{}).value || 'Pusat');
+      }
+  }
 }
 
 function onBranchChange() { loadBranchAssets(); }
@@ -621,7 +673,12 @@ function openAddAssetModal() {
   document.getElementById('assetTagInput').value = '';
   document.getElementById('assetNameInput').value = '';
   document.getElementById('assetCategoryInput').value = 'pc';
-  document.getElementById('assetBranchInput').value = (currentUser && currentUser.branch) ? currentUser.branch : ((document.getElementById('branchSelectFilter')||{}).value || '');
+  
+  var assetSel = document.getElementById('assetBranchInput');
+  if(assetSel) {
+      assetSel.value = (currentUser && currentUser.branch) ? currentUser.branch : ((document.getElementById('branchSelectFilter')||{}).value || 'Pusat');
+  }
+  
   if (currentUser && currentUser.role === 'adh') document.getElementById('assetBranchInput').disabled = true;
   else document.getElementById('assetBranchInput').disabled = false;
   document.getElementById('assetLocationInput').value = '';
@@ -643,7 +700,10 @@ function openEditAssetModal(id) {
   document.getElementById('assetTagInput').value = asset.asset_tag;
   document.getElementById('assetNameInput').value = asset.name;
   document.getElementById('assetCategoryInput').value = asset.category || 'other';
-  document.getElementById('assetBranchInput').value = asset.branch;
+  
+  var assetSel = document.getElementById('assetBranchInput');
+  if(assetSel) assetSel.value = asset.branch;
+  
   if (currentUser && currentUser.role === 'adh') document.getElementById('assetBranchInput').disabled = true;
   else document.getElementById('assetBranchInput').disabled = false;
   document.getElementById('assetLocationInput').value = asset.location || '';
@@ -809,7 +869,27 @@ function openEditUserModal(id) {
   document.getElementById('editUserUsername').value = u.username;
   document.getElementById('editUserPassword').value = '';
   document.getElementById('editUserRole').value = u.role;
-  document.getElementById('editUserBranch').value = u.branch || '';
+  
+  var branchSel = document.getElementById('editUserBranch');
+  if (branchSel) {
+      branchSel.innerHTML = '';
+      (cachedMasterBranches || []).forEach(function(b) {
+          var opt = document.createElement('option');
+          opt.value = b;
+          opt.textContent = b;
+          branchSel.appendChild(opt);
+      });
+      // Pre-select user branches
+      if (u.branch) {
+          var userBranches = u.branch.split(',').map(function(s){return s.trim();}).filter(Boolean);
+          for(var k=0; k<branchSel.options.length; k++) {
+              if(userBranches.indexOf(branchSel.options[k].value) !== -1) {
+                  branchSel.options[k].selected = true;
+              }
+          }
+      }
+  }
+  
   document.getElementById('editUserModal').style.display = 'flex';
 }
 
@@ -817,12 +897,14 @@ function closeEditUserModal() {
   document.getElementById('editUserModal').style.display = 'none';
 }
 
+
 async function submitEditUser() {
   var id = document.getElementById('editUserId').value;
   var username = document.getElementById('editUserUsername').value.trim();
   var password = document.getElementById('editUserPassword').value.trim();
   var role = document.getElementById('editUserRole').value;
-  var branch = document.getElementById('editUserBranch').value.trim();
+  var branchSel = document.getElementById('editUserBranch');
+  var branch = getSelectValues(branchSel).join(', ');
 
   if (!username) { alert('Username wajib diisi'); return; }
   if ((role === 'adh' || role === 'user' || role === 'spv') && !branch) {
@@ -850,11 +932,15 @@ async function submitEditUser() {
   }
 }
 
+
+
 async function createUser() {
   var username = document.getElementById('newUserUsername').value.trim();
   var password = document.getElementById('newUserPassword').value.trim();
   var role = document.getElementById('newUserRole').value;
-  var branch = document.getElementById('newUserBranch').value.trim();
+  var branchSel = document.getElementById('newUserBranch');
+  var branch = getSelectValues(branchSel).join(', ');
+  
   if (!username || !password) { alert('Username dan Password wajib diisi'); return; }
   if ((role === 'adh' || role === 'user' || role === 'spv') && !branch) { alert('Nama lokasi wajib diisi untuk ADH/SPV/User'); return; }
 
@@ -863,13 +949,16 @@ async function createUser() {
     showToast('Akun berhasil dibuat');
     document.getElementById('newUserUsername').value = '';
     document.getElementById('newUserPassword').value = '';
-    document.getElementById('newUserBranch').value = '';
+    // Reset selects
+    var opts = branchSel.options;
+    for(var i=0; i<opts.length; i++) opts[i].selected = false;
     loadUsers();
     loadBranches();
   } else {
     alert('Gagal: ' + ((res && res.error) || 'Terjadi kesalahan'));
   }
 }
+
 
 async function deleteUser(id, username) {
   var nameStr = username ? 'user ' + username : 'akun ini';
@@ -1909,6 +1998,7 @@ async function addBusinessUnit() { var name=prompt('Nama bisnis unit baru:'); if
 function closeBranchesModal() {
   var modal = document.getElementById('branchesModal');
   if (modal) modal.style.display = 'none';
+  loadBranches(); // Refresh selects in case branches changed
 }
 
 async function renameLocationType() {

@@ -9,7 +9,7 @@ import (
 	"github.com/user/remote-desktop/internal/server"
 )
 
-var version = "0.2.41"
+var version = "0.2.42"
 
 const bundledRustDeskConfig = "=0nI9c3Uah2dzBDUCV0KlVGN3sUZSljVQNXd1NkazgmVadjcJF1QBR1cRJnRIFlI6ISeltmIsIiI6ISawFmIsIiI6ISehxWZyJCLiUWbuk3Zvx2bul3cugWazFWa0FmaiojI0N3boJye"
 

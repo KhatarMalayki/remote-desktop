@@ -115,7 +115,7 @@ func TestAuditLogFilters(t *testing.T) {
 	if err := db.RecordAuthLog("bob", "10.0.0.20", "failed", "bad password", "test"); err != nil {
 		t.Fatal(err)
 	}
-	logs, err := db.GetAuthLogsFiltered("ali", "10.0.0.10", "success", time.Now().Format("2006-01-02"), time.Now().Format("2006-01-02"), 20)
+	logs, err := db.GetAuthLogsFiltered("ali", "10.0.0.10", "success", time.Now().UTC().Format("2006-01-02"), time.Now().UTC().Format("2006-01-02"), 20)
 	if err != nil || len(logs) != 1 || logs[0].Username != "alice" {
 		t.Fatalf("unexpected filtered auth logs: logs=%+v err=%v", logs, err)
 	}
@@ -124,7 +124,7 @@ func TestAuditLogFilters(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	verifications, err := db.GetAssetVerificationsFiltered("", "Pusat", "verified", "ga.", time.Now().Format("2006-01-02"), time.Now().Format("2006-01-02"), 20)
+	verifications, err := db.GetAssetVerificationsFiltered("", "Pusat", "verified", "ga.", time.Now().UTC().Format("2006-01-02"), time.Now().UTC().Format("2006-01-02"), 20)
 	if err != nil || len(verifications) != 1 || verifications[0].AssetID != "a1" {
 		t.Fatalf("unexpected filtered asset logs: logs=%+v err=%v", verifications, err)
 	}

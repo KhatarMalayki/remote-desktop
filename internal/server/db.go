@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -1293,8 +1294,6 @@ func (d *DB) GetBranches() ([]string, error) {
 		SELECT branch FROM devices WHERE branch != ''
 		UNION
 		SELECT group_name AS branch FROM devices WHERE group_name != '' AND group_name != 'default'
-		UNION
-		SELECT branch FROM users WHERE branch != ''
 	) ORDER BY 1`
 	rows, err := d.db.Query(q)
 	if err != nil {
@@ -1302,13 +1301,35 @@ func (d *DB) GetBranches() ([]string, error) {
 	}
 	defer rows.Close()
 
+	branchSet := make(map[string]bool)
 	var branches []string
 	for rows.Next() {
 		var b string
-		if err := rows.Scan(&b); err == nil && strings.TrimSpace(b) != "" {
-			branches = append(branches, strings.TrimSpace(b))
+		if err := rows.Scan(&b); err == nil {
+			b = strings.TrimSpace(b)
+			if b != "" && !branchSet[b] {
+				branchSet[b] = true
+				branches = append(branches, b)
+			}
 		}
 	}
+
+	uRows, err := d.db.Query(`SELECT DISTINCT branch FROM users WHERE branch != ''`)
+	if err == nil {
+		defer uRows.Close()
+		for uRows.Next() {
+			var ubr string
+			if err := uRows.Scan(&ubr); err == nil {
+				for _, part := range splitBranches(ubr) {
+					if part != "" && !branchSet[part] {
+						branchSet[part] = true
+						branches = append(branches, part)
+					}
+				}
+			}
+		}
+	}
+	sort.Strings(branches)
 	return branches, nil
 }
 
@@ -1559,6 +1580,37 @@ func (d *DB) UpdateBranch(id int64, name, branchType, businessUnit string) error
 		if _, err := tx.Exec(`UPDATE users SET branch=? WHERE branch=?`, name, oldName); err != nil {
 			return err
 		}
+		uRows, err := tx.Query(`SELECT id, branch FROM users WHERE branch LIKE '%,%' AND branch LIKE '%' || ? || '%'`, oldName)
+		if err == nil {
+			type userUpdate struct {
+				id     int64
+				branch string
+			}
+			var userUpdates []userUpdate
+			for uRows.Next() {
+				var uid int64
+				var ubr string
+				if err := uRows.Scan(&uid, &ubr); err == nil {
+					parts := splitBranches(ubr)
+					changed := false
+					for pi, p := range parts {
+						if p == oldName {
+							parts[pi] = name
+							changed = true
+						}
+					}
+					if changed {
+						userUpdates = append(userUpdates, userUpdate{id: uid, branch: strings.Join(parts, ", ")})
+					}
+				}
+			}
+			uRows.Close()
+			for _, uu := range userUpdates {
+				if _, err := tx.Exec(`UPDATE users SET branch=? WHERE id=?`, uu.branch, uu.id); err != nil {
+					return err
+				}
+			}
+		}
 		if _, err := tx.Exec(`UPDATE asset_verifications SET branch=? WHERE branch=?`, name, oldName); err != nil {
 			return err
 		}
@@ -1575,7 +1627,7 @@ func (d *DB) DeleteBranch(id int64) error {
 		return fmt.Errorf("Pusat is a required location and cannot be deleted")
 	}
 	var used int
-	err := d.db.QueryRow(`SELECT ((SELECT COUNT(*) FROM manual_assets WHERE branch=?) + (SELECT COUNT(*) FROM devices WHERE branch=? OR group_name=?) + (SELECT COUNT(*) FROM users WHERE branch=?))`, name, name, name, name).Scan(&used)
+	err := d.db.QueryRow(`SELECT ((SELECT COUNT(*) FROM manual_assets WHERE branch=?) + (SELECT COUNT(*) FROM devices WHERE branch=? OR group_name=?) + (SELECT COUNT(*) FROM users WHERE branch=? OR branch LIKE ? OR branch LIKE ? OR branch LIKE ?))`, name, name, name, name, name+", %", "%, "+name, "%, "+name+", %").Scan(&used)
 	if err != nil {
 		return err
 	}
