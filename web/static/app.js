@@ -2184,6 +2184,28 @@ function closeDownloadAgentModal() {
   if (modal) modal.style.display = 'none';
 }
 
+function copyDownloadAgentLink() {
+  var sel = document.getElementById('dlAgentBranch');
+  var branch = (sel && sel.value) ? sel.value.trim() : 'Pusat';
+  if (currentUser && currentUser.role === 'adh' && currentUser.branch) {
+    branch = currentUser.branch;
+  }
+  var os = (document.getElementById('dlAgentOS') || {}).value || 'windows';
+  
+  // Create absolute URL
+  var link = window.location.origin + '/api/agent/package?branch=' + encodeURIComponent(branch) + '&os=' + encodeURIComponent(os) + '&token=' + encodeURIComponent(token);
+  
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(link).then(function() {
+      showToast('Link download untuk cabang ' + branch + ' disalin ke clipboard');
+    }).catch(function() {
+      alert('Gagal menyalin link: ' + link);
+    });
+  } else {
+    alert('Link: ' + link);
+  }
+}
+
 function submitDownloadAgentPackage() {
   var sel = document.getElementById('dlAgentBranch');
   var branch = (sel && sel.value) ? sel.value.trim() : 'Pusat';

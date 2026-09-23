@@ -1,12 +1,12 @@
 {
   "cmd/agent/main.go": {
-    "mtime": 1790130424.7020786,
-    "ast_hash": "f7bf5bfdc5ae250d4279be058e6fd3c6",
+    "mtime": 1790133301.1117516,
+    "ast_hash": "77911e737ec3810959862cdde2d3707d",
     "semantic_hash": ""
   },
   "cmd/server/main.go": {
-    "mtime": 1790130424.7045817,
-    "ast_hash": "a513cc1cf468a8840e65c90598c86641",
+    "mtime": 1790133301.115037,
+    "ast_hash": "1579aaabdeadfdc5803f30bcafbec92a",
     "semantic_hash": ""
   },
   "go.mod": {
@@ -30,8 +30,8 @@
     "semantic_hash": ""
   },
   "internal/server/db.go": {
-    "mtime": 1790130219.5887592,
-    "ast_hash": "601c22842308c8b953889bde725829dd",
+    "mtime": 1790131970.3947015,
+    "ast_hash": "93754384cde647aa764c488db9b40f72",
     "semantic_hash": ""
   },
   "internal/server/hub.go": {
@@ -65,8 +65,8 @@
     "semantic_hash": "8c9cb5d1b967f64d6abc8c1ca0fe3e90"
   },
   "web/static/app.js": {
-    "mtime": 1790130353.5279627,
-    "ast_hash": "9e09553f945ba35c6f637b06da9b24f1",
+    "mtime": 1790132014.3613603,
+    "ast_hash": "44898cd837658955068495641a7597ae",
     "semantic_hash": ""
   },
   ".codex/hooks.json": {
@@ -75,8 +75,8 @@
     "semantic_hash": ""
   },
   "internal/server/db_test.go": {
-    "mtime": 1790130219.5901432,
-    "ast_hash": "b8d7299056341bcb73b1f3fe7bdc58ca",
+    "mtime": 1790133107.9439287,
+    "ast_hash": "6f4a18d2c942ad76cba5ceffe426070f",
     "semantic_hash": ""
   },
   "AGENTS.md": {
@@ -125,8 +125,8 @@
     "semantic_hash": ""
   },
   "web/index.html": {
-    "mtime": 1790130424.719684,
-    "ast_hash": "a7dffc6f1d67e4fa726e77eb552285ff",
+    "mtime": 1790133301.140465,
+    "ast_hash": "6592e3941798adb8bee916ca7421eaad",
     "semantic_hash": ""
   },
   "scripts/update-server.sh": {

@@ -1,16 +1,16 @@
 # Graph Report - remote-desktop  (2026-09-23)
 
 ## Corpus Check
-- 58 files · ~147,696 words
+- 58 files · ~147,803 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 773 nodes · 1676 edges · 53 communities (48 shown, 5 thin omitted)
+- 774 nodes · 1678 edges · 52 communities (47 shown, 5 thin omitted)
 - Extraction: 91% EXTRACTED · 9% INFERRED · 0% AMBIGUOUS · INFERRED: 159 edges (avg confidence: 0.78)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `77f0c1af`
+- Built from commit: `c10ed98c`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -58,7 +58,6 @@
 - README.md
 - Pasang Server di VPS Linux (Tanpa Docker)
 - 3. Halaman Devices
-- Masalah Server
 
 ## God Nodes (most connected - your core abstractions)
 1. `Server` - 70 edges
@@ -67,7 +66,7 @@
 4. `jsonError()` - 50 edges
 5. `getClaims()` - 49 edges
 6. `api()` - 45 edges
-7. `showToast()` - 35 edges
+7. `showToast()` - 36 edges
 8. `NewDB()` - 33 edges
 9. `Agent` - 24 edges
 10. `userAllowsBranch()` - 22 edges
@@ -87,7 +86,7 @@
 ## Import Cycles
 - None detected.
 
-## Communities (53 total, 5 thin omitted)
+## Communities (52 total, 5 thin omitted)
 
 ### Community 0 - "Community 0"
 Cohesion: 0.07
@@ -122,12 +121,12 @@ Cohesion: 0.21
 Nodes (15): attachAgentRelay(), closeRelaySession(), createViewerRelay(), Conn, Duration, Mutex, Time, pipeRelay() (+7 more)
 
 ### Community 8 - "Community 8"
-Cohesion: 0.18
-Nodes (10): ❌ API return "unauthorized" (401), ❌ Buka browser tapi halaman tidak muncul, ❌ Container tidak start, ❌ Data hilang setelah restart container, ❌ Login gagal "invalid credentials", Masalah Docker, Masalah Server, Masih Bingung? (+2 more)
+Cohesion: 0.14
+Nodes (13): ❌ API return "unauthorized" (401), ❌ Buka browser tapi halaman tidak muncul, ❌ Container tidak start, ❌ Data hilang setelah restart container, ❌ Klik Connect tapi layar tidak muncul, ❌ Login gagal "invalid credentials", Masalah Docker, Masalah Remote Desktop (+5 more)
 
 ### Community 9 - "Community 9"
-Cohesion: 0.50
-Nodes (4): CPU Usage, Hitungan Memori: Kok Bisa 1000 Device di 1 GB?, Jadi untuk 1000 device:, Setiap koneksi agent pakai berapa memori?
+Cohesion: 0.29
+Nodes (6): API Reference, Cara 1: Pakai Token dari Login, Cara 2: Pakai API Key Langsung, Cara Autentikasi, Contoh Script: Monitoring Otomatis, Error yang Mungkin Muncul
 
 ### Community 10 - "Community 10"
 Cohesion: 0.31
@@ -174,20 +173,20 @@ Cohesion: 0.27
 Nodes (11): remoteDeskService, ChangeRequest, enableTokenPrivilege(), exeToUTF16(), runSystemService(), startConsoleSystemWorker(), startSecureDesktopRelay(), superviseConsoleWorker() (+3 more)
 
 ### Community 29 - "esc"
-Cohesion: 0.15
-Nodes (26): addBusinessUnit(), api(), buildBranchOptionsHTML(), closeBranchesModal(), closeMFAModal(), createBranch(), deleteBranch(), editBranch() (+18 more)
+Cohesion: 0.29
+Nodes (7): closeManualAssetModal(), closeVerificationModal(), deleteManualAsset(), loadBranchAssets(), onBranchChange(), saveManualAsset(), submitVerification()
 
 ### Community 31 - "init"
 Cohesion: 0.28
-Nodes (9): checkAuth(), connectWS(), doLogin(), doLoginMFA(), doLogout(), handleSignal(), init(), resetIdleTimer() (+1 more)
+Nodes (9): checkAuth(), closeChangeUsernameModal(), doLogin(), doLoginMFA(), doLogout(), init(), resetIdleTimer(), submitChangeUsername() (+1 more)
 
 ### Community 32 - "loadBranchAssets"
-Cohesion: 0.14
-Nodes (16): closeManualAssetModal(), closeVerificationModal(), deleteManualAsset(), exportAssets(), fmtBytes(), loadBranchAssets(), onBranchChange(), onSearchBranchAssets() (+8 more)
+Cohesion: 0.16
+Nodes (16): buildBranchOptionsHTML(), esc(), exportAssets(), fmtBytes(), loadRoles(), onSearchBranchAssets(), openDeviceModal(), openDownloadAgentModal() (+8 more)
 
 ### Community 33 - "main"
-Cohesion: 0.12
-Nodes (22): closeChangePasswordModal(), closeChangeUsernameModal(), closeEditUserModal(), configureRustDesk(), copyMFASecret(), createUser(), deleteUser(), exportBranchAssetsCSV() (+14 more)
+Cohesion: 0.10
+Nodes (40): addBusinessUnit(), api(), closeBranchesModal(), closeChangePasswordModal(), closeEditUserModal(), closeMFAModal(), configureRustDesk(), copyDownloadAgentLink() (+32 more)
 
 ### Community 34 - "SecuritySettings"
 Cohesion: 0.20
@@ -198,8 +197,8 @@ Cohesion: 0.14
 Nodes (18): rustDeskExportConfig, rustDeskCLIConfig(), T, TestRustDeskCLIConfigDecodesExport(), TestRustDeskCLIConfigRejectsUnsafeValues(), ManageRustDesk(), findRustDeskBinary(), Duration (+10 more)
 
 ### Community 36 - "Cara Pasang Agent di Komputer"
-Cohesion: 0.20
-Nodes (10): Agent Connect → Register, Alur Kerja (Flow), Arsitektur & Kenapa Bisa Ringan, Gambaran Besar, Heartbeat (Setiap 30 Detik), Kenapa Pakai Go?, Kenapa Pakai SQLite (Bukan MySQL/PostgreSQL)?, Limitasi (Yang Tidak Bisa) (+2 more)
+Cohesion: 0.14
+Nodes (14): Agent Connect → Register, Alur Kerja (Flow), Arsitektur & Kenapa Bisa Ringan, CPU Usage, Gambaran Besar, Heartbeat (Setiap 30 Detik), Hitungan Memori: Kok Bisa 1000 Device di 1 GB?, Jadi untuk 1000 device: (+6 more)
 
 ### Community 37 - "Cara Install RemoteDesk"
 Cohesion: 0.40
@@ -218,12 +217,12 @@ Cohesion: 0.29
 Nodes (4): parseRustDeskID(), T, TestParseRustDeskID(), getRustDeskID()
 
 ### Community 43 - "SecuritySettings"
-Cohesion: 0.24
-Nodes (10): buildDeviceTable(), isVersionNewer(), osIcon(), parseAgentVersion(), renderDevices(), renderRecentDevices(), timeAgo(), updateDeviceAgent() (+2 more)
+Cohesion: 0.20
+Nodes (12): buildDeviceTable(), connectWS(), handleSignal(), isVersionNewer(), osIcon(), parseAgentVersion(), renderDevices(), renderRecentDevices() (+4 more)
 
 ### Community 46 - "Daftar API"
-Cohesion: 0.12
-Nodes (15): Activity Log Device, API Reference, Cara 1: Pakai Token dari Login, Cara 2: Pakai API Key Langsung, Cara Autentikasi, Contoh Script: Monitoring Otomatis, Daftar API, Detail Satu Device (+7 more)
+Cohesion: 0.22
+Nodes (9): Activity Log Device, Daftar API, Detail Satu Device, Hapus Device, List Semua Device, List Semua Group, Login, Statistik Dashboard (+1 more)
 
 ### Community 47 - "Hitungan Memori: Kok Bisa 1000 Device di 1 GB?"
 Cohesion: 0.67
@@ -240,10 +239,6 @@ Nodes (5): Langkah 1: Upload file rd-server ke VPS, Langkah 2: Beri izin execute
 ### Community 50 - "3. Halaman Devices"
 Cohesion: 0.40
 Nodes (5): ❌ Agent connect tapi device tidak muncul di dashboard, ❌ Agent sering putus dan reconnect, ❌ Agent tidak mau connect, "connection failed", ❌ Info hardware salah/kosong, Masalah Agent
-
-### Community 51 - "Masalah Server"
-Cohesion: 0.67
-Nodes (3): ❌ Klik Connect tapi layar tidak muncul, Masalah Remote Desktop, ❌ Remote desktop lambat/patah-patah
 
 ## Knowledge Gaps
 - **104 isolated node(s):** `github.com/user/remote-desktop`, `Agent`, `rustDeskExportConfig`, `RoleDefinition`, `contextKey` (+99 more)

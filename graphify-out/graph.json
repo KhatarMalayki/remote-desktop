@@ -5330,8 +5330,8 @@
       "source_location": "L183",
       "_origin": "ast",
       "id": "web_static_app_api",
-      "community": 29,
-      "community_name": "esc",
+      "community": 33,
+      "community_name": "main",
       "norm_label": "api()"
     },
     {
@@ -5341,8 +5341,8 @@
       "source_location": "L195",
       "_origin": "ast",
       "id": "web_static_app_connectws",
-      "community": 31,
-      "community_name": "init",
+      "community": 43,
+      "community_name": "SecuritySettings",
       "norm_label": "connectws()"
     },
     {
@@ -5627,8 +5627,8 @@
       "source_location": "L457",
       "_origin": "ast",
       "id": "web_static_app_buildbranchoptionshtml",
-      "community": 29,
-      "community_name": "esc",
+      "community": 32,
+      "community_name": "loadBranchAssets",
       "norm_label": "buildbranchoptionshtml()"
     },
     {
@@ -5638,8 +5638,8 @@
       "source_location": "L490",
       "_origin": "ast",
       "id": "web_static_app_loadbranches",
-      "community": 29,
-      "community_name": "esc",
+      "community": 33,
+      "community_name": "main",
       "norm_label": "loadbranches()"
     },
     {
@@ -5649,8 +5649,8 @@
       "source_location": "L547",
       "_origin": "ast",
       "id": "web_static_app_onbranchchange",
-      "community": 32,
-      "community_name": "loadBranchAssets",
+      "community": 29,
+      "community_name": "esc",
       "norm_label": "onbranchchange()"
     },
     {
@@ -5671,8 +5671,8 @@
       "source_location": "L558",
       "_origin": "ast",
       "id": "web_static_app_loadbranchassets",
-      "community": 32,
-      "community_name": "loadBranchAssets",
+      "community": 29,
+      "community_name": "esc",
       "norm_label": "loadbranchassets()"
     },
     {
@@ -5726,8 +5726,8 @@
       "source_location": "L798",
       "_origin": "ast",
       "id": "web_static_app_closemanualassetmodal",
-      "community": 32,
-      "community_name": "loadBranchAssets",
+      "community": 29,
+      "community_name": "esc",
       "norm_label": "closemanualassetmodal()"
     },
     {
@@ -5737,8 +5737,8 @@
       "source_location": "L802",
       "_origin": "ast",
       "id": "web_static_app_savemanualasset",
-      "community": 32,
-      "community_name": "loadBranchAssets",
+      "community": 29,
+      "community_name": "esc",
       "norm_label": "savemanualasset()"
     },
     {
@@ -5748,8 +5748,8 @@
       "source_location": "L835",
       "_origin": "ast",
       "id": "web_static_app_deletemanualasset",
-      "community": 32,
-      "community_name": "loadBranchAssets",
+      "community": 29,
+      "community_name": "esc",
       "norm_label": "deletemanualasset()"
     },
     {
@@ -5770,8 +5770,8 @@
       "source_location": "L860",
       "_origin": "ast",
       "id": "web_static_app_closeverificationmodal",
-      "community": 32,
-      "community_name": "loadBranchAssets",
+      "community": 29,
+      "community_name": "esc",
       "norm_label": "closeverificationmodal()"
     },
     {
@@ -5781,8 +5781,8 @@
       "source_location": "L864",
       "_origin": "ast",
       "id": "web_static_app_submitverification",
-      "community": 32,
-      "community_name": "loadBranchAssets",
+      "community": 29,
+      "community_name": "esc",
       "norm_label": "submitverification()"
     },
     {
@@ -5836,8 +5836,8 @@
       "source_location": "L946",
       "_origin": "ast",
       "id": "web_static_app_openeditusermodal",
-      "community": 29,
-      "community_name": "esc",
+      "community": 32,
+      "community_name": "loadBranchAssets",
       "norm_label": "openeditusermodal()"
     },
     {
@@ -6012,8 +6012,8 @@
       "source_location": "L1176",
       "_origin": "ast",
       "id": "web_static_app_startnetworkscan",
-      "community": 29,
-      "community_name": "esc",
+      "community": 32,
+      "community_name": "loadBranchAssets",
       "norm_label": "startnetworkscan()"
     },
     {
@@ -6221,8 +6221,8 @@
       "source_location": "L1495",
       "_origin": "ast",
       "id": "web_static_app_handlesignal",
-      "community": 31,
-      "community_name": "init",
+      "community": 43,
+      "community_name": "SecuritySettings",
       "norm_label": "handlesignal()"
     },
     {
@@ -6232,8 +6232,8 @@
       "source_location": "L1499",
       "_origin": "ast",
       "id": "web_static_app_esc",
-      "community": 29,
-      "community_name": "esc",
+      "community": 32,
+      "community_name": "loadBranchAssets",
       "norm_label": "esc()"
     },
     {
@@ -6364,8 +6364,8 @@
       "source_location": "L1692",
       "_origin": "ast",
       "id": "web_static_app_openmfamodal",
-      "community": 29,
-      "community_name": "esc",
+      "community": 33,
+      "community_name": "main",
       "norm_label": "openmfamodal()"
     },
     {
@@ -6375,8 +6375,8 @@
       "source_location": "L1733",
       "_origin": "ast",
       "id": "web_static_app_closemfamodal",
-      "community": 29,
-      "community_name": "esc",
+      "community": 33,
+      "community_name": "main",
       "norm_label": "closemfamodal()"
     },
     {
@@ -6397,8 +6397,8 @@
       "source_location": "L1747",
       "_origin": "ast",
       "id": "web_static_app_submitenablemfa",
-      "community": 29,
-      "community_name": "esc",
+      "community": 33,
+      "community_name": "main",
       "norm_label": "submitenablemfa()"
     },
     {
@@ -6408,8 +6408,8 @@
       "source_location": "L1774",
       "_origin": "ast",
       "id": "web_static_app_submitdisablemfa",
-      "community": 29,
-      "community_name": "esc",
+      "community": 33,
+      "community_name": "main",
       "norm_label": "submitdisablemfa()"
     },
     {
@@ -6441,8 +6441,8 @@
       "source_location": "L1819",
       "_origin": "ast",
       "id": "web_static_app_closechangeusernamemodal",
-      "community": 33,
-      "community_name": "main",
+      "community": 31,
+      "community_name": "init",
       "norm_label": "closechangeusernamemodal()"
     },
     {
@@ -6452,8 +6452,8 @@
       "source_location": "L1824",
       "_origin": "ast",
       "id": "web_static_app_submitchangeusername",
-      "community": 33,
-      "community_name": "main",
+      "community": 31,
+      "community_name": "init",
       "norm_label": "submitchangeusername()"
     },
     {
@@ -6507,8 +6507,8 @@
       "source_location": "L1959",
       "_origin": "ast",
       "id": "web_static_app_loadsecuritysettings",
-      "community": 29,
-      "community_name": "esc",
+      "community": 33,
+      "community_name": "main",
       "norm_label": "loadsecuritysettings()"
     },
     {
@@ -6518,8 +6518,8 @@
       "source_location": "L1995",
       "_origin": "ast",
       "id": "web_static_app_savesecuritysettings",
-      "community": 29,
-      "community_name": "esc",
+      "community": 33,
+      "community_name": "main",
       "norm_label": "savesecuritysettings()"
     },
     {
@@ -6529,8 +6529,8 @@
       "source_location": "L2028",
       "_origin": "ast",
       "id": "web_static_app_unblockip",
-      "community": 29,
-      "community_name": "esc",
+      "community": 33,
+      "community_name": "main",
       "norm_label": "unblockip()"
     },
     {
@@ -6540,8 +6540,8 @@
       "source_location": "L2048",
       "_origin": "ast",
       "id": "web_static_app_openbranchesmodal",
-      "community": 29,
-      "community_name": "esc",
+      "community": 33,
+      "community_name": "main",
       "norm_label": "openbranchesmodal()"
     },
     {
@@ -6573,8 +6573,8 @@
       "source_location": "L2064",
       "_origin": "ast",
       "id": "web_static_app_loadbusinessunits",
-      "community": 29,
-      "community_name": "esc",
+      "community": 33,
+      "community_name": "main",
       "norm_label": "loadbusinessunits()"
     },
     {
@@ -6584,8 +6584,8 @@
       "source_location": "L2069",
       "_origin": "ast",
       "id": "web_static_app_selectedbusinessunits",
-      "community": 29,
-      "community_name": "esc",
+      "community": 33,
+      "community_name": "main",
       "norm_label": "selectedbusinessunits()"
     },
     {
@@ -6595,8 +6595,8 @@
       "source_location": "L2070",
       "_origin": "ast",
       "id": "web_static_app_addbusinessunit",
-      "community": 29,
-      "community_name": "esc",
+      "community": 33,
+      "community_name": "main",
       "norm_label": "addbusinessunit()"
     },
     {
@@ -6606,8 +6606,8 @@
       "source_location": "L2072",
       "_origin": "ast",
       "id": "web_static_app_closebranchesmodal",
-      "community": 29,
-      "community_name": "esc",
+      "community": 33,
+      "community_name": "main",
       "norm_label": "closebranchesmodal()"
     },
     {
@@ -6617,8 +6617,8 @@
       "source_location": "L2078",
       "_origin": "ast",
       "id": "web_static_app_renamelocationtype",
-      "community": 29,
-      "community_name": "esc",
+      "community": 33,
+      "community_name": "main",
       "norm_label": "renamelocationtype()"
     },
     {
@@ -6628,8 +6628,8 @@
       "source_location": "L2093",
       "_origin": "ast",
       "id": "web_static_app_loadbranchesmanagement",
-      "community": 29,
-      "community_name": "esc",
+      "community": 33,
+      "community_name": "main",
       "norm_label": "loadbranchesmanagement()"
     },
     {
@@ -6639,8 +6639,8 @@
       "source_location": "L2114",
       "_origin": "ast",
       "id": "web_static_app_createbranch",
-      "community": 29,
-      "community_name": "esc",
+      "community": 33,
+      "community_name": "main",
       "norm_label": "createbranch()"
     },
     {
@@ -6650,8 +6650,8 @@
       "source_location": "L2127",
       "_origin": "ast",
       "id": "web_static_app_editbranch",
-      "community": 29,
-      "community_name": "esc",
+      "community": 33,
+      "community_name": "main",
       "norm_label": "editbranch()"
     },
     {
@@ -6661,8 +6661,8 @@
       "source_location": "L2145",
       "_origin": "ast",
       "id": "web_static_app_deletebranch",
-      "community": 29,
-      "community_name": "esc",
+      "community": 33,
+      "community_name": "main",
       "norm_label": "deletebranch()"
     },
     {
@@ -6672,8 +6672,8 @@
       "source_location": "L2158",
       "_origin": "ast",
       "id": "web_static_app_opendownloadagentmodal",
-      "community": 29,
-      "community_name": "esc",
+      "community": 32,
+      "community_name": "loadBranchAssets",
       "norm_label": "opendownloadagentmodal()"
     },
     {
@@ -6688,10 +6688,21 @@
       "norm_label": "closedownloadagentmodal()"
     },
     {
-      "label": "submitDownloadAgentPackage()",
+      "label": "copyDownloadAgentLink()",
       "file_type": "code",
       "source_file": "web/static/app.js",
       "source_location": "L2187",
+      "_origin": "ast",
+      "id": "web_static_app_copydownloadagentlink",
+      "community": 33,
+      "community_name": "main",
+      "norm_label": "copydownloadagentlink()"
+    },
+    {
+      "label": "submitDownloadAgentPackage()",
+      "file_type": "code",
+      "source_file": "web/static/app.js",
+      "source_location": "L2209",
       "_origin": "ast",
       "id": "web_static_app_submitdownloadagentpackage",
       "community": 26,
@@ -6702,18 +6713,18 @@
       "label": "openRolesModal()",
       "file_type": "code",
       "source_file": "web/static/app.js",
-      "source_location": "L2214",
+      "source_location": "L2236",
       "_origin": "ast",
       "id": "web_static_app_openrolesmodal",
-      "community": 29,
-      "community_name": "esc",
+      "community": 32,
+      "community_name": "loadBranchAssets",
       "norm_label": "openrolesmodal()"
     },
     {
       "label": "closeRolesModal()",
       "file_type": "code",
       "source_file": "web/static/app.js",
-      "source_location": "L2219",
+      "source_location": "L2241",
       "_origin": "ast",
       "id": "web_static_app_closerolesmodal",
       "community": 26,
@@ -6724,11 +6735,11 @@
       "label": "loadRoles()",
       "file_type": "code",
       "source_file": "web/static/app.js",
-      "source_location": "L2223",
+      "source_location": "L2245",
       "_origin": "ast",
       "id": "web_static_app_loadroles",
-      "community": 29,
-      "community_name": "esc",
+      "community": 32,
+      "community_name": "loadBranchAssets",
       "norm_label": "loadroles()"
     },
     {
@@ -7948,8 +7959,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "docs_04_api_reference",
-      "community": 46,
-      "community_name": "Daftar API",
+      "community": 9,
+      "community_name": "Community 9",
       "norm_label": "04-api-reference.md"
     },
     {
@@ -7959,8 +7970,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "docs_04_api_reference_api_reference",
-      "community": 46,
-      "community_name": "Daftar API",
+      "community": 9,
+      "community_name": "Community 9",
       "norm_label": "api reference"
     },
     {
@@ -7970,8 +7981,8 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "docs_04_api_reference_cara_autentikasi",
-      "community": 46,
-      "community_name": "Daftar API",
+      "community": 9,
+      "community_name": "Community 9",
       "norm_label": "cara autentikasi"
     },
     {
@@ -7981,8 +7992,8 @@
       "source_location": "L15",
       "_origin": "ast",
       "id": "docs_04_api_reference_cara_1_pakai_token_dari_login",
-      "community": 46,
-      "community_name": "Daftar API",
+      "community": 9,
+      "community_name": "Community 9",
       "norm_label": "cara 1: pakai token dari login"
     },
     {
@@ -7992,8 +8003,8 @@
       "source_location": "L35",
       "_origin": "ast",
       "id": "docs_04_api_reference_cara_2_pakai_api_key_langsung",
-      "community": 46,
-      "community_name": "Daftar API",
+      "community": 9,
+      "community_name": "Community 9",
       "norm_label": "cara 2: pakai api key langsung"
     },
     {
@@ -8102,8 +8113,8 @@
       "source_location": "L234",
       "_origin": "ast",
       "id": "docs_04_api_reference_contoh_script_monitoring_otomatis",
-      "community": 46,
-      "community_name": "Daftar API",
+      "community": 9,
+      "community_name": "Community 9",
       "norm_label": "contoh script: monitoring otomatis"
     },
     {
@@ -8113,8 +8124,8 @@
       "source_location": "L255",
       "_origin": "ast",
       "id": "docs_04_api_reference_error_yang_mungkin_muncul",
-      "community": 46,
-      "community_name": "Daftar API",
+      "community": 9,
+      "community_name": "Community 9",
       "norm_label": "error yang mungkin muncul"
     },
     {
@@ -8179,8 +8190,8 @@
       "source_location": "L59",
       "_origin": "ast",
       "id": "docs_05_architecture_hitungan_memori_kok_bisa_1000_device_di_1_gb",
-      "community": 9,
-      "community_name": "Community 9",
+      "community": 36,
+      "community_name": "Cara Pasang Agent di Komputer",
       "norm_label": "hitungan memori: kok bisa 1000 device di 1 gb?"
     },
     {
@@ -8190,8 +8201,8 @@
       "source_location": "L61",
       "_origin": "ast",
       "id": "docs_05_architecture_setiap_koneksi_agent_pakai_berapa_memori",
-      "community": 9,
-      "community_name": "Community 9",
+      "community": 36,
+      "community_name": "Cara Pasang Agent di Komputer",
       "norm_label": "setiap koneksi agent pakai berapa memori?"
     },
     {
@@ -8201,8 +8212,8 @@
       "source_location": "L74",
       "_origin": "ast",
       "id": "docs_05_architecture_jadi_untuk_1000_device",
-      "community": 9,
-      "community_name": "Community 9",
+      "community": 36,
+      "community_name": "Cara Pasang Agent di Komputer",
       "norm_label": "jadi untuk 1000 device:"
     },
     {
@@ -8212,8 +8223,8 @@
       "source_location": "L88",
       "_origin": "ast",
       "id": "docs_05_architecture_cpu_usage",
-      "community": 9,
-      "community_name": "Community 9",
+      "community": 36,
+      "community_name": "Cara Pasang Agent di Komputer",
       "norm_label": "cpu usage"
     },
     {
@@ -8421,8 +8432,8 @@
       "source_location": "L130",
       "_origin": "ast",
       "id": "docs_06_troubleshooting_masalah_remote_desktop",
-      "community": 51,
-      "community_name": "Masalah Server",
+      "community": 8,
+      "community_name": "Community 8",
       "norm_label": "masalah remote desktop"
     },
     {
@@ -8432,8 +8443,8 @@
       "source_location": "L132",
       "_origin": "ast",
       "id": "docs_06_troubleshooting_klik_connect_tapi_layar_tidak_muncul",
-      "community": 51,
-      "community_name": "Masalah Server",
+      "community": 8,
+      "community_name": "Community 8",
       "norm_label": "\u274c klik connect tapi layar tidak muncul"
     },
     {
@@ -8443,8 +8454,8 @@
       "source_location": "L138",
       "_origin": "ast",
       "id": "docs_06_troubleshooting_remote_desktop_lambat_patah_patah",
-      "community": 51,
-      "community_name": "Masalah Server",
+      "community": 8,
+      "community_name": "Community 8",
       "norm_label": "\u274c remote desktop lambat/patah-patah"
     },
     {
@@ -21966,7 +21977,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "web/static/app.js",
-      "source_location": "L2219",
+      "source_location": "L2241",
       "weight": 1.0,
       "_origin": "ast",
       "source": "web_static_app",
@@ -22037,6 +22048,17 @@
       "_origin": "ast",
       "source": "web_static_app",
       "target": "web_static_app_connectws",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "web/static/app.js",
+      "source_location": "L2187",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "web_static_app",
+      "target": "web_static_app_copydownloadagentlink",
       "confidence_score": 1.0
     },
     {
@@ -22373,7 +22395,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "web/static/app.js",
-      "source_location": "L2223",
+      "source_location": "L2245",
       "weight": 1.0,
       "_origin": "ast",
       "source": "web_static_app",
@@ -22604,7 +22626,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "web/static/app.js",
-      "source_location": "L2214",
+      "source_location": "L2236",
       "weight": 1.0,
       "_origin": "ast",
       "source": "web_static_app",
@@ -23132,7 +23154,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "web/static/app.js",
-      "source_location": "L2187",
+      "source_location": "L2209",
       "weight": 1.0,
       "_origin": "ast",
       "source": "web_static_app",
@@ -23707,7 +23729,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "web/static/app.js",
-      "source_location": "L2226",
+      "source_location": "L2248",
       "weight": 1.0,
       "_origin": "ast",
       "source": "web_static_app_loadroles",
@@ -25555,7 +25577,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "web/static/app.js",
-      "source_location": "L2249",
+      "source_location": "L2271",
       "weight": 1.0,
       "_origin": "ast",
       "source": "web_static_app_loadroles",
@@ -25596,6 +25618,18 @@
       "_origin": "ast",
       "source": "web_static_app_opendownloadagentmodal",
       "target": "web_static_app_esc",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "web/static/app.js",
+      "source_location": "L2200",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "web_static_app_copydownloadagentlink",
+      "target": "web_static_app_showtoast",
       "confidence_score": 1.0
     },
     {
@@ -25747,7 +25781,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "web/static/app.js",
-      "source_location": "L2197",
+      "source_location": "L2219",
       "weight": 1.0,
       "_origin": "ast",
       "source": "web_static_app_submitdownloadagentpackage",
@@ -26047,7 +26081,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "web/static/app.js",
-      "source_location": "L2207",
+      "source_location": "L2229",
       "weight": 1.0,
       "_origin": "ast",
       "source": "web_static_app_submitdownloadagentpackage",
@@ -26059,7 +26093,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "web/static/app.js",
-      "source_location": "L2216",
+      "source_location": "L2238",
       "weight": 1.0,
       "_origin": "ast",
       "source": "web_static_app_openrolesmodal",
@@ -27973,5 +28007,5 @@
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "77f0c1af621c15eb833378000500d611f848dd3e"
+  "built_at_commit": "c10ed98c26b84eafa809ce1ee5511736326d04a8"
 }
