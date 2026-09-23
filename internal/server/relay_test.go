@@ -36,14 +36,22 @@ func TestRelayRejectsUnauthorizedConnectionsBeforeUpgrade(t *testing.T) {
 	}
 	s := &Server{db: db, hub: NewHub(db), cfg: Config{APIKey: "agent-key", JWTSecret: "jwt-secret"}}
 
+	for _, u := range []struct{ name, role, branch string }{{"holder", "user", "Bandung"}, {"adh-medan", "adh", "Medan"}} {
+		if err := db.CreateUser(u.name, "fixture", u.role, u.branch); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := db.db.Exec(`UPDATE users SET mfa_enabled=1, mfa_secret='fixture', must_change_password=0 WHERE username=?`, u.name); err != nil {
+			t.Fatal(err)
+		}
+	}
 	tests := []struct {
 		name string
 		url  string
 		code int
 	}{
 		{name: "viewer without token", url: "/ws/relay/sess-1/viewer?device_id=device-1", code: http.StatusUnauthorized},
-		{name: "holder cannot remote", url: "/ws/relay/sess-1/viewer?device_id=device-1&token=" + generateToken("holder", "user", "Bandung", "jwt-secret"), code: http.StatusForbidden},
-		{name: "adh other branch", url: "/ws/relay/sess-1/viewer?device_id=device-1&token=" + generateToken("adh-medan", "adh", "Medan", "jwt-secret"), code: http.StatusForbidden},
+		{name: "holder cannot remote", url: "/ws/relay/sess-1/viewer?device_id=device-1&token=" + s.issueCredentialToken("holder", "session"), code: http.StatusForbidden},
+		{name: "adh other branch", url: "/ws/relay/sess-1/viewer?device_id=device-1&token=" + s.issueCredentialToken("adh-medan", "session"), code: http.StatusForbidden},
 		{name: "agent wrong key", url: "/ws/relay/sess-1/agent?device_id=device-1&key=wrong", code: http.StatusUnauthorized},
 	}
 	for _, test := range tests {

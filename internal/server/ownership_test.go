@@ -181,7 +181,7 @@ func TestHolderCannotAccessUnrelatedRoutes(t *testing.T) {
 	s := &Server{db: db, cfg: Config{APIKey: "private-agent-key", JWTSecret: "test-secret"}}
 	for _, path := range []string{"/ws/viewer", "/api/logs/another-device", "/api/agent/package", "/api/users", "/api/network-scans"} {
 		r := httptest.NewRequest("GET", path, nil)
-		r.Header.Set("Authorization", "Bearer "+generateToken("holder", "user", "Bandung", s.cfg.JWTSecret))
+		r.Header.Set("Authorization", "Bearer "+s.issueCredentialToken("holder", "session"))
 		w := httptest.NewRecorder()
 		s.authMiddleware(func(w http.ResponseWriter, r *http.Request) { t.Error("forbidden handler reached: " + path) })(w, r)
 		if w.Code != 403 {
@@ -528,7 +528,7 @@ func TestMasterRoleAndITSupportPermissions(t *testing.T) {
 		t.Fatal("it_support role not found in master roles")
 	}
 
-	rCreate := httptest.NewRequest("POST", "/api/users", strings.NewReader(`{"username":"andi_it","password":"secretpassword","role":"it_support","branch":""}`))
+	rCreate := httptest.NewRequest("POST", "/api/users", strings.NewReader(`{"username":"andi_it","password":"unique initial phrase 492","role":"it_support","branch":""}`))
 	wCreate := httptest.NewRecorder()
 	s.handleUsers(wCreate, rCreate.WithContext(context.WithValue(rCreate.Context(), userClaimsKey, adminClaims)))
 	if wCreate.Code != 201 {

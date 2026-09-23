@@ -224,6 +224,8 @@ func migrate(db *sql.DB) error {
 
 	// Dynamic column migrations for existing databases
 	alters := []string{
+		`ALTER TABLE users ADD COLUMN mfa_pending_secret TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE users ADD COLUMN must_change_password INTEGER NOT NULL DEFAULT 0`,
 		`ALTER TABLE users ADD COLUMN branch TEXT NOT NULL DEFAULT ''`,
 		`ALTER TABLE users ADD COLUMN mfa_enabled INTEGER NOT NULL DEFAULT 0`,
 		`ALTER TABLE users ADD COLUMN mfa_secret TEXT NOT NULL DEFAULT ''`,
@@ -508,7 +510,7 @@ func (d *DB) Stats() (map[string]interface{}, error) {
 
 func (d *DB) EnsureAdmin(username, passwordHash string) error {
 	_, err := d.db.Exec(
-		`INSERT OR IGNORE INTO users (username, password_hash, role, branch) VALUES (?, ?, 'admin', '')`,
+		`INSERT OR IGNORE INTO users (username, password_hash, role, branch, must_change_password) VALUES (?, ?, 'admin', '', 1)`,
 		username, passwordHash)
 	return err
 }
@@ -542,7 +544,7 @@ func (d *DB) ListUsers() ([]models.User, error) {
 
 func (d *DB) CreateUser(username, passwordHash, role, branch string) error {
 	_, err := d.db.Exec(
-		`INSERT INTO users (username, password_hash, role, branch) VALUES (?, ?, ?, ?)`,
+		`INSERT INTO users (username, password_hash, role, branch, must_change_password) VALUES (?, ?, ?, ?, 1)`,
 		username, passwordHash, role, branch)
 	return err
 }
@@ -608,9 +610,12 @@ func (d *DB) UpdateUser(id int64, newUsername, newPassword, newRole, newBranch s
 		}
 	}
 
-	if strings.TrimSpace(newPassword) != "" {
+	if newPassword != "" {
+		if err := validatePassword(newPassword); err != nil {
+			return err
+		}
 		newHash := hashPassword(newPassword)
-		_, err = tx.Exec(`UPDATE users SET username=?, role=?, branch=?, password_hash=? WHERE id=?`,
+		_, err = tx.Exec(`UPDATE users SET username=?, role=?, branch=?, password_hash=?, must_change_password=1 WHERE id=?`,
 			newUsername, newRole, newBranch, newHash, id)
 	} else {
 		_, err = tx.Exec(`UPDATE users SET username=?, role=?, branch=? WHERE id=?`,
@@ -674,7 +679,7 @@ func (d *DB) UpdateUsername(oldUsername, newUsername string) error {
 }
 
 func (d *DB) UpdatePassword(username, passwordHash string) error {
-	_, err := d.db.Exec(`UPDATE users SET password_hash=? WHERE username=?`, passwordHash, username)
+	_, err := d.db.Exec(`UPDATE users SET password_hash=?, must_change_password=0 WHERE username=?`, passwordHash, username)
 	return err
 }
 
@@ -769,12 +774,12 @@ func (d *DB) SetUserMFA(username, secret string, enabled bool) error {
 }
 
 func (d *DB) ResetUserMFA(id int64) error {
-	_, err := d.db.Exec(`UPDATE users SET mfa_enabled=0, mfa_secret='' WHERE id=?`, id)
+	_, err := d.db.Exec(`UPDATE users SET mfa_enabled=0, mfa_secret='', mfa_pending_secret='' WHERE id=?`, id)
 	return err
 }
 
 func (d *DB) ResetUserPassword(id int64, passwordHash string) error {
-	_, err := d.db.Exec(`UPDATE users SET password_hash=? WHERE id=?`, passwordHash, id)
+	_, err := d.db.Exec(`UPDATE users SET password_hash=?, must_change_password=1 WHERE id=?`, passwordHash, id)
 	return err
 }
 

@@ -560,13 +560,10 @@
       </div>
       <p style="font-size:13px;color:var(--fg2);margin-bottom:18px">Akun Anda dilindungi dengan autentikasi dua faktor (Google / Microsoft Authenticator). Setiap login membutuhkan 6 digit kode dari HP Anda.</p>
       
-      <div style="background:var(--bg3);padding:14px;border-radius:var(--radius);text-align:left;margin-bottom:14px">
-        <label style="font-size:12px;color:var(--fg2);display:block;margin-bottom:6px">Konfirmasi Password untuk Menonaktifkan:</label>
-        <input type="password" id="mfaDisablePass" placeholder="Password saat ini">
-      </div>
-      <button class="btn btn-danger btn-sm" onclick="submitDisableMFA()">Nonaktifkan 2FA</button>
+      <p style="font-size:12px;color:var(--fg2)">MFA wajib aktif. Jika kehilangan authenticator, hubungi admin untuk reset.</p>
     </div>
 
+    <button class="btn btn-ghost btn-sm" onclick="doLogout()">Keluar</button>
     <div id="mfaSetupSection" style="display:none">
       <p style="font-size:12px;color:var(--fg2);margin-bottom:12px">Pindai QR code ini menggunakan aplikasi <strong>Google Authenticator</strong>, <strong>Microsoft Authenticator</strong>, atau 1Password di HP Anda:</p>
       
@@ -587,8 +584,7 @@
       <p id="mfaError" style="color:var(--red);font-size:12px;display:none;margin-bottom:10px"></p>
       
       <div class="modal-actions">
-        <button class="btn btn-ghost" onclick="closeMFAModal()">Batal</button>
-        <button class="btn btn-primary" onclick="submitEnableMFA()">Aktifkan 2FA Sekarang</button>
+        <button class="btn btn-primary" style="width:100%" onclick="submitEnableMFA()">Aktifkan 2FA Sekarang</button>
       </div>
     </div>
 
@@ -786,14 +782,14 @@
 <div id="changePasswordModal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeChangePasswordModal()">
   <div class="modal" style="max-width:440px">
     <h3>&#128273; Ganti Password Akun</h3>
-    <p style="font-size:12px;color:var(--fg2);margin-bottom:14px">Masukkan password saat ini dan password baru minimal 8 karakter.</p>
+    <p style="font-size:12px;color:var(--fg2);margin-bottom:14px">Gunakan password unik sepanjang 15-128 karakter. Frasa dengan spasi diperbolehkan. Password awal dari admin wajib diganti.</p>
     <div class="form-group">
       <label>Password Saat Ini (Lama)</label>
       <input type="password" id="cpOldPass" placeholder="Password saat ini" autocomplete="current-password">
     </div>
     <div class="form-group">
-      <label>Password Baru (Min. 8 Karakter)</label>
-      <input type="password" id="cpNewPass" placeholder="Minimal 8 karakter" autocomplete="new-password">
+      <label>Password Baru (15-128 Karakter)</label>
+      <input type="password" id="cpNewPass" placeholder="Minimal 15 karakter" autocomplete="new-password">
     </div>
     <div class="form-group">
       <label>Konfirmasi Password Baru</label>
@@ -801,7 +797,8 @@
     </div>
     <p id="cpError" style="color:var(--red);font-size:12px;display:none;margin-bottom:10px"></p>
     <div class="modal-actions">
-      <button class="btn btn-ghost" onclick="closeChangePasswordModal()">Batal</button>
+      <button class="btn btn-ghost" onclick="doLogout()">Keluar</button>
+      <button id="cpCancel" class="btn btn-ghost" onclick="closeChangePasswordModal()">Batal</button>
       <button class="btn btn-primary" onclick="submitChangePassword()">Simpan Password</button>
     </div>
   </div>

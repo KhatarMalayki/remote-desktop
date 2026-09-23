@@ -290,7 +290,10 @@ func New(cfg Config, webFS embed.FS) (*Server, error) {
 	}
 
 	passHash := hashPassword(cfg.AdminPass)
-	db.EnsureAdmin(cfg.AdminUser, passHash)
+	if err := db.EnsureAdmin(cfg.AdminUser, passHash); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("admin init: %w", err)
+	}
 
 	sub, err := fs.Sub(webFS, "web")
 	if err != nil {
@@ -407,8 +410,8 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, storedHash, role, branch, err := s.db.GetUser(req.Username)
-	if err != nil || storedHash != hashPassword(req.Password) {
+	_, storedHash, role, _, err := s.db.GetUser(req.Username)
+	if err != nil || !verifyPassword(storedHash, req.Password) {
 		recordLoginFail(ip)
 		_ = s.db.RecordAuthLog(req.Username, ip, "failed", "Password salah atau username tidak ditemukan", r.UserAgent())
 		log.Printf("[security] LOGIN FAILED ip=%s username=%s", ip, req.Username)
@@ -416,14 +419,31 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	mfaEnabled, mfaSecret, _ := s.db.GetUserMFA(req.Username)
+	if !strings.HasPrefix(storedHash, "pbkdf2-sha256$") {
+		// Preserve forced-change status while upgrading a legacy credential.
+		if _, err := s.db.db.Exec(`UPDATE users SET password_hash=? WHERE username=? AND password_hash=?`, hashPassword(req.Password), req.Username, storedHash); err != nil {
+			jsonError(w, "Gagal memperbarui keamanan password", 500)
+			return
+		}
+	}
+	if validatePassword(req.Password) != nil {
+		if _, err := s.db.db.Exec(`UPDATE users SET must_change_password=1 WHERE username=?`, req.Username); err != nil {
+			jsonError(w, "Gagal memeriksa akun", 500)
+			return
+		}
+	}
+	mfaEnabled, mfaSecret, mfaErr := s.db.GetUserMFA(req.Username)
+	if mfaErr != nil {
+		jsonError(w, "Gagal memeriksa MFA", 500)
+		return
+	}
 	trusted := false
 	if c, err := r.Cookie("rd_trusted_device"); err == nil {
-		trusted = s.db.IsTrustedDevice(req.Username, hashPassword(c.Value))
+		trusted = s.db.IsTrustedDevice(req.Username, s.trustedDeviceDigest(req.Username, c.Value))
 	}
 	if mfaEnabled && !trusted {
 		if req.Code == "" {
-			ticket := generateMFATicket(req.Username, role, branch, s.cfg.JWTSecret)
+			ticket := s.issueCredentialToken(req.Username, "challenge")
 			jsonResp(w, map[string]interface{}{
 				"mfa_required": true,
 				"mfa_ticket":   ticket,
@@ -443,21 +463,21 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	recordLoginSuccess(ip)
 	_ = s.db.RecordAuthLog(req.Username, ip, "success", "Login berhasil", r.UserAgent())
 	log.Printf("[security] LOGIN SUCCESS ip=%s username=%s role=%s", ip, req.Username, role)
-	token := generateToken(req.Username, role, branch, s.cfg.JWTSecret)
+	// Only verified MFA or enrollment gets a credential token.
 	if req.RememberDevice && mfaEnabled {
 		s.setTrustedDeviceCookie(w, req.Username)
 	}
-	jsonResp(w, map[string]string{
-		"token":    token,
-		"username": req.Username,
-		"role":     role,
-		"branch":   branch,
-	}, 200)
+	s.writeSession(w, req.Username)
 }
 
 func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
 	claims := getClaims(r)
-	jsonResp(w, claims, 200)
+	_, _, enabled, mustChange, err := s.accountState(claims.Username)
+	if err != nil {
+		jsonError(w, "Akun tidak ditemukan", 401)
+		return
+	}
+	jsonResp(w, map[string]interface{}{"username": claims.Username, "role": claims.Role, "branch": claims.Branch, "mfa_enabled": enabled, "must_change_password": mustChange}, 200)
 }
 
 func (s *Server) handleDevices(w http.ResponseWriter, r *http.Request) {
@@ -1465,6 +1485,10 @@ func (s *Server) handleUsers(w http.ResponseWriter, r *http.Request) {
 			jsonError(w, "username and password are required", 400)
 			return
 		}
+		if err := validatePassword(req.Password); err != nil {
+			jsonError(w, err.Error(), 400)
+			return
+		}
 		if req.Role == "" {
 			req.Role = "adh"
 		}
@@ -1603,9 +1627,8 @@ func (s *Server) handleRelayWS(w http.ResponseWriter, r *http.Request) {
 
 	switch role {
 	case "viewer":
-		claims, ok := parseToken(r.URL.Query().Get("token"), s.cfg.JWTSecret)
+		claims, ok := s.authorizeUserToken(w, r, r.URL.Query().Get("token"))
 		if !ok {
-			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}
 		if claims.Role == "viewer" || isAssetHolderRole(claims.Role) {
@@ -1835,7 +1858,7 @@ func (s *Server) authMiddleware(next http.HandlerFunc) http.HandlerFunc {
 				token = r.URL.Query().Get("key")
 			}
 			if token != "" {
-				if token == s.cfg.APIKey {
+				if s.cfg.APIKey != "" && token == s.cfg.APIKey {
 					ctx := context.WithValue(r.Context(), userClaimsKey, &UserClaims{
 						Username: "api_key",
 						Role:     "admin",
@@ -1843,11 +1866,12 @@ func (s *Server) authMiddleware(next http.HandlerFunc) http.HandlerFunc {
 					next(w, r.WithContext(ctx))
 					return
 				}
-				if claims, ok := parseToken(token, s.cfg.JWTSecret); ok {
+				if claims, ok := s.authorizeUserToken(w, r, token); ok {
 					ctx := context.WithValue(r.Context(), userClaimsKey, claims)
 					next(w, r.WithContext(ctx))
 					return
 				}
+				return
 			}
 			http.Error(w, "unauthorized", 401)
 			return
@@ -1860,7 +1884,7 @@ func (s *Server) authMiddleware(next http.HandlerFunc) http.HandlerFunc {
 			auth = strings.TrimPrefix(auth, "Bearer ")
 		}
 
-		if auth == s.cfg.APIKey {
+		if s.cfg.APIKey != "" && auth == s.cfg.APIKey {
 			ctx := context.WithValue(r.Context(), userClaimsKey, &UserClaims{
 				Username: "api_key",
 				Role:     "admin",
@@ -1869,13 +1893,12 @@ func (s *Server) authMiddleware(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
-		if claims, ok := parseToken(auth, s.cfg.JWTSecret); ok {
+		if claims, ok := s.authorizeUserToken(w, r, auth); ok {
 			ctx := context.WithValue(r.Context(), userClaimsKey, claims)
 			next(w, r.WithContext(ctx))
 			return
 		}
 
-		jsonError(w, "unauthorized", 401)
 	}
 }
 
@@ -1897,58 +1920,9 @@ func jsonError(w http.ResponseWriter, msg string, status int) {
 	jsonResp(w, map[string]string{"error": msg}, status)
 }
 
-func hashPassword(pass string) string {
+func tokenDigest(pass string) string {
 	h := sha256.Sum256([]byte(pass))
 	return hex.EncodeToString(h[:])
-}
-
-func generateToken(username, role, branch, secret string) string {
-	payload := fmt.Sprintf("%s|%s|%s|%d", username, role, branch, time.Now().Add(24*time.Hour).Unix())
-	h := sha256.Sum256([]byte(payload + secret))
-	sig := hex.EncodeToString(h[:8])
-	return hex.EncodeToString([]byte(payload)) + "." + sig
-}
-
-func parseToken(token, secret string) (*UserClaims, bool) {
-	parts := strings.SplitN(token, ".", 2)
-	if len(parts) != 2 {
-		return nil, false
-	}
-	payloadBytes, err := hex.DecodeString(parts[0])
-	if err != nil {
-		return nil, false
-	}
-	payload := string(payloadBytes)
-
-	h := sha256.Sum256([]byte(payload + secret))
-	expectedSig := hex.EncodeToString(h[:8])
-	if parts[1] != expectedSig {
-		return nil, false
-	}
-
-	fields := strings.Split(payload, "|")
-	if len(fields) == 4 {
-		exp, err := strconv.ParseInt(fields[3], 10, 64)
-		if err != nil || time.Now().Unix() >= exp {
-			return nil, false
-		}
-		return &UserClaims{
-			Username: fields[0],
-			Role:     fields[1],
-			Branch:   fields[2],
-		}, true
-	} else if len(fields) == 3 {
-		exp, err := strconv.ParseInt(fields[2], 10, 64)
-		if err != nil || time.Now().Unix() >= exp {
-			return nil, false
-		}
-		return &UserClaims{
-			Username: fields[0],
-			Role:     fields[1],
-			Branch:   "",
-		}, true
-	}
-	return nil, false
 }
 
 func (s *Server) handleAgentVersion(w http.ResponseWriter, r *http.Request) {
@@ -1960,14 +1934,13 @@ func (s *Server) handleAgentVersion(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleAgentDownload(w http.ResponseWriter, r *http.Request) {
 	key := r.URL.Query().Get("key")
-	if key != s.cfg.APIKey {
+	if s.cfg.APIKey == "" || key != s.cfg.APIKey {
 		auth := r.Header.Get("Authorization")
 		token := strings.TrimPrefix(auth, "Bearer ")
 		if token == "" {
 			token = r.URL.Query().Get("token")
 		}
-		if token != s.cfg.APIKey && func() bool { _, ok := parseToken(token, s.cfg.JWTSecret); return !ok }() {
-			http.Error(w, "unauthorized", 401)
+		if (s.cfg.APIKey == "" || token != s.cfg.APIKey) && func() bool { _, ok := s.authorizeUserToken(w, r, token); return !ok }() {
 			return
 		}
 	}
@@ -2319,8 +2292,8 @@ func (s *Server) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if len(req.NewPassword) < 8 {
-		jsonError(w, "Password baru minimal 8 karakter", 400)
+	if err := validatePassword(req.NewPassword); err != nil {
+		jsonError(w, err.Error(), 400)
 		return
 	}
 	if req.NewPassword != req.ConfirmPassword {
@@ -2337,7 +2310,7 @@ func (s *Server) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "user not found", 404)
 		return
 	}
-	if storedHash != hashPassword(req.OldPassword) {
+	if !verifyPassword(storedHash, req.OldPassword) {
 		jsonError(w, "Password lama salah", 400)
 		return
 	}
@@ -2350,7 +2323,7 @@ func (s *Server) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 	s.db.RevokeTrustedDevices(claims.Username)
 
 	log.Printf("[auth] user %s successfully changed password", claims.Username)
-	jsonResp(w, map[string]string{"status": "success", "message": "Password berhasil diubah"}, 200)
+	jsonResp(w, map[string]string{"status": "success", "message": "Password berhasil diubah", "token": s.issueCredentialToken(claims.Username, "session")}, 200)
 }
 
 func (s *Server) handleUserSubroute(w http.ResponseWriter, r *http.Request) {
@@ -2446,8 +2419,8 @@ func (s *Server) handleResetUserPassword(w http.ResponseWriter, r *http.Request)
 		jsonError(w, "invalid request body", 400)
 		return
 	}
-	if len(req.NewPassword) < 8 {
-		jsonError(w, "Password baru minimal 8 karakter", 400)
+	if err := validatePassword(req.NewPassword); err != nil {
+		jsonError(w, err.Error(), 400)
 		return
 	}
 
@@ -2487,8 +2460,8 @@ func (s *Server) handleLoginMFA(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	claims, ok := parseMFATicket(req.MFATicket, s.cfg.JWTSecret)
-	if !ok {
+	claims, kind, enabled, _, ok := s.readCredentialToken(req.MFATicket)
+	if !ok || kind != "challenge" || !enabled {
 		jsonError(w, "Sesi 2FA kedaluwarsa, silakan login ulang", 401)
 		return
 	}
@@ -2505,16 +2478,11 @@ func (s *Server) handleLoginMFA(w http.ResponseWriter, r *http.Request) {
 	recordLoginSuccess(ip)
 	_ = s.db.RecordAuthLog(claims.Username, ip, "success", "Login 2FA berhasil", r.UserAgent())
 	log.Printf("[security] MFA LOGIN SUCCESS ip=%s username=%s role=%s", ip, claims.Username, claims.Role)
-	token := generateToken(claims.Username, claims.Role, claims.Branch, s.cfg.JWTSecret)
+	// MFA verified; issue a fresh account-bound session.
 	if req.RememberDevice {
 		s.setTrustedDeviceCookie(w, claims.Username)
 	}
-	jsonResp(w, map[string]string{
-		"token":    token,
-		"username": claims.Username,
-		"role":     claims.Role,
-		"branch":   claims.Branch,
-	}, 200)
+	s.writeSession(w, claims.Username)
 }
 
 func (s *Server) setTrustedDeviceCookie(w http.ResponseWriter, username string) {
@@ -2524,7 +2492,7 @@ func (s *Server) setTrustedDeviceCookie(w http.ResponseWriter, username string) 
 	}
 	value := hex.EncodeToString(b)
 	expires := time.Now().Add(14 * 24 * time.Hour)
-	if s.db.TrustDevice(username, hashPassword(value), expires) != nil {
+	if s.db.TrustDevice(username, s.trustedDeviceDigest(username, value), expires) != nil {
 		return
 	}
 	http.SetCookie(w, &http.Cookie{Name: "rd_trusted_device", Value: value, Path: "/", Expires: expires, MaxAge: 14 * 24 * 60 * 60, HttpOnly: true, Secure: true, SameSite: http.SameSiteLaxMode})
@@ -2546,7 +2514,16 @@ func (s *Server) handleMFASetup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	claims := getClaims(r)
+	enabled, _, err := s.db.GetUserMFA(claims.Username)
+	if err != nil || enabled {
+		jsonError(w, "MFA sudah aktif atau akun tidak tersedia", 409)
+		return
+	}
 	secret := GenerateTOTPSecret()
+	if _, err := s.db.db.Exec(`UPDATE users SET mfa_pending_secret=? WHERE username=? AND mfa_enabled=0`, secret, claims.Username); err != nil {
+		jsonError(w, "Gagal menyiapkan MFA", 500)
+		return
+	}
 	otpauthURL := fmt.Sprintf("otpauth://totp/RemoteDesk:%s?secret=%s&issuer=RemoteDesk", url.PathEscape(claims.Username), secret)
 	jsonResp(w, map[string]string{
 		"secret":      secret,
@@ -2570,48 +2547,38 @@ func (s *Server) handleMFAEnable(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !ValidateTOTPCode(req.Secret, req.Code) {
+	var pending string
+	if err := s.db.db.QueryRow(`SELECT mfa_pending_secret FROM users WHERE username=? AND mfa_enabled=0`, claims.Username).Scan(&pending); err != nil || pending == "" {
+		jsonError(w, "Mulai setup MFA terlebih dahulu", 409)
+		return
+	}
+	if !s.checkLoginRateLimit("mfa-setup:" + claims.Username) {
+		jsonError(w, "Terlalu banyak kode salah; coba lagi nanti", 429)
+		return
+	}
+	if !ValidateTOTPCode(pending, req.Code) {
+		recordLoginFail("mfa-setup:" + claims.Username)
 		jsonError(w, "Kode 2FA salah, pastikan waktu di HP Anda sudah akurat", 400)
 		return
 	}
 
-	if err := s.db.SetUserMFA(claims.Username, req.Secret, true); err != nil {
+	result, err := s.db.db.Exec(`UPDATE users SET mfa_enabled=1, mfa_secret=?, mfa_pending_secret='' WHERE username=? AND mfa_enabled=0 AND mfa_pending_secret=?`, pending, claims.Username, pending)
+	if err != nil {
 		jsonError(w, err.Error(), 500)
 		return
 	}
 
+	if n, _ := result.RowsAffected(); n != 1 {
+		jsonError(w, "Setup MFA berubah; silakan ulangi", 409)
+		return
+	}
+	recordLoginSuccess("mfa-setup:" + claims.Username)
 	log.Printf("[mfa] user %s enabled 2FA / MFA", claims.Username)
-	jsonResp(w, map[string]string{"status": "success", "message": "2FA / MFA berhasil diaktifkan"}, 200)
+	jsonResp(w, map[string]string{"status": "success", "message": "2FA / MFA berhasil diaktifkan", "token": s.issueCredentialToken(claims.Username, "session")}, 200)
 }
 
 func (s *Server) handleMFADisable(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "method not allowed", 405)
-		return
-	}
-	claims := getClaims(r)
-
-	var req struct {
-		Password string `json:"password"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		jsonError(w, "invalid body", 400)
-		return
-	}
-
-	_, storedHash, _, _, err := s.db.GetUser(claims.Username)
-	if err != nil || storedHash != hashPassword(req.Password) {
-		jsonError(w, "Password salah", 400)
-		return
-	}
-
-	if err := s.db.SetUserMFA(claims.Username, "", false); err != nil {
-		jsonError(w, err.Error(), 500)
-		return
-	}
-
-	log.Printf("[mfa] user %s disabled 2FA / MFA", claims.Username)
-	jsonResp(w, map[string]string{"status": "success", "message": "2FA / MFA dinonaktifkan"}, 200)
+	jsonError(w, "MFA wajib aktif. Hubungi admin untuk reset jika kehilangan authenticator.", 403)
 }
 
 func (s *Server) handleResetUserMFA(w http.ResponseWriter, r *http.Request) {
@@ -2669,8 +2636,8 @@ func (s *Server) handleChangeUsername(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Verify current password
-	_, storedHash, role, branch, err := s.db.GetUser(claims.Username)
-	if err != nil || storedHash != hashPassword(req.Password) {
+	_, storedHash, _, _, err := s.db.GetUser(claims.Username)
+	if err != nil || !verifyPassword(storedHash, req.Password) {
 		jsonError(w, "Password salah", 400)
 		return
 	}
@@ -2686,7 +2653,7 @@ func (s *Server) handleChangeUsername(w http.ResponseWriter, r *http.Request) {
 	}
 
 	log.Printf("[auth] user %s renamed to %s", claims.Username, newUsername)
-	token := generateToken(newUsername, role, branch, s.cfg.JWTSecret)
+	token := s.issueCredentialToken(newUsername, "session")
 	jsonResp(w, map[string]interface{}{
 		"status":   "success",
 		"message":  "Username berhasil diubah",

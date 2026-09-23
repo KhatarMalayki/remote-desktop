@@ -190,9 +190,12 @@ func TestBranchManagement(t *testing.T) {
 }
 
 func TestTokenClaims(t *testing.T) {
-	secret := "secret-jwt-key"
-	tok := generateToken("adh_bdg", "adh", "Bandung", secret)
-	claims, ok := parseToken(tok, secret)
+	s := securityServer(t)
+	if err := s.db.CreateUser("adh_bdg", "fixture", "adh", "Bandung"); err != nil {
+		t.Fatal(err)
+	}
+	tok := s.issueCredentialToken("adh_bdg", "session")
+	claims, _, _, _, ok := s.readCredentialToken(tok)
 	if !ok {
 		t.Fatalf("failed to parse token")
 	}
@@ -280,7 +283,7 @@ func TestChangePasswordAndRateLimit(t *testing.T) {
 	}
 
 	// 1. Test change password with wrong old password
-	bodyWrong := strings.NewReader(`{"old_password":"wrong","new_password":"newpassword123","confirm_password":"newpassword123"}`)
+	bodyWrong := strings.NewReader(`{"old_password":"wrong","new_password":"unique new password 492","confirm_password":"unique new password 492"}`)
 	reqWrong := httptest.NewRequest("POST", "/api/auth/change-password", bodyWrong)
 	ctx := context.WithValue(reqWrong.Context(), userClaimsKey, &UserClaims{Username: "admin", Role: "admin"})
 	wWrong := httptest.NewRecorder()
@@ -290,7 +293,7 @@ func TestChangePasswordAndRateLimit(t *testing.T) {
 	}
 
 	// 2. Test change password with correct old password
-	bodyOK := strings.NewReader(`{"old_password":"admin123","new_password":"newpassword123","confirm_password":"newpassword123"}`)
+	bodyOK := strings.NewReader(`{"old_password":"admin123","new_password":"unique new password 492","confirm_password":"unique new password 492"}`)
 	reqOK := httptest.NewRequest("POST", "/api/auth/change-password", bodyOK)
 	wOK := httptest.NewRecorder()
 	s.handleChangePassword(wOK, reqOK.WithContext(ctx))
@@ -300,7 +303,7 @@ func TestChangePasswordAndRateLimit(t *testing.T) {
 
 	// 3. Verify in database
 	_, newHash, _, _, err := db.GetUser("admin")
-	if err != nil || newHash != hashPassword("newpassword123") {
+	if err != nil || !verifyPassword(newHash, "unique new password 492") {
 		t.Fatalf("password not updated in db: %v", err)
 	}
 

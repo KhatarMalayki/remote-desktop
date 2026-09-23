@@ -56,6 +56,19 @@ async function checkAuth() {
   const me = await api('/api/auth/me');
   if (me && me.username) {
     currentUser = me;
+
+    document.getElementById('loginPage').style.display = 'none';
+    document.getElementById('appContainer').style.display = 'none';
+    window.isPasswordChangeForced = !!me.must_change_password;
+    if (me.must_change_password) {
+      openChangePasswordModal();
+      return;
+    }
+    if (!me.mfa_enabled) {
+      await openMFAModal(true);
+      return;
+    }
+
     updateUserUI();
     document.getElementById('loginPage').style.display = 'none';
     document.getElementById('appContainer').style.display = 'flex';
@@ -88,11 +101,7 @@ async function doLogin() {
     if (res.ok && data.token) {
       token = data.token;
       localStorage.setItem('rd_token', token);
-      currentUser = { username: data.username, role: data.role, branch: data.branch };
-      updateUserUI();
-      document.getElementById('loginPage').style.display = 'none';
-      document.getElementById('appContainer').style.display = 'flex';
-      init();
+      await checkAuth();
     } else {
       const errEl = document.getElementById('loginError');
       errEl.textContent = data.error || 'Login failed';
@@ -975,7 +984,7 @@ function closeEditUserModal() {
 async function submitEditUser() {
   var id = document.getElementById('editUserId').value;
   var username = document.getElementById('editUserUsername').value.trim();
-  var password = document.getElementById('editUserPassword').value.trim();
+  var password = document.getElementById('editUserPassword').value;
   var role = document.getElementById('editUserRole').value;
   var branchSel = document.getElementById('editUserBranch');
   var branch = getSelectValues(branchSel).join(', ');
@@ -986,6 +995,7 @@ async function submitEditUser() {
     return;
   }
 
+  if (password && (Array.from(password).length < 15 || Array.from(password).length > 128)) { alert('Password harus 15-128 karakter'); return; }
   var payload = { username: username, role: role, branch: branch };
   if (password) payload.password = password;
 
@@ -1010,12 +1020,13 @@ async function submitEditUser() {
 
 async function createUser() {
   var username = document.getElementById('newUserUsername').value.trim();
-  var password = document.getElementById('newUserPassword').value.trim();
+  var password = document.getElementById('newUserPassword').value;
   var role = document.getElementById('newUserRole').value;
   var branchSel = document.getElementById('newUserBranch');
   var branch = getSelectValues(branchSel).join(', ');
   
   if (!username || !password) { alert('Username dan Password wajib diisi'); return; }
+  if (Array.from(password).length < 15 || Array.from(password).length > 128) { alert('Password harus 15-128 karakter'); return; }
   if ((role === 'adh' || role === 'user' || role === 'spv') && !branch) { alert('Nama lokasi wajib diisi untuk ADH/SPV/User'); return; }
 
   var res = await api('/api/users', { method:'POST', body:JSON.stringify({ username:username, password:password, role:role, branch:branch }) });
@@ -1563,6 +1574,8 @@ async function openReconfigureModal() {
 // ==================== CHANGE & RESET PASSWORD ====================
 
 function openChangePasswordModal() {
+  const cancel = document.getElementById('cpCancel');
+  if (cancel) cancel.style.display = window.isPasswordChangeForced ? 'none' : '';
   var oldEl = document.getElementById('cpOldPass');
   var newEl = document.getElementById('cpNewPass');
   var confEl = document.getElementById('cpConfirmPass');
@@ -1576,6 +1589,7 @@ function openChangePasswordModal() {
 }
 
 function closeChangePasswordModal() {
+  if (window.isPasswordChangeForced) { showToast('Ganti password awal untuk melanjutkan'); return; }
   var modal = document.getElementById('changePasswordModal');
   if (modal) modal.style.display = 'none';
 }
@@ -1596,7 +1610,7 @@ async function submitChangePassword() {
   }
 
   if (!oldPass) { showErr('Password saat ini wajib diisi'); return; }
-  if (!newPass || newPass.length < 8) { showErr('Password baru minimal 8 karakter'); return; }
+  if (!newPass || Array.from(newPass).length < 15) { showErr('Password baru minimal 15 karakter'); return; }
   if (newPass !== confirmPass) { showErr('Konfirmasi password baru tidak cocok'); return; }
   if (newPass === oldPass) { showErr('Password baru tidak boleh sama dengan password lama'); return; }
 
@@ -1610,19 +1624,22 @@ async function submitChangePassword() {
   });
 
   if (res && res.status === 'success') {
+    const wasForced = !!window.isPasswordChangeForced;
+    if (res.token) { token = res.token; localStorage.setItem('rd_token', token); }
+    window.isPasswordChangeForced = false;
     closeChangePasswordModal();
     showToast('Password berhasil diubah!');
+    if (wasForced) await checkAuth();
   } else {
     showErr((res && res.error) || 'Gagal mengubah password');
   }
 }
 
 async function resetUserPassword(id, username) {
-  var newPass = prompt('Masukkan password baru untuk user ' + username + ' (minimal 8 karakter):');
+  var newPass = prompt('Masukkan password baru untuk user ' + username + ' (minimal 15 karakter):');
   if (!newPass || !newPass.trim()) return;
-  newPass = newPass.trim();
-  if (newPass.length < 8) {
-    alert('Password minimal 8 karakter!');
+  if (Array.from(newPass).length < 15) {
+    alert('Password minimal 15 karakter!');
     return;
   }
   var res = await api('/api/users/' + id + '/reset-password', {
@@ -1661,11 +1678,7 @@ async function doLoginMFA() {
     if (res.ok && data.token) {
       token = data.token;
       localStorage.setItem('rd_token', token);
-      currentUser = { username: data.username, role: data.role, branch: data.branch };
-      updateUserUI();
-      document.getElementById('loginPage').style.display = 'none';
-      document.getElementById('appContainer').style.display = 'flex';
-      init();
+      await checkAuth();
     } else {
       if (errEl) {
         errEl.textContent = data.error || 'Kode 2FA salah / kedaluwarsa';
@@ -1689,17 +1702,18 @@ function cancelMFA() {
 
 let currentMFASetupSecret = '';
 
-async function openMFAModal() {
+async function openMFAModal(isForced) {
   const modal = document.getElementById('mfaModal');
   if (!modal) return;
   modal.style.display = 'flex';
+  window.isMFAForced = !!isForced;
 
   const status = await api('/api/auth/mfa/status');
   if (status && status.mfa_enabled) {
     document.getElementById('mfaActiveSection').style.display = 'block';
     document.getElementById('mfaSetupSection').style.display = 'none';
     document.getElementById('mfaCloseAction').style.display = 'flex';
-    document.getElementById('mfaDisablePass').value = '';
+
   } else {
     document.getElementById('mfaActiveSection').style.display = 'none';
     document.getElementById('mfaSetupSection').style.display = 'block';
@@ -1731,6 +1745,10 @@ async function openMFAModal() {
 }
 
 function closeMFAModal() {
+  if (window.isMFAForced) {
+    showToast('Wajib mengaktifkan 2FA / MFA untuk melanjutkan');
+    return;
+  }
   const modal = document.getElementById('mfaModal');
   if (modal) modal.style.display = 'none';
 }
@@ -1761,8 +1779,11 @@ async function submitEnableMFA() {
   });
 
   if (res && res.status === 'success') {
+    if (res.token) { token = res.token; localStorage.setItem('rd_token', token); }
+    window.isMFAForced = false;
     closeMFAModal();
-    showToast('2FA / MFA Berhasil Diaktifkan! Akun Anda sekarang aman.');
+    showToast('2FA / MFA berhasil diaktifkan');
+    await checkAuth();
   } else {
     if (errEl) {
       errEl.textContent = (res && res.error) || 'Kode verifikasi salah, pastikan jam di HP Anda akurat.';
@@ -1771,29 +1792,8 @@ async function submitEnableMFA() {
   }
 }
 
-async function submitDisableMFA() {
-  const pass = (document.getElementById('mfaDisablePass') || {}).value || '';
-  if (!pass) {
-    alert('Masukkan password akun Anda untuk menonaktifkan 2FA');
-    return;
-  }
-  if (!confirm('Yakin ingin menonaktifkan 2FA? Keamanan akun akan berkurang.')) return;
-
-  const res = await api('/api/auth/mfa/disable', {
-    method: 'POST',
-    body: JSON.stringify({ password: pass })
-  });
-
-  if (res && res.status === 'success') {
-    closeMFAModal();
-    showToast('2FA / MFA berhasil dinonaktifkan.');
-  } else {
-    alert('Gagal: ' + ((res && res.error) || 'Password salah'));
-  }
-}
-
 async function resetUserMFA(id, username) {
-  if (!confirm('Reset 2FA untuk user ' + username + '? User akan bisa login tanpa kode 2FA sampai dia mengaktifkannya lagi.')) return;
+  if (!confirm('Reset 2FA untuk user ' + username + '? Sesi lama akan tidak berlaku. User wajib setup MFA kembali sebelum bisa mengakses aplikasi.')) return;
   const res = await api('/api/users/' + id + '/reset-mfa', { method: 'POST' });
   if (res && res.status === 'success') {
     showToast('2FA untuk ' + username + ' berhasil direset');
