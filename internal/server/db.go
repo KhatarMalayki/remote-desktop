@@ -1625,8 +1625,12 @@ func (d *DB) DeleteBranch(id int64) error {
 	if err := d.db.QueryRow(`SELECT name FROM branches WHERE id=?`, id).Scan(&name); err != nil {
 		return err
 	}
-	if name == "Pusat" {
-		return fmt.Errorf("Pusat is a required location and cannot be deleted")
+	var totalBranches int
+	if err := d.db.QueryRow(`SELECT COUNT(*) FROM branches`).Scan(&totalBranches); err != nil {
+		return err
+	}
+	if totalBranches <= 1 {
+		return fmt.Errorf("minimal harus ada 1 lokasi tersimpan di sistem")
 	}
 	var used int
 	err := d.db.QueryRow(`SELECT ((SELECT COUNT(*) FROM manual_assets WHERE branch=? OR branch LIKE ?) + (SELECT COUNT(*) FROM devices WHERE branch=? OR group_name=? OR branch LIKE ? OR group_name LIKE ?) + (SELECT COUNT(*) FROM users WHERE branch=? OR branch LIKE ? OR branch LIKE ? OR branch LIKE ? OR branch LIKE ?))`, name, name+" - %", name, name, name+" - %", name+" - %", name, name+" - %", name+", %", "%, "+name, "%, "+name+", %").Scan(&used)

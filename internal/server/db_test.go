@@ -175,8 +175,17 @@ func TestBranchManagement(t *testing.T) {
 	if err := db.DeleteBranch(surabaya.ID); err == nil {
 		t.Fatal("expected deletion of used location to fail")
 	}
-	if err := db.DeleteBranch(branches[0].ID); err == nil {
-		t.Fatal("expected Pusat deletion to fail")
+	var pusatID int64
+	for _, b := range branches {
+		if b.Name == "Pusat" {
+			pusatID = b.ID
+		}
+	}
+	if err := db.DeleteBranch(pusatID); err != nil {
+		t.Fatalf("expected Pusat deletion to succeed when not used, got: %v", err)
+	}
+	if err := db.DeleteBranch(surabaya.ID); err == nil {
+		t.Fatal("expected deletion of last remaining location to fail")
 	}
 }
 

@@ -2106,8 +2106,8 @@ async function loadBranchesManagement() {
   branchManagementRows = {};
   branches.forEach(function(b) { branchManagementRows[b.id] = b; });
   container.innerHTML = '<table class="device-table"><thead><tr><th>Nama Lokasi</th><th>Tipe</th><th>Bisnis Unit</th><th>Aksi</th></tr></thead><tbody>' + branches.map(function(b) {
-    var isPusat = b.name === 'Pusat';
-    return '<tr><td><strong>' + esc(b.name) + '</strong></td><td><span class="tag">' + esc(branchTypeLabels[b.type] || b.type) + '</span></td><td>' + esc((b.business_units || []).join(', ') || '-') + '</td><td><button class="btn btn-ghost btn-sm" onclick="editBranch(' + b.id + ')">Ubah</button> ' + (isPusat ? '' : '<button class="btn btn-danger btn-sm" onclick="deleteBranch(' + b.id + ')">Hapus</button>') + '</td></tr>';
+    var canDelete = branches.length > 1;
+    return '<tr><td><strong>' + esc(b.name) + '</strong></td><td><span class="tag">' + esc(branchTypeLabels[b.type] || b.type) + '</span></td><td>' + esc((b.business_units || []).join(', ') || '-') + '</td><td><button class="btn btn-ghost btn-sm" onclick="editBranch(' + b.id + ')">Ubah</button> ' + (canDelete ? '<button class="btn btn-danger btn-sm" onclick="deleteBranch(' + b.id + ')">Hapus</button>' : '') + '</td></tr>';
   }).join('') + '</tbody></table>';
 }
 
