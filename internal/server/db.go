@@ -1289,6 +1289,8 @@ func (d *DB) GetBranches() ([]string, error) {
 	SELECT DISTINCT branch FROM (
 		SELECT name AS branch FROM branches WHERE name != ''
 		UNION
+		SELECT b.name || ' - ' || bbu.business_unit AS branch FROM branches b JOIN branch_business_units bbu ON bbu.branch_id=b.id WHERE b.name != '' AND bbu.business_unit != ''
+		UNION
 		SELECT branch FROM manual_assets WHERE branch != ''
 		UNION
 		SELECT branch FROM devices WHERE branch != ''
@@ -1571,13 +1573,13 @@ func (d *DB) UpdateBranch(id int64, name, branchType, businessUnit string) error
 		return err
 	}
 	if oldName != name {
-		if _, err := tx.Exec(`UPDATE manual_assets SET branch=? WHERE branch=?`, name, oldName); err != nil {
+		if _, err := tx.Exec(`UPDATE manual_assets SET branch=CASE WHEN branch=? THEN ? WHEN branch LIKE ? THEN ? || SUBSTR(branch, LENGTH(?)+1) ELSE branch END WHERE branch=? OR branch LIKE ?`, oldName, name, oldName+" - %", name, oldName, oldName, oldName+" - %"); err != nil {
 			return err
 		}
-		if _, err := tx.Exec(`UPDATE devices SET branch=?, group_name=CASE WHEN group_name=? THEN ? ELSE group_name END WHERE branch=? OR group_name=?`, name, oldName, name, oldName, oldName); err != nil {
+		if _, err := tx.Exec(`UPDATE devices SET branch=CASE WHEN branch=? THEN ? WHEN branch LIKE ? THEN ? || SUBSTR(branch, LENGTH(?)+1) ELSE branch END, group_name=CASE WHEN group_name=? THEN ? WHEN group_name LIKE ? THEN ? || SUBSTR(group_name, LENGTH(?)+1) ELSE group_name END WHERE branch=? OR group_name=? OR branch LIKE ? OR group_name LIKE ?`, oldName, name, oldName+" - %", name, oldName, oldName, name, oldName+" - %", name, oldName, oldName, oldName, oldName+" - %", oldName+" - %"); err != nil {
 			return err
 		}
-		if _, err := tx.Exec(`UPDATE users SET branch=? WHERE branch=?`, name, oldName); err != nil {
+		if _, err := tx.Exec(`UPDATE users SET branch=CASE WHEN branch=? THEN ? WHEN branch LIKE ? THEN ? || SUBSTR(branch, LENGTH(?)+1) ELSE branch END WHERE branch=? OR branch LIKE ?`, oldName, name, oldName+" - %", name, oldName, oldName, oldName+" - %"); err != nil {
 			return err
 		}
 		uRows, err := tx.Query(`SELECT id, branch FROM users WHERE branch LIKE '%,%' AND branch LIKE '%' || ? || '%'`, oldName)
@@ -1627,7 +1629,7 @@ func (d *DB) DeleteBranch(id int64) error {
 		return fmt.Errorf("Pusat is a required location and cannot be deleted")
 	}
 	var used int
-	err := d.db.QueryRow(`SELECT ((SELECT COUNT(*) FROM manual_assets WHERE branch=?) + (SELECT COUNT(*) FROM devices WHERE branch=? OR group_name=?) + (SELECT COUNT(*) FROM users WHERE branch=? OR branch LIKE ? OR branch LIKE ? OR branch LIKE ?))`, name, name, name, name, name+", %", "%, "+name, "%, "+name+", %").Scan(&used)
+	err := d.db.QueryRow(`SELECT ((SELECT COUNT(*) FROM manual_assets WHERE branch=? OR branch LIKE ?) + (SELECT COUNT(*) FROM devices WHERE branch=? OR group_name=? OR branch LIKE ? OR group_name LIKE ?) + (SELECT COUNT(*) FROM users WHERE branch=? OR branch LIKE ? OR branch LIKE ? OR branch LIKE ? OR branch LIKE ?))`, name, name+" - %", name, name, name+" - %", name+" - %", name, name+" - %", name+", %", "%, "+name, "%, "+name+", %").Scan(&used)
 	if err != nil {
 		return err
 	}

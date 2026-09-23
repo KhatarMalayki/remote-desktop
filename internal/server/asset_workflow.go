@@ -138,7 +138,11 @@ func (d *DB) ListActivities(branch, assetID, category, search, fromDate, toDate 
 
 func (d *DB) RelocateAsset(assetType, assetID, toBranch, toLocation string) error {
 	var exists int
-	if err := d.db.QueryRow(`SELECT COUNT(*) FROM branches WHERE name=?`, toBranch).Scan(&exists); err != nil || exists != 1 {
+	baseBranch := toBranch
+	if idx := strings.Index(toBranch, " - "); idx != -1 {
+		baseBranch = strings.TrimSpace(toBranch[:idx])
+	}
+	if err := d.db.QueryRow(`SELECT COUNT(*) FROM branches WHERE name=? OR name=?`, toBranch, baseBranch).Scan(&exists); err != nil || exists < 1 {
 		return fmt.Errorf("lokasi tujuan tidak terdaftar")
 	}
 	var result interface{ RowsAffected() (int64, error) }

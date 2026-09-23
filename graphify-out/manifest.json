@@ -1,12 +1,12 @@
 {
   "cmd/agent/main.go": {
-    "mtime": 1790127889.5143967,
-    "ast_hash": "bd6aa545ef1ed1e7f764ab51317bca8e",
+    "mtime": 1790130424.7020786,
+    "ast_hash": "f7bf5bfdc5ae250d4279be058e6fd3c6",
     "semantic_hash": ""
   },
   "cmd/server/main.go": {
-    "mtime": 1790127889.5193172,
-    "ast_hash": "4d6e7f3856a228e774945769370d37b9",
+    "mtime": 1790130424.7045817,
+    "ast_hash": "a513cc1cf468a8840e65c90598c86641",
     "semantic_hash": ""
   },
   "go.mod": {
@@ -25,13 +25,13 @@
     "semantic_hash": ""
   },
   "internal/models/device.go": {
-    "mtime": 1790086278.880608,
-    "ast_hash": "13e70c87ec4b03db0ec63aaa26862731",
+    "mtime": 1790130219.5803955,
+    "ast_hash": "77af14dc950019ea52affaf46bae10d3",
     "semantic_hash": ""
   },
   "internal/server/db.go": {
-    "mtime": 1790119854.6127157,
-    "ast_hash": "ec49f336f20e73e36ba33b901cb0c52c",
+    "mtime": 1790130219.5887592,
+    "ast_hash": "601c22842308c8b953889bde725829dd",
     "semantic_hash": ""
   },
   "internal/server/hub.go": {
@@ -45,8 +45,8 @@
     "semantic_hash": ""
   },
   "internal/server/server.go": {
-    "mtime": 1790086638.3105364,
-    "ast_hash": "13cb8c0031f1a2bfb170cb835bc11ea9",
+    "mtime": 1790130219.5986345,
+    "ast_hash": "f6c9c71d5ee2f8937d648db8bbc0afc0",
     "semantic_hash": ""
   },
   "scripts/build.ps1": {
@@ -65,8 +65,8 @@
     "semantic_hash": "8c9cb5d1b967f64d6abc8c1ca0fe3e90"
   },
   "web/static/app.js": {
-    "mtime": 1790128599.9734151,
-    "ast_hash": "2cb1e291092e3d641e6148d9deae4c0d",
+    "mtime": 1790130353.5279627,
+    "ast_hash": "9e09553f945ba35c6f637b06da9b24f1",
     "semantic_hash": ""
   },
   ".codex/hooks.json": {
@@ -75,8 +75,8 @@
     "semantic_hash": ""
   },
   "internal/server/db_test.go": {
-    "mtime": 1790119902.1153202,
-    "ast_hash": "9af21cb3e0b27bdcc72fac667e422ddd",
+    "mtime": 1790130219.5901432,
+    "ast_hash": "b8d7299056341bcb73b1f3fe7bdc58ca",
     "semantic_hash": ""
   },
   "AGENTS.md": {
@@ -125,8 +125,8 @@
     "semantic_hash": ""
   },
   "web/index.html": {
-    "mtime": 1790120277.5698838,
-    "ast_hash": "a45e29566a29cd09f569c01a0e9dff3d",
+    "mtime": 1790130424.719684,
+    "ast_hash": "a7dffc6f1d67e4fa726e77eb552285ff",
     "semantic_hash": ""
   },
   "scripts/update-server.sh": {
@@ -150,8 +150,8 @@
     "semantic_hash": ""
   },
   "internal/server/totp.go": {
-    "mtime": 1789369174.9412706,
-    "ast_hash": "32f8ffe61729243a6d5d6b579b89d7f9",
+    "mtime": 1790130219.5986345,
+    "ast_hash": "10a12f3c8c11edc0f61491b7c7b43a08",
     "semantic_hash": ""
   },
   "web/static/qrcode.min.js": {
@@ -165,13 +165,13 @@
     "semantic_hash": ""
   },
   "internal/server/ownership_test.go": {
-    "mtime": 1790086794.9678774,
-    "ast_hash": "3b52f13d46562b9ad01b1f1e5affbd0c",
+    "mtime": 1790130219.5901432,
+    "ast_hash": "f15bd21d78a53ca2747d9858cef548de",
     "semantic_hash": ""
   },
   "web/static/ownership.js": {
-    "mtime": 1790086733.792579,
-    "ast_hash": "18326528ac763cd9d03ca6e124b5deb8",
+    "mtime": 1790130397.5969994,
+    "ast_hash": "1ee7f5cabc5196ea53115a6c64871cbf",
     "semantic_hash": ""
   },
   ".playwright-cli/page-2026-09-17T04-41-06-001Z.yml": {
@@ -565,8 +565,8 @@
     "semantic_hash": ""
   },
   "internal/server/asset_workflow.go": {
-    "mtime": 1790086312.1483939,
-    "ast_hash": "992fb046d1031b5c5adc0f7811b73ffe",
+    "mtime": 1790130219.5814312,
+    "ast_hash": "20ae87c86c75fa5a1ac294bd48c020bf",
     "semantic_hash": ""
   },
   ".playwright-cli/page-2026-09-22T02-04-46-467Z.yml": {

@@ -50,7 +50,10 @@ func canApproveSwitch(role string) bool { return role == "adh" || isCentralRole(
 
 func isHeadOfficeBranch(b string) bool {
 	s := strings.ToLower(strings.TrimSpace(b))
-	return s == "pusat" || s == "ho" || s == "ho-bintaro" || s == "ho bintaro" || s == "kantor pusat"
+	if idx := strings.Index(s, " - "); idx != -1 {
+		s = strings.TrimSpace(s[:idx])
+	}
+	return s == "pusat" || s == "ho" || s == "ho-bintaro" || s == "ho bintaro" || s == "kantor pusat" || s == "bintaro"
 }
 
 func isEligibleHolderRole(role string) bool {
@@ -69,6 +72,19 @@ func branchesMatch(a, b string) bool {
 	}
 	if isHeadOfficeBranch(a) && isHeadOfficeBranch(b) {
 		return true
+	}
+	baseA := a
+	if idx := strings.Index(a, " - "); idx != -1 {
+		baseA = strings.TrimSpace(a[:idx])
+	}
+	baseB := b
+	if idx := strings.Index(b, " - "); idx != -1 {
+		baseB = strings.TrimSpace(b[:idx])
+	}
+	if strings.EqualFold(baseA, baseB) {
+		if !strings.Contains(a, " - ") || !strings.Contains(b, " - ") {
+			return true
+		}
 	}
 	return false
 }

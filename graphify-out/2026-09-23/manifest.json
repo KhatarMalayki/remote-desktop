@@ -1,12 +1,12 @@
 {
   "cmd/agent/main.go": {
-    "mtime": 1790087021.757544,
-    "ast_hash": "6dfc3b9080b2034944401a0c46b34510",
+    "mtime": 1790127889.5143967,
+    "ast_hash": "bd6aa545ef1ed1e7f764ab51317bca8e",
     "semantic_hash": ""
   },
   "cmd/server/main.go": {
-    "mtime": 1790087021.757544,
-    "ast_hash": "2b71183dfb862603f322213564064c72",
+    "mtime": 1790127889.5193172,
+    "ast_hash": "4d6e7f3856a228e774945769370d37b9",
     "semantic_hash": ""
   },
   "go.mod": {
@@ -65,8 +65,8 @@
     "semantic_hash": "8c9cb5d1b967f64d6abc8c1ca0fe3e90"
   },
   "web/static/app.js": {
-    "mtime": 1790120374.7922428,
-    "ast_hash": "d21b332bc71873163bc22c8d52b5306f",
+    "mtime": 1790128599.9734151,
+    "ast_hash": "2cb1e291092e3d641e6148d9deae4c0d",
     "semantic_hash": ""
   },
   ".codex/hooks.json": {

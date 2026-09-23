@@ -115,16 +115,20 @@ async function relocateAsset(type, id) {
   document.getElementById('relocateError').style.display = 'none';
 
   var sel = document.getElementById('relocateToBranch');
-  sel.innerHTML = '';
-  var branches = await api('/api/branches');
-  var bList = (Array.isArray(branches) && branches.length) ? branches : [currentBranch];
-  bList.forEach(function(b) {
-    var opt = document.createElement('option');
-    opt.value = b;
-    opt.textContent = b;
-    if (b === currentBranch) opt.selected = true;
-    sel.appendChild(opt);
-  });
+  if (typeof buildBranchOptionsHTML === 'function') {
+    sel.innerHTML = buildBranchOptionsHTML(false, currentBranch);
+  } else {
+    sel.innerHTML = '';
+    var branches = await api('/api/branches');
+    var bList = (Array.isArray(branches) && branches.length) ? branches : [currentBranch];
+    bList.forEach(function(b) {
+      var opt = document.createElement('option');
+      opt.value = b;
+      opt.textContent = b;
+      if (b === currentBranch) opt.selected = true;
+      sel.appendChild(opt);
+    });
+  }
   document.getElementById('relocateModal').style.display = 'flex';
 }
 
