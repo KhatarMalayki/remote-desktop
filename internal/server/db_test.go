@@ -138,8 +138,11 @@ func TestBranchManagement(t *testing.T) {
 	defer db.Close()
 
 	branches, err := db.ListBranches()
-	if err != nil || len(branches) != 1 || branches[0].Name != "Pusat" {
-		t.Fatalf("expected seeded Pusat location, got %#v (err=%v)", branches, err)
+	if err != nil || len(branches) != 0 {
+		t.Fatalf("expected no automatic locations, got %#v (err=%v)", branches, err)
+	}
+	if err := db.CreateBranch("Pusat", "pusat", ""); err != nil {
+		t.Fatal(err)
 	}
 	if err := db.CreateBranch("Surabaya", "cabang", "Operasional"); err != nil {
 		t.Fatalf("create branch: %v", err)
@@ -816,7 +819,7 @@ func TestPusatDoesNotReappearAfterDeletion(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := db.CreateUser("testadmin", "hash", "admin", ""); err != nil {
+	if err := db.CreateBranch("Pusat", "pusat", ""); err != nil {
 		t.Fatal(err)
 	}
 	if err := db.CreateBranch("Bintaro", "ho", "Mitra"); err != nil {
@@ -839,8 +842,25 @@ func TestPusatDoesNotReappearAfterDeletion(t *testing.T) {
 	defer db2.Close()
 
 	var count int
-	_ = db2.db.QueryRow("SELECT COUNT(*) FROM branches WHERE name='Pusat'").Scan(&count)
+	if err := db2.db.QueryRow("SELECT COUNT(*) FROM branches WHERE name='Pusat'").Scan(&count); err != nil {
+		t.Fatal(err)
+	}
 	if count != 0 {
 		t.Fatal("Pusat branch reappeared after server restart!")
+	}
+}
+
+func TestEmptyDatabaseDoesNotSeedLocationsOnRestart(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "empty.db")
+	for attempt := 0; attempt < 3; attempt++ {
+		db, err := NewDB(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		branches, err := db.ListBranches()
+		db.Close()
+		if err != nil || len(branches) != 0 {
+			t.Fatalf("restart %d created locations: %#v, %v", attempt, branches, err)
+		}
 	}
 }

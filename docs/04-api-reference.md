@@ -254,6 +254,15 @@ fi
 
 ## Error yang Mungkin Muncul
 
+### PIC dan pemegang fisik aset
+
+- `owner_username` adalah akun PIC penanggung jawab; `assigned_to` adalah nama karyawan pemakai fisik, tidak wajib memiliki akun aplikasi.
+- Admin dan GA dapat menetapkan melalui `POST /api/assets/switch-requests`; ADH tetap terbatas pada lokasi yang ditugaskan.
+- IT Support dapat mengajukan penetapan atau pergantian pemegang. Permintaan tetap pending sampai Admin/GA menyetujui; IT Support dan ADH tidak dapat menyetujui pengajuan IT Support.
+- PIC tujuan boleh Admin, GA, IT Support, ADH, SPV, atau user sesuai cakupan lokasi. Akun Admin/GA/IT Support tanpa penugasan lokasi dapat menjadi PIC lintas lokasi.
+- Edit metadata aset yang sudah tersimpan tidak mengubah pemakai fisik. Gunakan alur serah terima dengan alasan minimal 10 karakter; nama sebelumnya dicatat bersama pengajuan.
+- Form menyarankan nama dari aset lokasi yang sudah dimuat dan menerima nama baru. Ini bukan direktori HR lengkap.
+
 ### Pengelolaan MFA
 
 - Browser yang diingat hanya melewati MFA login, bukan pengelolaan authenticator.

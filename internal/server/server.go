@@ -57,7 +57,11 @@ func isHeadOfficeBranch(b string) bool {
 }
 
 func isEligibleHolderRole(role string) bool {
-	return role == "adh" || role == "spv" || role == "user" || role == "ga_pusat" || role == "it_support"
+	return role == "admin" || role == "adh" || role == "spv" || role == "user" || role == "ga_pusat" || role == "it_support"
+}
+
+func eligibleHolderAt(role, branch, assetBranch string) bool {
+	return isEligibleHolderRole(role) && (userAllowsBranch(branch, assetBranch) || ((isCentralRole(role) || role == "it_support") && branch == ""))
 }
 
 func isAssetHolderRole(role string) bool {
@@ -959,7 +963,8 @@ func (s *Server) handleManualAssets(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		if asset.Branch == "" {
-			asset.Branch = "Pusat"
+			jsonError(w, "Pilih lokasi aset terlebih dahulu", 400)
+			return
 		}
 		asset.CreatedBy = claims.Username
 		asset.OwnerUsername = "" // Assign a holder through the audited switch workflow.
@@ -1049,6 +1054,7 @@ func (s *Server) handleManualAsset(w http.ResponseWriter, r *http.Request) {
 			upd.Name = existing.Name
 		}
 		upd.OwnerUsername = existing.OwnerUsername
+		upd.AssignedTo = existing.AssignedTo
 		if claims.Role == "user" {
 			upd.AssignedTo = existing.AssignedTo
 			upd.AcquisitionYear = existing.AcquisitionYear
@@ -1140,6 +1146,10 @@ func (s *Server) handleSwitchRequests(w http.ResponseWriter, r *http.Request) {
 		req.AssetType = strings.TrimSpace(req.AssetType)
 		req.ToOwner = strings.TrimSpace(req.ToOwner)
 		req.Reason = strings.TrimSpace(req.Reason)
+		if len([]rune(req.AssignedTo)) > 200 || len([]rune(req.Reason)) > 4000 {
+			jsonError(w, "Nama pemakai maksimal 200 karakter; alasan maksimal 4000 karakter", 400)
+			return
+		}
 		if req.AssetID == "" || req.ToOwner == "" || len([]rune(req.Reason)) < 10 || (req.AssetType != "manual" && req.AssetType != "device") {
 			jsonError(w, "Aset dan pemegang tujuan wajib diisi; alasan minimal 10 karakter", 400)
 			return
@@ -1172,6 +1182,7 @@ func (s *Server) handleSwitchRequests(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			sw.AssetName, sw.Branch, sw.FromOwner = asset.Name, asset.Branch, asset.OwnerUsername
+			sw.Reason += fmt.Sprintf(" [Pemakai sebelumnya: %s]", asset.AssignedTo)
 			if sw.FromOwner == "" {
 				sw.Operation = "assignment"
 			}
@@ -1195,19 +1206,20 @@ func (s *Server) handleSwitchRequests(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			sw.AssetName, sw.Branch, sw.FromOwner = dev.Hostname, branch, dev.OwnerUsername
+			sw.Reason += fmt.Sprintf(" [Pemakai sebelumnya: %s]", dev.AssignedTo)
 			if sw.FromOwner == "" {
 				sw.Operation = "assignment"
 			}
 			sw.Recommendation = deviceRecommendation(dev)
 		}
 
-		if !isAssetHolderRole(claims.Role) && !canApproveSwitch(claims.Role) {
+		if !isAssetHolderRole(claims.Role) && !canApproveSwitch(claims.Role) && claims.Role != "it_support" {
 			jsonError(w, "forbidden", 403)
 			return
 		}
 		_, _, targetRole, targetBranch, targetErr := s.db.GetUser(req.ToOwner)
-		if targetErr != nil || !isEligibleHolderRole(targetRole) || !userAllowsBranch(targetBranch, sw.Branch) || (sw.FromOwner == sw.ToOwner && strings.TrimSpace(req.AssignedTo) == "") {
-			jsonError(w, "Pilih akun ADH, SPV, atau user yang terdaftar di lokasi aset", 400)
+		if targetErr != nil || !eligibleHolderAt(targetRole, targetBranch, sw.Branch) || (sw.FromOwner == sw.ToOwner && strings.TrimSpace(req.AssignedTo) == "") {
+			jsonError(w, "Pilih PIC yang memiliki akses ke lokasi aset", 400)
 			return
 		}
 		if strings.TrimSpace(req.SwapTag) != "" {
@@ -1296,6 +1308,11 @@ func (s *Server) handleSwitchRequestSubroute(w http.ResponseWriter, r *http.Requ
 	}
 	if !canApproveSwitch(claims.Role) {
 		jsonError(w, "only ADH, GA Pusat, or admin can review switch requests", 403)
+		return
+	}
+	_, _, requesterRole, _, requesterErr := s.db.GetUser(reqItem.RequestedBy)
+	if requesterErr != nil || (requesterRole == "it_support" && !isCentralRole(claims.Role)) {
+		jsonError(w, "Pengajuan IT Support harus ditinjau Admin atau GA", 403)
 		return
 	}
 	action := parts[1]
@@ -2780,7 +2797,8 @@ func (s *Server) handleAgentPackageDownload(w http.ResponseWriter, r *http.Reque
 		branch = claims.Branch
 	}
 	if branch == "" {
-		branch = "Pusat"
+		jsonError(w, "Pilih lokasi untuk paket agent terlebih dahulu", 400)
+		return
 	}
 
 	targetOS := strings.ToLower(r.URL.Query().Get("os"))

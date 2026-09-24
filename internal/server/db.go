@@ -216,14 +216,6 @@ func migrate(db *sql.DB) error {
 	if _, err := db.Exec(schema); err != nil {
 		return err
 	}
-	var branchCount int
-	if err := db.QueryRow("SELECT COUNT(*) FROM branches").Scan(&branchCount); err == nil && branchCount == 0 {
-		var schemaInitialized int
-		_ = db.QueryRow("SELECT COUNT(*) FROM users").Scan(&schemaInitialized)
-		if schemaInitialized == 0 {
-			_, _ = db.Exec("INSERT INTO branches (name, type) VALUES ('Pusat', 'pusat')")
-		}
-	}
 	// Role Kacab has been replaced by ADH; preserve every existing account and scope.
 	_, _ = db.Exec(`UPDATE users SET role='adh' WHERE role='kacab'`)
 	_, _ = db.Exec(`INSERT OR IGNORE INTO business_units(name) SELECT business_unit FROM branches WHERE TRIM(business_unit) != ''`)
@@ -1198,7 +1190,7 @@ func (d *DB) ReviewSwitchRequest(id int64, status, reviewedBy, note string) erro
 	}
 	if status == "approved" {
 		var targetRole, targetBranch string
-		if err := tx.QueryRow(`SELECT role, branch FROM users WHERE username=?`, req.ToOwner).Scan(&targetRole, &targetBranch); err != nil || !isEligibleHolderRole(targetRole) || !userAllowsBranch(targetBranch, req.Branch) {
+		if err := tx.QueryRow(`SELECT role, branch FROM users WHERE username=?`, req.ToOwner).Scan(&targetRole, &targetBranch); err != nil || !eligibleHolderAt(targetRole, targetBranch, req.Branch) {
 			return fmt.Errorf("pemegang tujuan harus akun ADH/SPV/user di lokasi aset")
 		}
 		assignedTo := strings.TrimSpace(req.AssignedTo)
@@ -1224,7 +1216,7 @@ func (d *DB) ReviewSwitchRequest(id int64, status, reviewedBy, note string) erro
 				return fmt.Errorf("aset awal belum memiliki pemegang")
 			}
 			var fromRole, fromBranch string
-			if err := tx.QueryRow(`SELECT role, branch FROM users WHERE username=?`, req.FromOwner).Scan(&fromRole, &fromBranch); err != nil || !isEligibleHolderRole(fromRole) || !userAllowsBranch(fromBranch, req.Branch) {
+			if err := tx.QueryRow(`SELECT role, branch FROM users WHERE username=?`, req.FromOwner).Scan(&fromRole, &fromBranch); err != nil || !eligibleHolderAt(fromRole, fromBranch, req.Branch) {
 				return fmt.Errorf("pemegang awal tidak lagi valid")
 			}
 			switch req.SwapAssetType {

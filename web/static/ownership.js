@@ -9,21 +9,24 @@ async function requestAssetSwitch(type, id) {
   var asset = type === 'manual' ? manualAssets.find(function(a) { return a.id === id; }) : devices.find(function(a) { return a.id === id; });
   if (!asset) return;
   var isAssignment = !asset.owner_username;
-  var branch=asset.branch||asset.group||'Pusat';
+  var branch=asset.branch||asset.group||'';
   var users=await api('/api/assets/holder-options?branch='+encodeURIComponent(branch));
   if(!Array.isArray(users)){showToast((users&&users.error)||'Daftar PIC tidak dapat dimuat');return}
   if(users.length === 0){
-    showToast('Belum ada akun PIC (ADH / SPV) di lokasi ' + branch + '. Silakan buat di menu Akun Cabang.');
+    showToast('Belum ada akun PIC yang dapat mengakses lokasi ' + branch + '. Hubungi Admin.');
     return;
   }
   handoverDraft={type:type,id:id,asset:asset,isAssignment:isAssignment};
-  document.getElementById('handoverTitle').textContent=isAssignment?'Tetapkan PIC Awal':'Serah Terima / Switch PIC';
+  document.getElementById('handoverTitle').textContent=isAssignment?'Tetapkan PIC & Pemegang Aset':'Ubah Pemegang / Serah Terima';
   document.getElementById('handoverAssetName').textContent=(asset.name||asset.hostname)+' · '+branch;
   document.getElementById('handoverCurrentOwner').textContent=asset.owner_username||'Belum ditugaskan';
   document.getElementById('handoverAssignedTo').value = asset.assigned_to || '';
+  const names = [...new Set(manualAssets.concat(devices).filter(item => (item.branch || item.group || '') === branch).map(item => item.assigned_to).filter(Boolean))].sort();
+  document.getElementById('handoverEmployeeNames').innerHTML = names.map(name => '<option value="' + esc(name) + '"></option>').join('');
   var select=document.getElementById('handoverTarget');select.innerHTML='<option value="">Pilih akun PIC...</option>'+users.map(function(u){
     var roleLabel = '';
-    if(u.role === 'adh') roleLabel = ' (ADH Cabang)';
+    if(u.role === 'admin') roleLabel = ' (Admin)';
+    else if(u.role === 'adh') roleLabel = ' (ADH Cabang)';
     else if(u.role === 'spv') roleLabel = ' (SPV Dept)';
     else if(u.role === 'it_support') roleLabel = ' (IT Support)';
     else if(u.role === 'ga_pusat') roleLabel = ' (GA Pusat)';
@@ -33,6 +36,7 @@ async function requestAssetSwitch(type, id) {
   document.getElementById('handoverReasonLabel').textContent=isAssignment?'Dasar penetapan PIC awal':'Alasan serah terima';
   document.getElementById('handoverReason').value='';document.getElementById('handoverSwap').value='';document.getElementById('handoverSwapGroup').style.display=isAssignment?'none':'block';document.getElementById('handoverAttachment').value='';document.getElementById('handoverError').style.display='none';
   document.getElementById('handoverSubmit').textContent=mayReviewSwitch()?(isAssignment?'Tetapkan PIC':'Simpan Serah Terima'):'Ajukan Persetujuan';
+  document.getElementById('handoverSubmit').disabled = false;
   document.getElementById('handoverModal').style.display='flex';
 }
 
@@ -54,7 +58,7 @@ async function submitHandover() {
     handoverDraft.asset.assigned_to=assignedTo.trim();
   }
   var wasAssignment=handoverDraft.isAssignment;closeHandoverModal();renderBranchAssets();
-  showToast(result.status === 'approved' ? (wasAssignment ? 'PIC awal berhasil ditetapkan' : 'Serah terima berhasil dicatat') : 'Permintaan menunggu persetujuan ADH');
+  showToast(result.status === 'approved' ? (wasAssignment ? 'PIC dan pemegang berhasil ditetapkan' : 'Serah terima berhasil dicatat') : 'Permintaan menunggu persetujuan; pengajuan IT Support ditinjau Admin/GA');
   await loadBranchAssets();
 }
 
@@ -82,8 +86,8 @@ async function openSwitchHistory() {
 }
 
 async function downloadAssetAttachment(id, encodedName) {
-  try { var res=await fetch('/api/assets/attachments/'+id,{headers:{Authorization:'Bearer '+token}}); if(!res.ok){var e=await res.json();alert(e.error||'Lampiran tidak dapat diunduh');return} var blob=await res.blob();var url=URL.createObjectURL(blob);var a=document.createElement('a');a.href=url;a.download=decodeURIComponent(encodedName);a.click();setTimeout(function(){URL.revokeObjectURL(url)},1000); }
-  catch(e){alert('Lampiran tidak dapat diunduh: '+e.message)}
+  try { var res=await fetch('/api/assets/attachments/'+id,{headers:{Authorization:'Bearer '+token}}); if(!res.ok){var e=await res.json();appAlert(e.error||'Lampiran tidak dapat diunduh');return} var blob=await res.blob();var url=URL.createObjectURL(blob);var a=document.createElement('a');a.href=url;a.download=decodeURIComponent(encodedName);a.click();setTimeout(function(){URL.revokeObjectURL(url)},1000); }
+  catch(e){appAlert('Lampiran tidak dapat diunduh: '+e.message)}
 }
 
 async function openAssetTimeline(assetId) {
@@ -275,11 +279,11 @@ async function submitServiceModal() {
 }
 
 async function reviewAssetSwitch(id, action) {
-  var note = prompt(action === 'approve' ? 'Catatan persetujuan / hasil pemeriksaan serah terima:' : 'Alasan penolakan:');
+  var note = await appPrompt(action === 'approve' ? 'Catatan persetujuan / hasil pemeriksaan serah terima:' : 'Alasan penolakan:');
   if (note === null) return;
-  if (!confirm(responsibilityNotice + '\n\n' + (action === 'approve' ? 'Setujui switch dan pindahkan tanggung jawab?' : 'Tolak permintaan switch ini?'))) return;
+  if (!await appConfirm(responsibilityNotice + '\n\n' + (action === 'approve' ? 'Setujui switch dan pindahkan tanggung jawab?' : 'Tolak permintaan switch ini?'))) return;
   var result = await api('/api/assets/switch-requests/'+id+'/'+action, {method:'POST', body:JSON.stringify({note:note.trim()})});
-  if (!result || result.error) { alert(result && result.error || 'Gagal memproses approval'); return; }
+  if (!result || result.error) { appAlert(result && result.error || 'Gagal memproses approval'); return; }
   await openSwitchHistory();
   await loadBranchAssets();
 }

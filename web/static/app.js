@@ -383,14 +383,14 @@ async function updateDeviceAgent(deviceID) {
   if (!device) return;
   var hostname = device.hostname || device.id;
   var currentVersion = device.version || 'tidak diketahui';
-  if (!confirm('Update agent ' + hostname + ' dari v' + currentVersion + ' ke v' + serverAgentVersion + '?\n\nLakukan satu perangkat pilot terlebih dahulu. Remote akan terputus beberapa detik saat agent restart.')) return;
+  if (!await appConfirm('Update agent ' + hostname + ' dari v' + currentVersion + ' ke v' + serverAgentVersion + '?\n\nLakukan satu perangkat pilot terlebih dahulu. Remote akan terputus beberapa detik saat agent restart.')) return;
   pendingAgentUpdates[deviceID] = true;
   renderDevices();
   var res = await api('/api/agent/update', { method:'POST', body:JSON.stringify({device_id:deviceID}) });
   if (!res || res.error) {
     delete pendingAgentUpdates[deviceID];
     renderDevices();
-    alert('Update gagal dikirim: ' + ((res && res.error) || 'Unknown error'));
+    appAlert('Update gagal dikirim: ' + ((res && res.error) || 'Unknown error'));
     return;
   }
   showToast('Update v' + serverAgentVersion + ' dikirim ke ' + hostname + '.');
@@ -398,9 +398,9 @@ async function updateDeviceAgent(deviceID) {
 }
 
 async function updateAllOutdatedAgents() {
-  if (!confirm('Update semua agent Online yang tertinggal ke v' + serverAgentVersion + '?\n\nSebaiknya gunakan ini hanya setelah satu perangkat pilot berhasil. Agent Offline tidak akan disentuh.')) return;
+  if (!await appConfirm('Update semua agent Online yang tertinggal ke v' + serverAgentVersion + '?\n\nSebaiknya gunakan ini hanya setelah satu perangkat pilot berhasil. Agent Offline tidak akan disentuh.')) return;
   var res = await api('/api/agent/broadcast-update', { method:'POST' });
-  if (!res || res.error) { alert('Update massal gagal: ' + ((res && res.error) || 'Unknown error')); return; }
+  if (!res || res.error) { appAlert('Update massal gagal: ' + ((res && res.error) || 'Unknown error')); return; }
   showToast('Update dikirim ke ' + res.agents_notified + ' agent yang tertinggal.');
   setTimeout(loadDevices, 12000);
 }
@@ -766,13 +766,14 @@ function openAddAssetModal() {
   
   var assetSel = document.getElementById('assetBranchInput');
   if(assetSel) {
-      assetSel.value = (currentUser && currentUser.branch) ? currentUser.branch : ((document.getElementById('branchSelectFilter')||{}).value || 'Pusat');
+      assetSel.value = (currentUser && currentUser.branch) ? currentUser.branch : ((document.getElementById('branchSelectFilter')||{}).value || '');
   }
   
   if (currentUser && currentUser.role === 'adh') document.getElementById('assetBranchInput').disabled = true;
   else document.getElementById('assetBranchInput').disabled = false;
   document.getElementById('assetLocationInput').value = '';
   document.getElementById('assetAssignedInput').value = '';
+  document.getElementById('assetAssignedInput').disabled = false;
   document.getElementById('assetSNInput').value = '';
   document.getElementById('assetConditionInput').value = 'good';
   document.getElementById('assetSpecsInput').value = '';
@@ -798,6 +799,7 @@ function openEditAssetModal(id) {
   else document.getElementById('assetBranchInput').disabled = false;
   document.getElementById('assetLocationInput').value = asset.location || '';
   document.getElementById('assetAssignedInput').value = asset.assigned_to || '';
+  document.getElementById('assetAssignedInput').disabled = true;
   document.getElementById('assetSNInput').value = asset.serial_number || '';
   document.getElementById('assetConditionInput').value = asset.condition || 'good';
   document.getElementById('assetSpecsInput').value = asset.specs || '';
@@ -821,18 +823,19 @@ async function saveManualAsset() {
   var condition = document.getElementById('assetConditionInput').value;
   var specs = document.getElementById('assetSpecsInput').value.trim();
 
-  if (!assetTag || !name) { alert('Nomor tag dan Nama perangkat wajib diisi!'); return; }
+  if (!assetTag || !name) { appAlert('Nomor tag dan Nama perangkat wajib diisi!'); return; }
 
-  var payload = { asset_tag: assetTag, name: name, category: category, branch: branch || 'Pusat', location: location, assigned_to: assignedTo, serial_number: sn, condition: condition, specs: specs };
+  if (!branch) { appAlert('Pilih lokasi aset terlebih dahulu.'); return; }
+  var payload = { asset_tag: assetTag, name: name, category: category, branch: branch, location: location, assigned_to: assignedTo, serial_number: sn, condition: condition, specs: specs };
   payload.acquisition_year = Number(document.getElementById('assetAcquisitionYear').value) || 0;
 
   if (id) {
     var saved = await api('/api/assets/manual/' + id, { method: 'PUT', body: JSON.stringify(payload) });
-    if (!saved || saved.error) { alert(saved && saved.error || 'Gagal menyimpan aset'); return; }
+    if (!saved || saved.error) { appAlert(saved && saved.error || 'Gagal menyimpan aset'); return; }
     showToast('Aset diperbarui');
   } else {
     var created = await api('/api/assets/manual', { method: 'POST', body: JSON.stringify(payload) });
-    if (!created || created.error) { alert(created && created.error || 'Gagal menyimpan aset'); return; }
+    if (!created || created.error) { appAlert(created && created.error || 'Gagal menyimpan aset'); return; }
     showToast('Aset ditambahkan');
   }
 
@@ -842,11 +845,11 @@ async function saveManualAsset() {
 }
 
 async function deleteManualAsset(id) {
-  if (!confirm('Hapus data aset manual ini?')) return;
-  var reason = prompt('Alasan penghapusan aset (wajib):');
-  if (!reason || !reason.trim()) { alert('Alasan penghapusan wajib diisi.'); return; }
+  if (!await appConfirm('Hapus data aset manual ini?')) return;
+  var reason = await appPrompt('Alasan penghapusan aset (wajib):');
+  if (!reason || !reason.trim()) { appAlert('Alasan penghapusan wajib diisi.'); return; }
   var res = await api('/api/assets/manual/' + id, { method: 'DELETE', body: JSON.stringify({reason:reason.trim()}) });
-  if (!res || res.error) { alert('Gagal menghapus: '+((res&&res.error)||'Terjadi kesalahan')); return; }
+  if (!res || res.error) { appAlert('Gagal menghapus: '+((res&&res.error)||'Terjadi kesalahan')); return; }
   showToast('Aset dihapus');
   loadBranchAssets();
 }
@@ -887,7 +890,7 @@ async function submitVerification() {
     closeVerificationModal();
     loadBranchAssets();
   } else {
-    alert('Gagal: ' + ((res && res.error) || 'Terjadi kesalahan'));
+    appAlert('Gagal: ' + ((res && res.error) || 'Terjadi kesalahan'));
   }
 }
 
@@ -989,13 +992,13 @@ async function submitEditUser() {
   var branchSel = document.getElementById('editUserBranch');
   var branch = getSelectValues(branchSel).join(', ');
 
-  if (!username) { alert('Username wajib diisi'); return; }
+  if (!username) { appAlert('Username wajib diisi'); return; }
   if ((role === 'adh' || role === 'user' || role === 'spv') && !branch) {
-    alert('Nama lokasi/cabang wajib diisi untuk ADH/SPV/User');
+    appAlert('Nama lokasi/cabang wajib diisi untuk ADH/SPV/User');
     return;
   }
 
-  if (password && (Array.from(password).length < 15 || Array.from(password).length > 128)) { alert('Password harus 15-128 karakter'); return; }
+  if (password && (Array.from(password).length < 15 || Array.from(password).length > 128)) { appAlert('Password harus 15-128 karakter'); return; }
   var payload = { username: username, role: role, branch: branch };
   if (password) payload.password = password;
 
@@ -1012,7 +1015,7 @@ async function submitEditUser() {
       updateUserUI();
     }
   } else {
-    alert('Gagal memperbarui: ' + ((res && res.error) || 'Terjadi kesalahan'));
+    appAlert('Gagal memperbarui: ' + ((res && res.error) || 'Terjadi kesalahan'));
   }
 }
 
@@ -1025,9 +1028,9 @@ async function createUser() {
   var branchSel = document.getElementById('newUserBranch');
   var branch = getSelectValues(branchSel).join(', ');
   
-  if (!username || !password) { alert('Username dan Password wajib diisi'); return; }
-  if (Array.from(password).length < 15 || Array.from(password).length > 128) { alert('Password harus 15-128 karakter'); return; }
-  if ((role === 'adh' || role === 'user' || role === 'spv') && !branch) { alert('Nama lokasi wajib diisi untuk ADH/SPV/User'); return; }
+  if (!username || !password) { appAlert('Username dan Password wajib diisi'); return; }
+  if (Array.from(password).length < 15 || Array.from(password).length > 128) { appAlert('Password harus 15-128 karakter'); return; }
+  if ((role === 'adh' || role === 'user' || role === 'spv') && !branch) { appAlert('Nama lokasi wajib diisi untuk ADH/SPV/User'); return; }
 
   var res = await api('/api/users', { method:'POST', body:JSON.stringify({ username:username, password:password, role:role, branch:branch }) });
   if (res && res.status === 'created') {
@@ -1040,20 +1043,20 @@ async function createUser() {
     loadUsers();
     loadBranches();
   } else {
-    alert('Gagal: ' + ((res && res.error) || 'Terjadi kesalahan'));
+    appAlert('Gagal: ' + ((res && res.error) || 'Terjadi kesalahan'));
   }
 }
 
 
 async function deleteUser(id, username) {
   var nameStr = username ? 'user ' + username : 'akun ini';
-  if (!confirm('Hapus ' + nameStr + '?')) return;
+  if (!await appConfirm('Hapus ' + nameStr + '?')) return;
   var res = await api('/api/users/' + id, { method: 'DELETE' });
   if (res && res.status === 'deleted') {
     showToast('Akun berhasil dihapus');
     loadUsers();
   } else {
-    alert('Gagal menghapus: ' + ((res && res.error) || 'Terjadi kesalahan'));
+    appAlert('Gagal menghapus: ' + ((res && res.error) || 'Terjadi kesalahan'));
   }
 }
 
@@ -1131,17 +1134,17 @@ async function openDeviceModal(id) {
 }
 
 async function configureRustDesk() {
-  var config = prompt('Tempel Server Config String hasil Export Server Config dari RustDesk. Nilai ini tidak akan ditampilkan kembali:');
+  var config = await appPrompt('Tempel Server Config String hasil Export Server Config dari RustDesk. Nilai ini tidak akan ditampilkan kembali:');
   if (!config) return;
   var result = await api('/api/rustdesk/settings', {method:'POST', body:JSON.stringify({config:config.trim()})});
   config = '';
-  if (!result || result.error) { alert((result && result.error) || 'Konfigurasi RustDesk gagal disimpan'); return; }
+  if (!result || result.error) { appAlert((result && result.error) || 'Konfigurasi RustDesk gagal disimpan'); return; }
   showToast('Konfigurasi deployment RustDesk tersimpan');
 }
 
 function manageRustDesk(operation) {
   if (!currentDevice) return;
-  if (!currentDevice.online) { alert('Agent harus online untuk mengelola RustDesk.'); return; }
+  if (!currentDevice.online) { appAlert('Agent harus online untuk mengelola RustDesk.'); return; }
   document.getElementById('rustDeskOperation').value = operation;
   document.getElementById('rustDeskManageTitle').textContent = operation === 'install' ? 'Install/Konfigurasi RustDesk' : 'Set/Reset Password RustDesk';
   document.getElementById('rustDeskPassword').value = '';
@@ -1186,8 +1189,8 @@ function closeDeviceModal() { document.getElementById('deviceModal').style.displ
 
 async function startNetworkScan() {
   if (!currentDevice) return;
-  if (!currentDevice.online) { alert('Agent harus online untuk memindai jaringan lokal.'); return; }
-  if (!confirm('Pindai subnet lokal dari Agent ini? Scan dibatasi ke jaringan /24 Agent.')) return;
+  if (!currentDevice.online) { appAlert('Agent harus online untuk memindai jaringan lokal.'); return; }
+  if (!await appConfirm('Pindai subnet lokal dari Agent ini? Scan dibatasi ke jaringan /24 Agent.')) return;
   var box = document.getElementById('networkScanResult');
   box.style.display = 'block'; box.innerHTML = '<small>Meminta Agent memindai jaringan lokal...</small>';
   var scan = await api('/api/network-scans', { method:'POST', body:JSON.stringify({device_id:currentDevice.id}) });
@@ -1209,7 +1212,7 @@ async function startNetworkScan() {
 function resetIdleTimer() {
   if (!token) return;
   clearTimeout(idleTimer);
-  idleTimer = setTimeout(function(){ alert('Sesi berakhir karena 30 menit tidak ada aktivitas.'); doLogout(); }, IDLE_TIMEOUT_MS);
+  idleTimer = setTimeout(function(){ appAlert('Sesi berakhir karena 30 menit tidak ada aktivitas.'); doLogout(); }, IDLE_TIMEOUT_MS);
 }
 ['click','keydown','mousemove','touchstart'].forEach(function(e){ document.addEventListener(e, resetIdleTimer, {passive:true}); });
 
@@ -1224,7 +1227,7 @@ async function saveDeviceMeta() {
       acquisition_year: Number(document.getElementById('modalAcquisitionYear').value) || 0
     })
   });
-  if (!saved || saved.error) { alert(saved && saved.error || 'Gagal menyimpan perangkat'); return; }
+  if (!saved || saved.error) { appAlert(saved && saved.error || 'Gagal menyimpan perangkat'); return; }
   closeDeviceModal();
   loadDevices();
   loadGroups();
@@ -1234,11 +1237,11 @@ async function saveDeviceMeta() {
 
 async function deleteDevice() {
   if (!currentDevice) return;
-  if (!confirm('Delete device ' + currentDevice.hostname + '?')) return;
-  var reason = prompt('Alasan penghapusan perangkat (wajib):');
-  if (!reason || !reason.trim()) { alert('Alasan penghapusan wajib diisi.'); return; }
+  if (!await appConfirm('Delete device ' + currentDevice.hostname + '?')) return;
+  var reason = await appPrompt('Alasan penghapusan perangkat (wajib):');
+  if (!reason || !reason.trim()) { appAlert('Alasan penghapusan wajib diisi.'); return; }
   var res = await api('/api/devices/' + currentDevice.id, { method: 'DELETE', body: JSON.stringify({reason:reason.trim()}) });
-  if (!res || res.error) { alert('Gagal menghapus: '+((res&&res.error)||'Terjadi kesalahan')); return; }
+  if (!res || res.error) { appAlert('Gagal menghapus: '+((res&&res.error)||'Terjadi kesalahan')); return; }
   closeDeviceModal();
   loadDevices();
   loadBranchAssets();
@@ -1554,10 +1557,10 @@ checkAuth();
 // ==================== RECONFIGURE ENDPOINT (ADMIN) ====================
 
 async function openReconfigureModal() {
-  var newUrl = prompt('Masukkan Endpoint Baru untuk 400 Agent (misal: https://newserver.synology.me:8443):');
+  var newUrl = await appPrompt('Masukkan Endpoint Baru untuk 400 Agent (misal: https://newserver.synology.me:8443):');
   if (!newUrl || !newUrl.trim()) return;
   newUrl = newUrl.trim();
-  if (!confirm('PERHATIAN: Semua ' + (devices.length || '?') + ' agent yang sedang online akan berpindah ke endpoint baru:\n\n' + newUrl + '\n\nApakah yakin?')) return;
+  if (!await appConfirm('PERHATIAN: Semua ' + (devices.length || '?') + ' agent yang sedang online akan berpindah ke endpoint baru:\n\n' + newUrl + '\n\nApakah yakin?')) return;
 
   var res = await api('/api/agent/reconfigure', {
     method: 'POST',
@@ -1567,7 +1570,7 @@ async function openReconfigureModal() {
   if (res && res.status === 'reconfigure_sent') {
     showToast('Perintah pindah endpoint terkirim ke ' + res.agents_notified + ' agent. Config mereka akan otomatis terupdate.');
   } else {
-    alert('Gagal: ' + ((res && res.error) || 'Unknown error'));
+    appAlert('Gagal: ' + ((res && res.error) || 'Unknown error'));
   }
 }
 
@@ -1605,7 +1608,7 @@ async function submitChangePassword() {
       errEl.textContent = msg;
       errEl.style.display = 'block';
     } else {
-      alert(msg);
+      appAlert(msg);
     }
   }
 
@@ -1636,10 +1639,10 @@ async function submitChangePassword() {
 }
 
 async function resetUserPassword(id, username) {
-  var newPass = prompt('Masukkan password baru untuk user ' + username + ' (minimal 15 karakter):');
+  var newPass = await appPrompt('Masukkan password baru untuk user ' + username + ' (minimal 15 karakter):', '', { type: 'password' });
   if (!newPass || !newPass.trim()) return;
   if (Array.from(newPass).length < 15) {
-    alert('Password minimal 15 karakter!');
+    appAlert('Password minimal 15 karakter!');
     return;
   }
   var res = await api('/api/users/' + id + '/reset-password', {
@@ -1649,7 +1652,7 @@ async function resetUserPassword(id, username) {
   if (res && res.status === 'success') {
     showToast('Password untuk ' + username + ' berhasil direset');
   } else {
-    alert('Gagal reset password: ' + ((res && res.error) || 'Terjadi kesalahan'));
+    appAlert('Gagal reset password: ' + ((res && res.error) || 'Terjadi kesalahan'));
   }
 }
 
@@ -1841,13 +1844,13 @@ async function submitEnableMFA() {
 }
 
 async function resetUserMFA(id, username) {
-  if (!confirm('Reset 2FA untuk user ' + username + '? Sesi lama akan tidak berlaku. User wajib setup MFA kembali sebelum bisa mengakses aplikasi.')) return;
+  if (!await appConfirm('Reset 2FA untuk user ' + username + '? Sesi lama akan tidak berlaku. User wajib setup MFA kembali sebelum bisa mengakses aplikasi.')) return;
   const res = await api('/api/users/' + id + '/reset-mfa', { method: 'POST' });
   if (res && res.status === 'success') {
     showToast('2FA untuk ' + username + ' berhasil direset');
     loadUsers();
   } else {
-    alert('Gagal reset 2FA: ' + ((res && res.error) || 'Terjadi kesalahan'));
+    appAlert('Gagal reset 2FA: ' + ((res && res.error) || 'Terjadi kesalahan'));
   }
 }
 
@@ -1879,7 +1882,7 @@ async function submitChangeUsername() {
       errEl.textContent = msg;
       errEl.style.display = 'block';
     } else {
-      alert(msg);
+      appAlert(msg);
     }
   }
 
@@ -2047,11 +2050,11 @@ async function saveSecuritySettings() {
   var wl = ((document.getElementById('secIPWhitelist') || {}).value || '').trim();
 
   if (maxAtt <= 0 || maxAtt > 50) {
-    alert('Batas maksimal salah password harus antara 1 sampai 50');
+    appAlert('Batas maksimal salah password harus antara 1 sampai 50');
     return;
   }
   if (blockDur <= 0 || blockDur > 1440) {
-    alert('Durasi pemblokiran harus antara 1 sampai 1440 menit (24 jam)');
+    appAlert('Durasi pemblokiran harus antara 1 sampai 1440 menit (24 jam)');
     return;
   }
 
@@ -2069,12 +2072,12 @@ async function saveSecuritySettings() {
     showToast('Pengaturan proteksi brute-force berhasil disimpan!');
     loadSecuritySettings();
   } else {
-    alert('Gagal menyimpan: ' + ((res && res.error) || 'Terjadi kesalahan'));
+    appAlert('Gagal menyimpan: ' + ((res && res.error) || 'Terjadi kesalahan'));
   }
 }
 
 async function unblockIP(ip) {
-  if (!confirm('Buka blokir IP ' + ip + '? User di IP ini akan bisa mencoba login kembali segera.')) return;
+  if (!await appConfirm('Buka blokir IP ' + ip + '? User di IP ini akan bisa mencoba login kembali segera.')) return;
   var res = await api('/api/security/unblock', {
     method: 'POST',
     body: JSON.stringify({ ip: ip })
@@ -2084,7 +2087,7 @@ async function unblockIP(ip) {
     showToast('IP ' + ip + ' berhasil dibuka blokirnya!');
     loadSecuritySettings();
   } else {
-    alert('Gagal membuka blokir: ' + ((res && res.error) || 'Terjadi kesalahan'));
+    appAlert('Gagal membuka blokir: ' + ((res && res.error) || 'Terjadi kesalahan'));
   }
 }
 
@@ -2115,7 +2118,7 @@ async function loadBusinessUnits(selected) {
   box.innerHTML = units.map(function(u){ return '<label style="display:flex;gap:4px;align-items:center;font-size:12px"><input type="checkbox" value="'+esc(u)+'" '+(selected.indexOf(u)>=0?'checked':'')+'>'+esc(u)+'</label>'; }).join('') || '<small style="color:var(--fg2)">Belum ada bisnis unit.</small>';
 }
 function selectedBusinessUnits() { return Array.prototype.slice.call(document.querySelectorAll('#branchBusinessUnitsInput input:checked')).map(function(x){return x.value;}); }
-async function addBusinessUnit() { var name=prompt('Nama bisnis unit baru:'); if(!name) return; var r=await api('/api/business-units',{method:'POST',body:JSON.stringify({name:name.trim()})}); if(!r||r.error){alert('Gagal: '+((r&&r.error)||'Terjadi kesalahan'));return;} await loadBusinessUnits(selectedBusinessUnits().concat([name.trim()])); }
+async function addBusinessUnit() { var name=await appPrompt('Nama bisnis unit baru:'); if(!name) return; var r=await api('/api/business-units',{method:'POST',body:JSON.stringify({name:name.trim()})}); if(!r||r.error){appAlert('Gagal: '+((r&&r.error)||'Terjadi kesalahan'));return;} await loadBusinessUnits(selectedBusinessUnits().concat([name.trim()])); }
 
 function closeBranchesModal() {
   var modal = document.getElementById('branchesModal');
@@ -2124,16 +2127,16 @@ function closeBranchesModal() {
 }
 
 async function renameLocationType() {
-  var oldType = prompt('Nama tipe saat ini, contoh: Pusat');
+  var oldType = await appPrompt('Nama tipe saat ini, contoh: Pusat');
   if (oldType === null) return;
   oldType = oldType.trim();
-  var newType = prompt('Nama tipe baru, contoh: HO', oldType);
+  var newType = await appPrompt('Nama tipe baru, contoh: HO', oldType);
   if (newType === null) return;
   newType = newType.trim();
-  if (!oldType || !newType) { alert('Nama tipe wajib diisi.'); return; }
-  if (!confirm('Ubah semua tipe lokasi "' + oldType + '" menjadi "' + newType + '"?')) return;
+  if (!oldType || !newType) { appAlert('Nama tipe wajib diisi.'); return; }
+  if (!await appConfirm('Ubah semua tipe lokasi "' + oldType + '" menjadi "' + newType + '"?')) return;
   var res = await api('/api/location-types/rename', {method:'POST', body:JSON.stringify({old_type:oldType, new_type:newType})});
-  if (!res || res.error) { alert('Gagal mengubah tipe: ' + ((res&&res.error)||'Terjadi kesalahan')); return; }
+  if (!res || res.error) { appAlert('Gagal mengubah tipe: ' + ((res&&res.error)||'Terjadi kesalahan')); return; }
   showToast('Nama tipe lokasi berhasil diperbarui.');
   await loadBranchesManagement();
 }
@@ -2163,10 +2166,10 @@ async function createBranch() {
   var nameInput = document.getElementById('branchNameInput');
   var typeInput = document.getElementById('branchTypeInput');
   var name = (nameInput.value || '').trim();
-  if (!name) { alert('Nama lokasi wajib diisi.'); nameInput.focus(); return; }
+  if (!name) { appAlert('Nama lokasi wajib diisi.'); nameInput.focus(); return; }
   var businessUnits = selectedBusinessUnits();
   var res = await api('/api/branches', { method:'POST', body:JSON.stringify({ name:name, type:typeInput.value, business_units:businessUnits }) });
-  if (!res || res.error) { alert('Gagal menambahkan lokasi: ' + ((res && res.error) || 'Terjadi kesalahan')); return; }
+  if (!res || res.error) { appAlert('Gagal menambahkan lokasi: ' + ((res && res.error) || 'Terjadi kesalahan')); return; }
   nameInput.value = '';
   showToast('Lokasi ' + name + ' berhasil ditambahkan.');
   await Promise.all([loadBranchesManagement(), loadBranches()]);
@@ -2178,14 +2181,14 @@ async function editBranch(id) {
   var oldName = branch.name;
   var oldType = branch.type;
   await loadBusinessUnits(branch.business_units || []);
-  var name = prompt('Nama lokasi:', oldName);
+  var name = await appPrompt('Nama lokasi:', oldName);
   if (name === null) return;
   name = name.trim();
-  if (!name) { alert('Nama lokasi wajib diisi.'); return; }
-  var type = prompt('Tipe lokasi:', oldType);
+  if (!name) { appAlert('Nama lokasi wajib diisi.'); return; }
+  var type = await appPrompt('Tipe lokasi:', oldType);
   if (type === null) return;
   var res = await api('/api/branches/' + id, { method:'PUT', body:JSON.stringify({ name:name, type:type.trim(), business_units:selectedBusinessUnits() }) });
-  if (!res || res.error) { alert('Gagal mengubah lokasi: ' + ((res && res.error) || 'Terjadi kesalahan')); return; }
+  if (!res || res.error) { appAlert('Gagal mengubah lokasi: ' + ((res && res.error) || 'Terjadi kesalahan')); return; }
   showToast('Lokasi berhasil diperbarui.');
   await Promise.all([loadBranchesManagement(), loadBranches(), loadBranchAssets()]);
 }
@@ -2194,9 +2197,9 @@ async function deleteBranch(id) {
   var branch = branchManagementRows[id];
   if (!branch) return;
   var name = branch.name;
-  if (!confirm('Hapus lokasi ' + name + '? Lokasi yang masih dipakai tidak dapat dihapus.')) return;
+  if (!await appConfirm('Hapus lokasi ' + name + '? Lokasi yang masih dipakai tidak dapat dihapus.')) return;
   var res = await api('/api/branches/' + id, { method:'DELETE' });
-  if (!res || res.error) { alert('Gagal menghapus lokasi: ' + ((res && res.error) || 'Terjadi kesalahan')); return; }
+  if (!res || res.error) { appAlert('Gagal menghapus lokasi: ' + ((res && res.error) || 'Terjadi kesalahan')); return; }
   showToast('Lokasi ' + name + ' berhasil dihapus.');
   await Promise.all([loadBranchesManagement(), loadBranches()]);
 }
@@ -2216,7 +2219,7 @@ async function openDownloadAgentModal() {
       sel.disabled = true;
     } else {
       sel.disabled = false;
-      sel.innerHTML = buildBranchOptionsHTML(true, 'Pusat');
+      sel.innerHTML = '<option value="">Pilih lokasi</option>' + buildBranchOptionsHTML(true, '');
       var currentFilter = (document.getElementById('branchSelectFilter') || {}).value;
       if (currentFilter && sel.querySelector('option[value="' + currentFilter + '"]')) {
         sel.value = currentFilter;
@@ -2234,11 +2237,12 @@ function closeDownloadAgentModal() {
 
 function copyDownloadAgentLink() {
   var sel = document.getElementById('dlAgentBranch');
-  var branch = (sel && sel.value) ? sel.value.trim() : 'Pusat';
+  var branch = (sel && sel.value) ? sel.value.trim() : '';
   if (currentUser && currentUser.role === 'adh' && currentUser.branch) {
     branch = currentUser.branch;
   }
   var os = (document.getElementById('dlAgentOS') || {}).value || 'windows';
+  if (!branch) { appAlert('Pilih lokasi terlebih dahulu.'); return; }
   
   // Create absolute URL
   var link = window.location.origin + '/api/agent/package?branch=' + encodeURIComponent(branch) + '&os=' + encodeURIComponent(os) + '&token=' + encodeURIComponent(token);
@@ -2247,20 +2251,21 @@ function copyDownloadAgentLink() {
     navigator.clipboard.writeText(link).then(function() {
       showToast('Link download untuk cabang ' + branch + ' disalin ke clipboard');
     }).catch(function() {
-      alert('Gagal menyalin link: ' + link);
+      appAlert('Gagal menyalin link: ' + link);
     });
   } else {
-    alert('Link: ' + link);
+    appAlert('Link: ' + link);
   }
 }
 
 function submitDownloadAgentPackage() {
   var sel = document.getElementById('dlAgentBranch');
-  var branch = (sel && sel.value) ? sel.value.trim() : 'Pusat';
+  var branch = (sel && sel.value) ? sel.value.trim() : '';
   if (currentUser && currentUser.role === 'adh' && currentUser.branch) {
     branch = currentUser.branch;
   }
   var os = (document.getElementById('dlAgentOS') || {}).value || 'windows';
+  if (!branch) { appAlert('Pilih lokasi terlebih dahulu.'); return; }
 
   var downloadURL = '/api/agent/package?branch=' + encodeURIComponent(branch) + '&os=' + encodeURIComponent(os) + '&token=' + encodeURIComponent(token);
   

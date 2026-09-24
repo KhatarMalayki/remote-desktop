@@ -58,7 +58,7 @@ func (d *DB) AddActivity(a *models.AssetActivity) error {
 
 func (d *DB) ListHolderOptions(branch string) ([]models.User, error) {
 	branch = strings.TrimSpace(branch)
-	rows, err := d.db.Query(`SELECT id,username,role,branch,mfa_enabled,created_at FROM users WHERE role IN ('adh','spv','user','ga_pusat','it_support') ORDER BY username`)
+	rows, err := d.db.Query(`SELECT id,username,role,branch,mfa_enabled,created_at FROM users WHERE role IN ('admin','adh','spv','user','ga_pusat','it_support') ORDER BY username`)
 	if err != nil {
 		return nil, err
 	}
@@ -69,7 +69,7 @@ func (d *DB) ListHolderOptions(branch string) ([]models.User, error) {
 		if err := rows.Scan(&u.ID, &u.Username, &u.Role, &u.Branch, &u.MFAEnabled, &u.CreatedAt); err != nil {
 			return nil, err
 		}
-		if userAllowsBranch(u.Branch, branch) {
+		if eligibleHolderAt(u.Role, u.Branch, branch) {
 			out = append(out, u)
 		}
 	}

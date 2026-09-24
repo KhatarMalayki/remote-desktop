@@ -656,3 +656,12 @@ select.filter-select {
 .handover-notice { padding:10px 12px; border-radius:8px; background:rgba(79,140,255,.08); color:var(--fg2); font-size:11px; line-height:1.5; }
 .form-error { margin-top:10px; color:var(--red); font-size:12px; }
 @media (max-width:620px) { .handover-owner-row { grid-template-columns:1fr; } .handover-arrow { transform:rotate(90deg); justify-self:center; } }
+.app-dialog { width: min(480px, calc(100vw - 32px)); box-sizing: border-box; max-height: calc(100dvh - 32px); overflow: auto; padding: 24px; border: 1px solid var(--border); border-radius: 14px; background: var(--bg2); color: var(--fg); box-shadow: 0 24px 80px #0008; }
+.app-dialog { margin: auto; }
+.app-dialog::backdrop { background: #0009; backdrop-filter: blur(3px); }
+.app-dialog h3 { margin: 0 0 16px; }
+.app-dialog p { white-space: pre-wrap; overflow-wrap: anywhere; color: var(--fg2); line-height: 1.6; margin-bottom: 20px; }
+.app-dialog input { box-sizing: border-box; width: 100%; margin-top: 8px; padding: 12px; border: 1px solid var(--border); border-radius: 8px; color: var(--fg); background: var(--bg); }
+.app-dialog .modal-actions { margin-top: 24px; gap: 10px; }
+.app-dialog :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.app-dialog [hidden] { display: none; }
