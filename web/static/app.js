@@ -607,6 +607,8 @@ function renderBranchAssets() {
   var search = ((document.getElementById('branchAssetSearch')||{}).value || '').toLowerCase();
   var catFilter = (document.getElementById('branchCategoryFilter')||{}).value || '';
   var statusFilter = (document.getElementById('branchStatusFilter')||{}).value || '';
+  var taskFilter = (document.getElementById('branchTaskFilter')||{}).value || '';
+  var sort = (document.getElementById('branchSort')||{}).value || 'priority';
   var branchFilter = (document.getElementById('branchSelectFilter')||{}).value || '';
   var userBranches = (currentUser && currentUser.role === 'adh' && currentUser.branch)
     ? currentUser.branch.split(',').map(function(s){return s.trim();}).filter(Boolean)
@@ -615,7 +617,7 @@ function renderBranchAssets() {
   var items = [];
   if (currentAssetTab === 'all' || currentAssetTab === 'manual') {
     manualAssets.forEach(function(a) {
-      items.push({ isManual:true, id:a.id, tag:a.asset_tag, name:a.name, category:a.category, branch:a.branch, location:a.location, pic:a.assigned_to, condition:a.condition, status:a.status||'active', specs:a.specs||a.serial_number, vStatus:a.verification_status||'unverified', vAt:a.verified_at, vBy:a.verified_by, vNote:a.verification_note });
+      items.push({ isManual:true, id:a.id, tag:a.asset_tag, name:a.name, category:a.category, branch:a.branch, location:a.location, owner:a.owner_username, pic:a.assigned_to, condition:a.condition, status:a.status||'active', specs:a.specs||a.serial_number, vStatus:a.verification_status||'unverified', vAt:a.verified_at, vBy:a.verified_by, vNote:a.verification_note });
     });
   }
   if (currentAssetTab === 'all' || currentAssetTab === 'device') {
@@ -623,7 +625,7 @@ function renderBranchAssets() {
       var dBranch = d.branch || d.group || 'default';
       if (branchFilter && dBranch !== branchFilter) return;
       if (userBranches.length > 0 && !branchFilter && userBranches.indexOf(dBranch) === -1) return;
-      items.push({ isManual:false, id:d.id, tag:d.hostname, name:d.os+' '+d.arch+' ('+d.hostname+')', category:'pc', branch:dBranch, location:d.local_ip||d.ip, pic:d.assigned_to||d.note||'-', condition:d.condition||(d.online?'good':'fair'), status:d.status||'active', specs:d.cpu_model+' ('+d.cpu_cores+'c) | '+fmtBytes(d.memory_total), vStatus:d.verification_status||'unverified', vAt:d.verified_at, vBy:d.verified_by, vNote:d.verification_note });
+      items.push({ isManual:false, id:d.id, tag:d.hostname, name:d.os+' '+d.arch+' ('+d.hostname+')', category:'pc', branch:dBranch, location:d.local_ip||d.ip, owner:d.owner_username, pic:d.assigned_to||d.note||'', condition:d.condition||(d.online?'good':'fair'), status:d.status||'active', specs:d.cpu_model+' ('+d.cpu_cores+'c) | '+fmtBytes(d.memory_total), vStatus:d.verification_status||'unverified', vAt:d.verified_at, vBy:d.verified_by, vNote:d.verification_note });
     });
   }
 
@@ -647,7 +649,19 @@ function renderBranchAssets() {
   }
   if (catFilter) items = items.filter(function(it){return it.category===catFilter});
   if (statusFilter) items = items.filter(function(it){return it.vStatus===statusFilter});
+  if (taskFilter === 'unverified') items = items.filter(function(it){return it.vStatus !== 'verified'});
+  if (taskFilter === 'no_pic') items = items.filter(function(it){return !it.owner});
+  if (taskFilter === 'no_user') items = items.filter(function(it){return !it.pic});
+  if (taskFilter === 'complete') items = items.filter(function(it){return it.vStatus === 'verified' && it.owner && it.pic});
   if (search) items = items.filter(function(it){return (it.name||'').toLowerCase().includes(search)||(it.tag||'').toLowerCase().includes(search)||(it.location||'').toLowerCase().includes(search)||(it.pic||'').toLowerCase().includes(search)||(it.specs||'').toLowerCase().includes(search)});
+  var priority = function(it) { return (it.vStatus !== 'verified' ? 4 : 0) + (!it.owner ? 2 : 0) + (!it.pic ? 1 : 0); };
+  items.sort(function(a, b) {
+    if (sort === 'name_asc') return (a.name||'').localeCompare(b.name||'');
+    if (sort === 'name_desc') return (b.name||'').localeCompare(a.name||'');
+    if (sort === 'oldest_verified') return new Date(a.vAt||0) - new Date(b.vAt||0);
+    if (sort === 'newest_verified') return new Date(b.vAt||0) - new Date(a.vAt||0);
+    return priority(b) - priority(a) || (a.name||'').localeCompare(b.name||'');
+  });
 
   if (items.length === 0) {
     container.innerHTML = '<div class="empty-state"><p>Tidak ada aset ditemukan. Klik "+ Input Aset Manual" untuk menambahkan.</p></div>';
@@ -663,13 +677,15 @@ function renderBranchAssets() {
       var verifiedMeta = it.vBy
         ? '<strong>'+esc(it.vBy)+'</strong><span>'+esc(it.vAt?new Date(it.vAt).toLocaleDateString():'')+(it.vNote?' · '+esc(it.vNote):'')+'</span>'
         : '<strong>Belum dicek</strong><span>Belum ada riwayat verifikasi</span>';
-      return '<article class="asset-record" data-item-index="'+index+'">' +
+      var taskBadges = (!it.owner?'<span class="badge-status missing-pic">Belum ada PIC</span>':'') + (!it.pic?'<span class="badge-status missing-user">Belum ada pemakai</span>':'');
+      var taskClass = it.vStatus !== 'verified' ? ' needs-verification' : (!it.owner ? ' needs-pic' : '');
+      return '<article class="asset-record'+taskClass+'" data-item-index="'+index+'">' +
         '<div class="asset-record-head">' +
           '<div class="asset-record-identity"><div class="asset-record-icon">'+(it.isManual?'&#128230;':'&#128421;')+'</div><div>' +
             '<div class="asset-record-title">'+esc(it.name)+'</div>' +
             '<div class="asset-record-subtitle"><span>'+esc(it.tag)+'</span><span class="asset-source">'+(it.isManual?'Manual':'Agent')+'</span><span class="tag">'+esc(it.category.toUpperCase())+'</span></div>' +
           '</div></div>' +
-          '<div class="asset-record-badges">'+(it.status==='maintenance'?'<span class="badge-status" style="background:rgba(245,158,11,0.2);color:#fbbf24;border:1px solid rgba(245,158,11,0.4)">&#128295; Dalam Servis</span>':'')+'<span class="badge-cond '+condClass+'">'+condLabel+'</span><span class="badge-status '+vBadge+'">'+vLabel+'</span></div>' +
+          '<div class="asset-record-badges">'+taskBadges+(it.status==='maintenance'?'<span class="badge-status" style="background:rgba(245,158,11,0.2);color:#fbbf24;border:1px solid rgba(245,158,11,0.4)">&#128295; Dalam Servis</span>':'')+'<span class="badge-cond '+condClass+'">'+condLabel+'</span><span class="badge-status '+vBadge+'">'+vLabel+'</span></div>' +
         '</div>' +
         '<div class="asset-record-details">' +
           '<div class="asset-detail"><span>Spesifikasi</span><strong>'+esc(it.specs||'Belum tersedia')+'</strong></div>' +
@@ -710,7 +726,7 @@ function renderBranchAssets() {
     var asset = (item.isManual ? manualAssets : devices).find(function(a) { return a.id === item.id; }) || {};
     var actions = card.querySelector('.asset-record-actions');
     var holder = card.querySelector('.asset-holder');
-    holder.textContent = asset.owner_username || 'Belum ditugaskan';
+    holder.textContent = asset.owner_username || 'Belum ada PIC';
     function addAction(label, className, handler) {
       var button = document.createElement('button');
       button.className = className;

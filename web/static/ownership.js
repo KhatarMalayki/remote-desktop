@@ -110,7 +110,7 @@ async function relocateAsset(type, id) {
   var asset = type === 'manual' ? manualAssets.find(function(a) { return a.id === id; }) : devices.find(function(a) { return a.id === id; });
   if (!asset) return;
   relocateDraft = { type: type, id: id, asset: asset };
-  var currentBranch = asset.branch || asset.group || 'Pusat';
+  var currentBranch = asset.branch || asset.group || '';
   document.getElementById('relocateAssetName').textContent = (asset.name || asset.hostname) + ' · Lokasi saat ini: ' + currentBranch;
   document.getElementById('relocateAssetId').value = id;
   document.getElementById('relocateAssetType').value = type;
@@ -197,7 +197,7 @@ function openServiceModal(type, id, action) {
   document.getElementById('serviceAssetId').value = id;
   document.getElementById('serviceAssetType').value = type;
   document.getElementById('serviceAction').value = serviceDraft.action;
-  document.getElementById('serviceAssetName').textContent = (asset.name || asset.hostname) + ' (' + (asset.branch || asset.group || 'Pusat') + ')';
+  document.getElementById('serviceAssetName').textContent = (asset.name || asset.hostname) + ' (' + (asset.branch || asset.group || 'Lokasi belum diisi') + ')';
   document.getElementById('serviceError').style.display = 'none';
 
   var isComplete = serviceDraft.action === 'complete';

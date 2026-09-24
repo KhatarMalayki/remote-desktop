@@ -1,16 +1,16 @@
 # Graph Report - remote-desktop  (2026-09-24)
 
 ## Corpus Check
-- 66 files · ~153,410 words
+- 66 files · ~153,610 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 836 nodes · 1808 edges · 58 communities (51 shown, 7 thin omitted)
-- Extraction: 89% EXTRACTED · 11% INFERRED · 0% AMBIGUOUS · INFERRED: 207 edges (avg confidence: 0.79)
+- 836 nodes · 1810 edges · 59 communities (51 shown, 8 thin omitted)
+- Extraction: 88% EXTRACTED · 12% INFERRED · 0% AMBIGUOUS · INFERRED: 209 edges (avg confidence: 0.79)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `6e4de82c`
+- Built from commit: `64c7603d`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -64,6 +64,7 @@
 - NewDB
 - dialogs.test.cjs
 - dialogs.js
+- User
 
 ## God Nodes (most connected - your core abstractions)
 1. `Server` - 70 edges
@@ -92,7 +93,7 @@
 ## Import Cycles
 - None detected.
 
-## Communities (58 total, 7 thin omitted)
+## Communities (59 total, 8 thin omitted)
 
 ### Community 0 - "Community 0"
 Cohesion: 0.06
@@ -143,8 +144,8 @@ Cohesion: 0.19
 Nodes (15): activeInputDesktopName(), Rectangle, handleRemoteInput(), isSecureInputDesktop(), mouseFlags(), prepareRemoteDesktop(), releaseRemoteInputs(), sendKeyboardInput() (+7 more)
 
 ### Community 17 - "device.go"
-Cohesion: 0.11
-Nodes (13): ManageRustDesk(), Time, AssetActivity, AuthLog, BlockedIPInfo, Branch, DeviceHeartbeat, NetworkScan (+5 more)
+Cohesion: 0.13
+Nodes (12): ManageRustDesk(), Time, AssetActivity, AuthLog, BlockedIPInfo, Branch, DeviceHeartbeat, NetworkScan (+4 more)
 
 ### Community 19 - "NewDB"
 Cohesion: 0.10
@@ -265,7 +266,7 @@ Nodes (5): appAlert(), appConfirm(), appDialog(), appDialogQueue, appPrompt()
 ## Knowledge Gaps
 - **114 isolated node(s):** `github.com/user/remote-desktop`, `Agent`, `rustDeskExportConfig`, `RoleDefinition`, `credentialToken` (+109 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **7 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **8 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
@@ -274,7 +275,7 @@ _Questions this graph is uniquely positioned to answer:_
   _High betweenness centrality (0.085) - this node is a cross-community bridge._
 - **Why does `Server` connect `Community 1` to `device.go`, `Community 3`, `NewDB`?**
   _High betweenness centrality (0.077) - this node is a cross-community bridge._
-- **Why does `DB` connect `Community 2` to `Community 10`, `device.go`, `NewDB`, `.Close`, `ManualAsset`, `main`?**
+- **Why does `DB` connect `Community 2` to `Community 10`, `device.go`, `NewDB`, `.Close`, `ManualAsset`, `main`, `User`?**
   _High betweenness centrality (0.069) - this node is a cross-community bridge._
 - **Are the 9 inferred relationships involving `jsonError()` (e.g. with `.authorizeUserToken()` and `.handleActivities()`) actually correct?**
   _`jsonError()` has 9 INFERRED edges - model-reasoned connections that need verification._

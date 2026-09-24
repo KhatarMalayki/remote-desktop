@@ -227,6 +227,20 @@
           <option value="unverified">Belum Diverifikasi</option>
           <option value="discrepancy">Ada Masalah / Selisih</option>
         </select>
+        <select class="filter-select" id="branchTaskFilter" onchange="renderBranchAssets()">
+          <option value="">Semua Tugas</option>
+          <option value="unverified">Perlu Verifikasi</option>
+          <option value="no_pic">Belum Ada PIC</option>
+          <option value="no_user">Belum Ada Pemakai</option>
+          <option value="complete">Data Lengkap</option>
+        </select>
+        <select class="filter-select" id="branchSort" onchange="renderBranchAssets()">
+          <option value="priority">Urutkan: Prioritas</option>
+          <option value="name_asc">Nama A-Z</option>
+          <option value="name_desc">Nama Z-A</option>
+          <option value="oldest_verified">Verifikasi Terlama</option>
+          <option value="newest_verified">Verifikasi Terbaru</option>
+        </select>
         <input class="search-input" id="branchAssetSearch" placeholder="Cari nama aset, no. inventaris, PIC..." oninput="onSearchBranchAssets()">
         <button class="btn btn-ghost" onclick="loadBranchAssets()">&#8635; Refresh</button>
         <button class="btn btn-ghost" onclick="exportBranchAssetsCSV()">&#128230; Export CSV</button>

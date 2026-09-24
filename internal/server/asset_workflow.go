@@ -241,7 +241,8 @@ func (s *Server) handleHolderOptions(w http.ResponseWriter, r *http.Request) {
 		branch = c.Branch
 	}
 	if branch == "" {
-		branch = "Pusat"
+		jsonError(w, "branch is required", 400)
+		return
 	}
 	items, err := s.db.ListHolderOptions(branch)
 	if err != nil {
