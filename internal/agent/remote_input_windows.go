@@ -7,11 +7,16 @@ import (
 	"image"
 	"os/exec"
 	"strings"
+	"sync/atomic"
 	"syscall"
 	"unsafe"
 
 	"github.com/lxn/win"
 )
+
+var interactiveUserInput atomic.Bool
+
+func setInteractiveInputMode(enabled bool) { interactiveUserInput.Store(enabled) }
 
 var (
 	user32DLL             = syscall.NewLazyDLL("user32.dll")
@@ -169,7 +174,7 @@ func sendRemoteHotkey(keys []string) error {
 // reliable than the deprecated keybd_event/mouse_event APIs on the Winlogon
 // desktop and reports when Windows rejects an event instead of failing silently.
 func sendKeyboardInput(vk uint16, flags uint32) error {
-	if shouldUseLegacyInputFallback(activeInputDesktopName()) {
+	if shouldUseLegacyInputFallback(activeInputDesktopName(), interactiveUserInput.Load()) {
 		keybdEventProc.Call(uintptr(vk), 0, uintptr(flags), 0)
 		return nil
 	}
@@ -183,7 +188,7 @@ func sendKeyboardInput(vk uint16, flags uint32) error {
 }
 
 func sendMouseInput(flags uint32, data int32) error {
-	if shouldUseLegacyInputFallback(activeInputDesktopName()) {
+	if shouldUseLegacyInputFallback(activeInputDesktopName(), interactiveUserInput.Load()) {
 		mouseEventProc.Call(uintptr(flags), 0, 0, uintptr(data), 0)
 		return nil
 	}
@@ -196,8 +201,8 @@ func sendMouseInput(flags uint32, data int32) error {
 	return nil
 }
 
-func shouldUseLegacyInputFallback(desktopName string) bool {
-	return desktopName != "" && !strings.EqualFold(desktopName, "Winlogon")
+func shouldUseLegacyInputFallback(desktopName string, interactiveUser bool) bool {
+	return !interactiveUser && desktopName != "" && !strings.EqualFold(desktopName, "Winlogon")
 }
 
 func setRemoteCursor(x, y float64, bounds image.Rectangle) {

@@ -67,6 +67,8 @@ func (a *Agent) SetSecureRelayStarter(starter func(string) error) {
 
 func (a *Agent) SetUserRelayStarter(starter func(string) error) { a.userRelayStarter = starter }
 
+func (a *Agent) SetInteractiveUserRelay(enabled bool) { setInteractiveInputMode(enabled) }
+
 func (a *Agent) SetSecureDesktopOnly(secureOnly bool) {
 	a.secureDesktopOnly = secureOnly
 }

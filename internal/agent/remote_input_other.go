@@ -21,6 +21,8 @@ func isSecureInputDesktop() bool { return false }
 
 func activeInputDesktopName() string { return "" }
 
+func setInteractiveInputMode(bool) {}
+
 func setRemoteClipboard(text string) error {
 	return fmt.Errorf("clipboard is only supported on Windows")
 }

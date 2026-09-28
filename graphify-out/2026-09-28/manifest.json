@@ -1,12 +1,12 @@
 {
   "cmd/agent/main.go": {
-    "mtime": 1790610287.9530344,
-    "ast_hash": "973d8db349c7bdd7fc964e618e9b1cee",
+    "mtime": 1790613143.2833238,
+    "ast_hash": "98d8441f63ea72b53e05067e5525dc9d",
     "semantic_hash": ""
   },
   "cmd/server/main.go": {
-    "mtime": 1790610287.9885018,
-    "ast_hash": "8199183ef8ecb6841c214e814747da98",
+    "mtime": 1790613129.5344112,
+    "ast_hash": "c69a1a92cddcbec38bb1d0c78e3e8474",
     "semantic_hash": ""
   },
   "go.mod": {
@@ -15,8 +15,8 @@
     "semantic_hash": ""
   },
   "internal/agent/client.go": {
-    "mtime": 1790611354.334594,
-    "ast_hash": "ad5dc6a075d14aa2727ef545249b0395",
+    "mtime": 1790613129.5029035,
+    "ast_hash": "799b0e46904b355236dd220bef6d8da5",
     "semantic_hash": ""
   },
   "internal/agent/sysinfo.go": {
@@ -220,8 +220,8 @@
     "semantic_hash": ""
   },
   "internal/agent/remote.go": {
-    "mtime": 1789979922.9279273,
-    "ast_hash": "4743aa2494300ff9e54e9a86222ba122",
+    "mtime": 1790613186.3461812,
+    "ast_hash": "3a2ccfd16862e2aa78b0d2b7c45b0090",
     "semantic_hash": ""
   },
   "internal/agent/remote_input_other.go": {
@@ -320,13 +320,13 @@
     "semantic_hash": ""
   },
   "cmd/agent/system_service_other.go": {
-    "mtime": 1789955829.9465168,
-    "ast_hash": "855b0aa7d05fef1d7fc66ec75c2aee1e",
+    "mtime": 1790613129.5064323,
+    "ast_hash": "0dd20363a39cdacdb6342bcf5cc53a41",
     "semantic_hash": ""
   },
   "cmd/agent/system_service_windows.go": {
-    "mtime": 1789975111.7159648,
-    "ast_hash": "9e4d3341d9cc7f4bd420416afbf9e6bb",
+    "mtime": 1790613143.2833238,
+    "ast_hash": "c1b3e7ef2d4b6f5ee6e42a337f304ed2",
     "semantic_hash": ""
   },
   "internal/agent/remote_desktop_other.go": {
@@ -717,6 +717,11 @@
   "internal/agent/process_usage_windows.go": {
     "mtime": 1790611354.332292,
     "ast_hash": "1e38e827fc7660a13bae03ec3e075eb8",
+    "semantic_hash": ""
+  },
+  "internal/agent/remote_relay_test.go": {
+    "mtime": 1790613201.3873887,
+    "ast_hash": "d8fcb4559e63ef98d548bf2b3c604733",
     "semantic_hash": ""
   }
 }

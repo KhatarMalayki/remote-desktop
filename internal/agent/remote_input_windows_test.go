@@ -36,10 +36,13 @@ func TestMouseButtonFlags(t *testing.T) {
 }
 
 func TestLegacyInputFallbackOnlyOnNormalDesktop(t *testing.T) {
-	if !shouldUseLegacyInputFallback("Default") {
+	if !shouldUseLegacyInputFallback("Default", false) {
 		t.Fatal("normal desktop must allow legacy input fallback")
 	}
-	if shouldUseLegacyInputFallback("Winlogon") || shouldUseLegacyInputFallback("") {
+	if shouldUseLegacyInputFallback("Winlogon", false) || shouldUseLegacyInputFallback("", false) {
 		t.Fatal("secure or unknown desktop must not use legacy input fallback")
+	}
+	if shouldUseLegacyInputFallback("Default", true) {
+		t.Fatal("interactive user relay must use SendInput")
 	}
 }
