@@ -167,16 +167,37 @@ func (a *Agent) heartbeatLoop() {
 	ticker := time.NewTicker(time.Duration(a.cfg.Heartbeat) * time.Second)
 	defer ticker.Stop()
 
+	var applications []string
+	var applicationUsage map[string]int64
+	heartbeatCount := 0
 	for {
 		select {
 		case <-ticker.C:
+			if heartbeatCount%10 == 0 {
+				if processes, err := listProcesses(); err == nil {
+					applications = activeApplications(processes)
+				}
+			}
+			if heartbeatCount%60 == 0 {
+				if usage, err := applicationUsage24Hours(); err == nil {
+					for name := range usage {
+						if isSystemProcess(strings.ToLower(name)) {
+							delete(usage, name)
+						}
+					}
+					applicationUsage = usage
+				}
+			}
+			heartbeatCount++
 			_, memUsed := getMemoryInfo()
 			_, diskUsed := getDiskInfo()
 			hb := map[string]interface{}{
-				"cpu_usage":   GetCPUUsage(),
-				"memory_used": memUsed,
-				"disk_used":   diskUsed,
-				"rustdesk_id": a.getRustDeskID(),
+				"cpu_usage":         GetCPUUsage(),
+				"memory_used":       memUsed,
+				"disk_used":         diskUsed,
+				"rustdesk_id":       a.getRustDeskID(),
+				"applications":      applications,
+				"application_usage": applicationUsage,
 			}
 			data, _ := json.Marshal(hb)
 			msg := map[string]interface{}{

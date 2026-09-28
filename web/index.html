@@ -171,6 +171,14 @@
             <canvas id="chartDisk"></canvas>
           </div>
         </div>
+        <div class="chart-card">
+          <div class="chart-title">Top Aplikasi Aktif</div>
+          <div class="chart-container"><canvas id="chartApplications"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-title">Durasi Aplikasi Berjalan — 24 Jam</div>
+          <div class="chart-container"><canvas id="chartApplicationRuntime"></canvas></div>
+        </div>
       </div>
 
       <h3 style="margin: 24px 0 12px">Recent Devices</h3>
@@ -351,7 +359,7 @@
   <div class="modal" style="max-width:760px">
     <h3 id="processListTitle">Aplikasi Aktif</h3>
     <p class="asset-advice">Snapshot on-demand. Menampilkan 50 proses dengan penggunaan RAM terbesar; tidak merekam isi layar atau dokumen.</p>
-    <div class="table-wrap"><table><thead><tr><th>Aplikasi / Proses</th><th>PID</th><th>RAM</th></tr></thead><tbody id="processListBody"></tbody></table></div>
+    <div class="table-wrap"><table><thead><tr><th>Aplikasi / Proses</th><th>Kategori</th><th>PID</th><th>RAM</th></tr></thead><tbody id="processListBody"></tbody></table></div>
     <div class="modal-actions"><button class="btn btn-ghost" onclick="closeProcessList()">Tutup</button></div>
   </div>
 </div>

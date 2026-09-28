@@ -23,6 +23,8 @@ var chartOnlineOffline = null;
 var chartOS = null;
 var chartMemory = null;
 var chartDisk = null;
+var chartApplications = null;
+var chartApplicationRuntime = null;
 
 const CHART_COLORS = [
   '#4f8cff', '#34d399', '#fbbf24', '#ef4444', '#a78bfa',
@@ -265,7 +267,21 @@ function renderRecentDevices() {
   document.getElementById('recentDevices').innerHTML = buildDeviceTable(recent);
 }
 
-function renderCharts() { if (!lastStats) return; renderOnlineOfflineChart(); renderOSChart(); renderMemoryChart(); renderDiskChart(); }
+function renderCharts() { if (!lastStats) return; renderOnlineOfflineChart(); renderOSChart(); renderMemoryChart(); renderDiskChart(); renderApplicationsChart(); renderApplicationRuntimeChart(); }
+
+function renderApplicationsChart() {
+  var ctx = document.getElementById('chartApplications'); if (!ctx) return;
+  var apps = lastStats.top_applications || [];
+  if (chartApplications) chartApplications.destroy();
+  chartApplications = new Chart(ctx, {type:'bar',data:{labels:apps.length?apps.map(function(a){return processIcon(a.name)+' '+a.name}):['Belum ada data'],datasets:[{data:apps.length?apps.map(function(a){return a.count}):[0],backgroundColor:'#34d399',borderRadius:4}]},options:Object.assign({},chartDefaults(),{indexAxis:'y',scales:{x:{beginAtZero:true,ticks:{precision:0,color:'#a0a3b1'},grid:{color:'#2d3042'}},y:{ticks:{color:'#a0a3b1'},grid:{display:false}}},plugins:{legend:{display:false}}})});
+}
+
+function renderApplicationRuntimeChart() {
+  var ctx = document.getElementById('chartApplicationRuntime'); if (!ctx) return;
+  var apps = lastStats.top_application_runtime || [];
+  if (chartApplicationRuntime) chartApplicationRuntime.destroy();
+  chartApplicationRuntime = new Chart(ctx, {type:'bar',data:{labels:apps.length?apps.map(function(a){return processIcon(a.name)+' '+a.name}):['Audit proses belum tersedia'],datasets:[{data:apps.length?apps.map(function(a){return Math.round(a.seconds/360)/10}):[0],backgroundColor:'#f59e0b',borderRadius:4}]},options:Object.assign({},chartDefaults(),{indexAxis:'y',scales:{x:{beginAtZero:true,ticks:{color:'#a0a3b1',callback:function(v){return v+' jam'}},grid:{color:'#2d3042'}},y:{ticks:{color:'#a0a3b1'},grid:{display:false}}},plugins:{legend:{display:false}}})});
+}
 
 function chartDefaults() {
   return { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#a0a3b1', font: { size: 12 } } } } };
@@ -1173,17 +1189,24 @@ async function openProcessList(deviceID) {
   if (!id) return;
   var dev = devices.find(function(item){ return item.id === id; }) || currentDevice || {};
   document.getElementById('processListTitle').textContent = 'Aplikasi Aktif - ' + (dev.hostname || id);
-  document.getElementById('processListBody').innerHTML = '<tr><td colspan="3">Mengambil snapshot...</td></tr>';
+  document.getElementById('processListBody').innerHTML = '<tr><td colspan="4">Mengambil snapshot...</td></tr>';
   document.getElementById('processListModal').style.display = 'flex';
   var result = await api('/api/devices/' + encodeURIComponent(id) + '/processes');
   if (!result || result.error) {
-    document.getElementById('processListBody').innerHTML = '<tr><td colspan="3">'+esc((result && result.error) || 'Gagal mengambil daftar proses')+'</td></tr>';
+    document.getElementById('processListBody').innerHTML = '<tr><td colspan="4">'+esc((result && result.error) || 'Gagal mengambil daftar proses')+'</td></tr>';
     return;
   }
   var processes = result.processes || [];
   document.getElementById('processListBody').innerHTML = processes.length ? processes.map(function(process){
-    return '<tr><td>'+esc(process.name)+'</td><td>'+process.pid+'</td><td>'+fmtBytes(process.memory_bytes)+'</td></tr>';
-  }).join('') : '<tr><td colspan="3">Tidak ada data proses.</td></tr>';
+    return '<tr><td><span style="font-size:20px;margin-right:8px">'+esc(process.icon || processIcon(process.name))+'</span>'+esc(process.name)+'</td><td><span class="badge '+(process.is_system?'badge-gray':'badge-green')+'">'+(process.is_system?'Sistem Windows':'Aplikasi User')+'</span></td><td>'+process.pid+'</td><td>'+fmtBytes(process.memory_bytes)+'</td></tr>';
+  }).join('') : '<tr><td colspan="4">Tidak ada data proses.</td></tr>';
+}
+
+function processIcon(name) {
+  name = String(name || '').toLowerCase();
+  var icons = {chrome:'🌐',msedge:'🌐',firefox:'🦊',excel:'📗',winword:'📘',powerpnt:'📙',outlook:'✉️',teams:'💬',whatsapp:'💬',onedrive:'☁️',photos:'🖼️',acrobat:'📄',code:'💻',rustdesk:'🖥️',anydesk:'🖥️'};
+  for (var key in icons) if (name.indexOf(key) >= 0) return icons[key];
+  return '▣';
 }
 
 function closeProcessList() { document.getElementById('processListModal').style.display = 'none'; }

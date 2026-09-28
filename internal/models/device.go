@@ -182,12 +182,14 @@ type BlockedIPInfo struct {
 }
 
 type DeviceHeartbeat struct {
-	ID         string  `json:"id"`
-	CPUUsage   float64 `json:"cpu_usage"`
-	MemoryUsed uint64  `json:"memory_used"`
-	DiskUsed   uint64  `json:"disk_used"`
-	Uptime     int64   `json:"uptime"`
-	RustDeskID string  `json:"rustdesk_id"`
+	ID               string           `json:"id"`
+	CPUUsage         float64          `json:"cpu_usage"`
+	MemoryUsed       uint64           `json:"memory_used"`
+	DiskUsed         uint64           `json:"disk_used"`
+	Uptime           int64            `json:"uptime"`
+	RustDeskID       string           `json:"rustdesk_id"`
+	Applications     []string         `json:"applications,omitempty"`
+	ApplicationUsage map[string]int64 `json:"application_usage,omitempty"`
 }
 
 type RustDeskCommand struct {
@@ -222,6 +224,8 @@ type ProcessInfo struct {
 	PID         int    `json:"pid"`
 	Name        string `json:"name"`
 	MemoryBytes uint64 `json:"memory_bytes"`
+	IsSystem    bool   `json:"is_system"`
+	Icon        string `json:"icon"`
 }
 
 type NetworkScanHost struct {

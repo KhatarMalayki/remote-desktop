@@ -16,6 +16,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -273,6 +274,9 @@ type Server struct {
 	scans          map[string]*models.NetworkScan
 	processMu      sync.Mutex
 	processReplies map[string]chan []models.ProcessInfo
+	appsMu         sync.RWMutex
+	deviceApps     map[string][]string
+	deviceAppUsage map[string]map[string]int64
 	attachmentsDir string
 }
 
@@ -313,6 +317,8 @@ func New(cfg Config, webFS embed.FS) (*Server, error) {
 		webFS:          sub,
 		scans:          make(map[string]*models.NetworkScan),
 		processReplies: make(map[string]chan []models.ProcessInfo),
+		deviceApps:     make(map[string][]string),
+		deviceAppUsage: make(map[string]map[string]int64),
 		attachmentsDir: filepath.Join(filepath.Dir(cfg.DBPath), "attachments"),
 		upgrader: websocket.Upgrader{
 			ReadBufferSize:  4096,
@@ -813,6 +819,59 @@ func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	stats["online_devices"] = s.hub.OnlineCount()
+	s.appsMu.RLock()
+	counts := map[string]int{}
+	for deviceID, apps := range s.deviceApps {
+		if !s.hub.IsOnline(deviceID) {
+			continue
+		}
+		for _, app := range apps {
+			counts[app]++
+		}
+	}
+	s.appsMu.RUnlock()
+	type appCount struct {
+		Name  string `json:"name"`
+		Count int    `json:"count"`
+	}
+	topApps := make([]appCount, 0, len(counts))
+	for name, count := range counts {
+		topApps = append(topApps, appCount{name, count})
+	}
+	sort.Slice(topApps, func(i, j int) bool {
+		if topApps[i].Count == topApps[j].Count {
+			return topApps[i].Name < topApps[j].Name
+		}
+		return topApps[i].Count > topApps[j].Count
+	})
+	if len(topApps) > 10 {
+		topApps = topApps[:10]
+	}
+	stats["top_applications"] = topApps
+	usageTotals := map[string]int64{}
+	s.appsMu.RLock()
+	for deviceID, usage := range s.deviceAppUsage {
+		if !s.hub.IsOnline(deviceID) {
+			continue
+		}
+		for name, seconds := range usage {
+			usageTotals[name] += seconds
+		}
+	}
+	s.appsMu.RUnlock()
+	type usageCount struct {
+		Name    string `json:"name"`
+		Seconds int64  `json:"seconds"`
+	}
+	topUsage := make([]usageCount, 0, len(usageTotals))
+	for name, seconds := range usageTotals {
+		topUsage = append(topUsage, usageCount{name, seconds})
+	}
+	sort.Slice(topUsage, func(i, j int) bool { return topUsage[i].Seconds > topUsage[j].Seconds })
+	if len(topUsage) > 10 {
+		topUsage = topUsage[:10]
+	}
+	stats["top_application_runtime"] = topUsage
 	jsonResp(w, stats, 200)
 }
 
@@ -1857,6 +1916,22 @@ func (s *Server) handleAgentMessage(c *Client, raw []byte) {
 		}
 		hb.ID = c.DeviceID
 		s.db.UpdateHeartbeat(&hb)
+		if hb.Applications != nil {
+			s.appsMu.Lock()
+			if s.deviceApps == nil {
+				s.deviceApps = make(map[string][]string)
+			}
+			s.deviceApps[c.DeviceID] = hb.Applications
+			s.appsMu.Unlock()
+		}
+		if hb.ApplicationUsage != nil {
+			s.appsMu.Lock()
+			if s.deviceAppUsage == nil {
+				s.deviceAppUsage = make(map[string]map[string]int64)
+			}
+			s.deviceAppUsage[c.DeviceID] = hb.ApplicationUsage
+			s.appsMu.Unlock()
+		}
 
 	case "rustdesk_result":
 		var result models.RustDeskResult

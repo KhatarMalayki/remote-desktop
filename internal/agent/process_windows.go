@@ -16,5 +16,8 @@ func listProcesses() ([]models.ProcessInfo, error) {
 		return nil, err
 	}
 	var processes []models.ProcessInfo
-	return processes, json.Unmarshal(out, &processes)
+	if err := json.Unmarshal(out, &processes); err != nil {
+		return nil, err
+	}
+	return enrichProcesses(processes), nil
 }

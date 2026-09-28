@@ -169,28 +169,28 @@ func sendRemoteHotkey(keys []string) error {
 // reliable than the deprecated keybd_event/mouse_event APIs on the Winlogon
 // desktop and reports when Windows rejects an event instead of failing silently.
 func sendKeyboardInput(vk uint16, flags uint32) error {
+	if shouldUseLegacyInputFallback(activeInputDesktopName()) {
+		keybdEventProc.Call(uintptr(vk), 0, uintptr(flags), 0)
+		return nil
+	}
 	input := win.KEYBD_INPUT{Type: win.INPUT_KEYBOARD}
 	input.Ki.WVk = vk
 	input.Ki.DwFlags = flags
 	if sent := win.SendInput(1, unsafe.Pointer(&input), int32(unsafe.Sizeof(input))); sent != 1 {
-		if shouldUseLegacyInputFallback(activeInputDesktopName()) {
-			keybdEventProc.Call(uintptr(vk), 0, uintptr(flags), 0)
-			return nil
-		}
 		return fmt.Errorf("Windows menolak input keyboard (SendInput: %d, error: %d)", sent, win.GetLastError())
 	}
 	return nil
 }
 
 func sendMouseInput(flags uint32, data int32) error {
+	if shouldUseLegacyInputFallback(activeInputDesktopName()) {
+		mouseEventProc.Call(uintptr(flags), 0, 0, uintptr(data), 0)
+		return nil
+	}
 	input := win.MOUSE_INPUT{Type: win.INPUT_MOUSE}
 	input.Mi.DwFlags = flags
 	input.Mi.MouseData = uint32(data)
 	if sent := win.SendInput(1, unsafe.Pointer(&input), int32(unsafe.Sizeof(input))); sent != 1 {
-		if shouldUseLegacyInputFallback(activeInputDesktopName()) {
-			mouseEventProc.Call(uintptr(flags), 0, 0, uintptr(data), 0)
-			return nil
-		}
 		return fmt.Errorf("Windows menolak input mouse (SendInput: %d, error: %d)", sent, win.GetLastError())
 	}
 	return nil
