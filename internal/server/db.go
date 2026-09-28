@@ -438,7 +438,7 @@ func (d *DB) ListDevices(group, search string, limit, offset int) ([]*models.Dev
 		memory_total, memory_used, disk_total, disk_used, version, rustdesk_id, status, tags, group_name,
 		branch, verification_status, verified_at, verified_by, verification_note, note,
 		owner_username, acquisition_year, last_seen, registered_at,
-		COALESCE(assigned_to, ''), COALESCE(condition, 'good'), manual_asset_id FROM devices WHERE %s ORDER BY last_seen DESC LIMIT ? OFFSET ?`, where)
+		COALESCE(assigned_to, ''), COALESCE(condition, 'good'), manual_asset_id FROM devices WHERE %s ORDER BY hostname COLLATE NOCASE ASC, id ASC LIMIT ? OFFSET ?`, where)
 	args = append(args, limit, offset)
 	rows, err := d.db.Query(query, args...)
 	if err != nil {
@@ -475,7 +475,7 @@ func (d *DB) ListDevicesForOwner(username, search string, limit, offset int) ([]
 		memory_total, memory_used, disk_total, disk_used, version, rustdesk_id, status, tags, group_name,
 		branch, verification_status, verified_at, verified_by, verification_note, note,
 		owner_username, acquisition_year, last_seen, registered_at,
-		COALESCE(assigned_to, ''), COALESCE(condition, 'good'), manual_asset_id FROM devices WHERE %s ORDER BY last_seen DESC LIMIT ? OFFSET ?`, where)
+		COALESCE(assigned_to, ''), COALESCE(condition, 'good'), manual_asset_id FROM devices WHERE %s ORDER BY hostname COLLATE NOCASE ASC, id ASC LIMIT ? OFFSET ?`, where)
 	args = append(args, limit, offset)
 	rows, err := d.db.Query(query, args...)
 	if err != nil {

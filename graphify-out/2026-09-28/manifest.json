@@ -1,12 +1,12 @@
 {
   "cmd/agent/main.go": {
-    "mtime": 1790136238.0990815,
-    "ast_hash": "db244dd657c219c53ede98b5708a0d99",
+    "mtime": 1790585034.1600091,
+    "ast_hash": "43de3990df0a7b8e097d7cefe41d475d",
     "semantic_hash": ""
   },
   "cmd/server/main.go": {
-    "mtime": 1790136238.106262,
-    "ast_hash": "a359ace6ea409120e1882982d09180b1",
+    "mtime": 1790585034.161015,
+    "ast_hash": "658187cf85b9541ec8589867581a97ed",
     "semantic_hash": ""
   },
   "go.mod": {
@@ -230,8 +230,8 @@
     "semantic_hash": ""
   },
   "internal/agent/remote_input_windows.go": {
-    "mtime": 1789956794.1022904,
-    "ast_hash": "f17bb4c76eac40aa5cd459bc9fd136cb",
+    "mtime": 1790584860.1616712,
+    "ast_hash": "fcf9b975880bb04f4e741a62696f3644",
     "semantic_hash": ""
   },
   "internal/agent/remote_test.go": {
@@ -245,8 +245,8 @@
     "semantic_hash": ""
   },
   "internal/agent/remote_input_windows_test.go": {
-    "mtime": 1789674801.997779,
-    "ast_hash": "cc8602fdbd9d850269762364e9e05b85",
+    "mtime": 1790584860.1652138,
+    "ast_hash": "a922ef79ac90cdddb20d28e3ed7952d9",
     "semantic_hash": ""
   },
   ".playwright-cli/page-2026-09-17T19-04-10-922Z.yml": {

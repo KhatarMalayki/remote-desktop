@@ -321,6 +321,11 @@ function renderDevices() {
   if (sf === 'online') filtered = devices.filter(function(d){return d.online});
   if (sf === 'offline') filtered = devices.filter(function(d){return !d.online});
   if (sf === 'outdated') filtered = devices.filter(function(d){return isVersionNewer(serverAgentVersion, d.version || '')});
+  filtered = filtered.slice().sort(function(a, b) {
+    if (!!a.online !== !!b.online) return a.online ? -1 : 1;
+    var hostnameOrder = String(a.hostname || '').localeCompare(String(b.hostname || ''), undefined, {sensitivity:'base', numeric:true});
+    return hostnameOrder || String(a.id || '').localeCompare(String(b.id || ''));
+  });
   if (filtered.length === 0) { document.getElementById('devicesTable').innerHTML = '<div class="empty-state"><p>No devices found</p></div>'; return; }
   document.getElementById('devicesTable').innerHTML = buildDeviceTable(filtered);
 }

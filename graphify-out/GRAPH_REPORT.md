@@ -1,7 +1,7 @@
 # Graph Report - remote-desktop  (2026-09-28)
 
 ## Corpus Check
-- 69 files · ~156,199 words
+- 69 files · ~156,242 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
@@ -10,7 +10,7 @@
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `00ff1bc4`
+- Built from commit: `9279d6d7`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -125,8 +125,8 @@ Cohesion: 0.12
 Nodes (16): ❌ Agent connect tapi device tidak muncul di dashboard, ❌ Agent sering putus dan reconnect, ❌ Agent tidak mau connect, "connection failed", ❌ Container tidak start, ❌ Data hilang setelah restart container, ❌ Error "gcc not found" waktu build server, ❌ Error "go: command not found", ❌ Info hardware salah/kosong (+8 more)
 
 ### Community 9 - "Community 9"
-Cohesion: 0.10
-Nodes (37): api(), closeChangePasswordModal(), closeDeviceModal(), closeManualAssetModal(), closeMFAModal(), closeRustDeskManageModal(), closeVerificationModal(), configureRustDesk() (+29 more)
+Cohesion: 0.16
+Nodes (15): closeChangePasswordModal(), closeMFAModal(), configureRustDesk(), copyDownloadAgentLink(), copyMFASecret(), exportBranchAssetsCSV(), openReconfigureModal(), openRustDesk() (+7 more)
 
 ### Community 10 - "Community 10"
 Cohesion: 0.36
@@ -162,7 +162,7 @@ Nodes (4): DB, AssetActivity, AssetAttachment, AssetSwitchRequest
 
 ### Community 26 - "validBranchType"
 Cohesion: 0.07
-Nodes (21): closeDownloadAgentModal(), devices, loadHistoryLogs(), loadRoles(), loadSecurityLogs(), manualAssets, openHistoryModal(), openRolesModal() (+13 more)
+Nodes (19): closeDownloadAgentModal(), devices, loadHistoryLogs(), loadSecurityLogs(), manualAssets, openHistoryModal(), openSecurityLogsModal(), pendingAgentUpdates (+11 more)
 
 ### Community 27 - "SecuritySettings"
 Cohesion: 0.10
@@ -181,16 +181,16 @@ Cohesion: 0.33
 Nodes (6): checkAuth(), doLogin(), doLoginMFA(), doLogout(), openChangePasswordModal(), resetIdleTimer()
 
 ### Community 31 - "init"
-Cohesion: 0.39
-Nodes (8): CHART_COLORS, chartDefaults(), openProcessList(), renderCharts(), renderDiskChart(), renderMemoryChart(), renderOnlineOfflineChart(), renderOSChart()
+Cohesion: 0.17
+Nodes (16): CHART_COLORS, chartDefaults(), connectWS(), handleSignal(), init(), loadStats(), openProcessList(), quickRemote() (+8 more)
 
 ### Community 32 - "loadBranchAssets"
-Cohesion: 0.22
-Nodes (10): exportAssets(), fmtBytes(), onSearchBranchAssets(), openDeviceModal(), openEditAssetModal(), openVerifyModal(), renderAssets(), renderBranchAssets() (+2 more)
+Cohesion: 0.13
+Nodes (17): closeManualAssetModal(), closeVerificationModal(), deleteManualAsset(), exportAssets(), fmtBytes(), loadBranchAssets(), onBranchChange(), onSearchBranchAssets() (+9 more)
 
 ### Community 33 - "main"
-Cohesion: 0.20
-Nodes (16): addBusinessUnit(), buildBranchOptionsHTML(), closeBranchesModal(), createBranch(), deleteBranch(), editBranch(), esc(), loadBranches() (+8 more)
+Cohesion: 0.16
+Nodes (25): addBusinessUnit(), api(), buildBranchOptionsHTML(), closeBranchesModal(), createBranch(), deleteBranch(), editBranch(), esc() (+17 more)
 
 ### Community 34 - "SecuritySettings"
 Cohesion: 0.22
@@ -222,7 +222,7 @@ Nodes (4): parseRustDeskID(), T, TestParseRustDeskID(), getRustDeskID()
 
 ### Community 43 - "SecuritySettings"
 Cohesion: 0.12
-Nodes (22): buildDeviceTable(), connectWS(), filterDevices(), goPage(), handleSignal(), init(), isVersionNewer(), loadDevices() (+14 more)
+Nodes (22): buildDeviceTable(), closeDeviceModal(), closeRustDeskManageModal(), deleteDevice(), filterDevices(), goPage(), isVersionNewer(), loadDevices() (+14 more)
 
 ### Community 46 - "Daftar API"
 Cohesion: 0.20
