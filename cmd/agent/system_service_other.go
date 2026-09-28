@@ -11,3 +11,5 @@ func runSystemService(_ string) {
 func startSecureDesktopRelay(_, _ string) error {
 	return nil
 }
+
+func startUserDesktopRelay(_, _ string) error { return nil }

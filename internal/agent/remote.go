@@ -75,6 +75,14 @@ func (a *Agent) startRemoteRelay(sessionID string) {
 			log.Printf("[remote] cannot start Winlogon relay worker: %v", err)
 		}
 	}
+	if a.userRelayStarter != nil && shouldDelegateUserRelay(desktopName, forceSecure) {
+		if err := a.userRelayStarter(sessionID); err == nil {
+			log.Printf("[remote] delegated normal desktop relay to interactive user worker")
+			return
+		} else {
+			log.Printf("[remote] cannot start interactive user relay worker: %v", err)
+		}
+	}
 	// A Windows desktop is bound to an OS thread, not a Go goroutine.  Keep the
 	// capture path on one thread for the complete relay lifetime so it remains
 	// attached when Windows switches Default <-> Winlogon on lock/unlock.
@@ -303,6 +311,10 @@ func (a *Agent) startRemoteRelay(sessionID string) {
 			lastSent = time.Now()
 		}
 	}
+}
+
+func shouldDelegateUserRelay(desktopName string, forceSecure bool) bool {
+	return !forceSecure && !strings.EqualFold(desktopName, "Winlogon")
 }
 
 func captureRemoteFrame(bounds image.Rectangle) ([]byte, error) {

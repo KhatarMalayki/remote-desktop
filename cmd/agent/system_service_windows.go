@@ -240,6 +240,60 @@ func startSecureDesktopRelay(configPath, relayID string) error {
 	return nil
 }
 
+func startUserDesktopRelay(configPath, relayID string) error {
+	if relayID == "" {
+		return fmt.Errorf("missing relay ID")
+	}
+	sessionID := windows.WTSGetActiveConsoleSessionId()
+	if sessionID == 0xFFFFFFFF {
+		return fmt.Errorf("no active console session")
+	}
+	var userToken windows.Token
+	if err := windows.WTSQueryUserToken(sessionID, &userToken); err != nil {
+		return fmt.Errorf("query interactive user token: %w", err)
+	}
+	defer userToken.Close()
+	var token windows.Token
+	if err := windows.DuplicateTokenEx(userToken, windows.TOKEN_ALL_ACCESS, nil, windows.SecurityImpersonation, windows.TokenPrimary, &token); err != nil {
+		return fmt.Errorf("duplicate interactive user token: %w", err)
+	}
+	defer token.Close()
+	uiAccess := uint32(1)
+	if err := windows.SetTokenInformation(token, windows.TokenUIAccess, (*byte)(unsafe.Pointer(&uiAccess)), uint32(unsafe.Sizeof(uiAccess))); err != nil {
+		return fmt.Errorf("enable UIAccess for user relay: %w", err)
+	}
+	exe, err := os.Executable()
+	if err != nil {
+		return err
+	}
+	exe, err = filepath.EvalSymlinks(exe)
+	if err != nil {
+		return err
+	}
+	desktop, err := windows.UTF16PtrFromString("winsta0\\Default")
+	if err != nil {
+		return err
+	}
+	logPath := filepath.Join(filepath.Dir(configPath), "user-relay.log")
+	command, err := windows.UTF16PtrFromString(fmt.Sprintf("\"%s\" --user-relay %s --config \"%s\" --log-file \"%s\"", exe, relayID, configPath, logPath))
+	if err != nil {
+		return err
+	}
+	workingDir, err := windows.UTF16PtrFromString(filepath.Dir(exe))
+	if err != nil {
+		return err
+	}
+	startup := &windows.StartupInfo{Cb: uint32(unsafe.Sizeof(windows.StartupInfo{})), Desktop: desktop}
+	var process windows.ProcessInformation
+	if err := windows.CreateProcessAsUser(token, exeToUTF16(exe), command, nil, nil, false, windows.CREATE_NO_WINDOW|windows.CREATE_UNICODE_ENVIRONMENT, nil, workingDir, startup, &process); err != nil {
+		return fmt.Errorf("create interactive user relay: %w", err)
+	}
+	defer windows.CloseHandle(process.Thread)
+	defer windows.CloseHandle(process.Process)
+	writeServiceDiagnostic(configPath, fmt.Sprintf("interactive user relay started for %s in session %d (pid %d)", relayID, sessionID, process.ProcessId))
+	return nil
+}
+
 func exeToUTF16(value string) *uint16 {
 	result, _ := windows.UTF16PtrFromString(value)
 	return result

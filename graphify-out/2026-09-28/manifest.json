@@ -15,8 +15,8 @@
     "semantic_hash": ""
   },
   "internal/agent/client.go": {
-    "mtime": 1790610765.5760765,
-    "ast_hash": "704693b0e4a2331faddfba182a1142b1",
+    "mtime": 1790611354.334594,
+    "ast_hash": "ad5dc6a075d14aa2727ef545249b0395",
     "semantic_hash": ""
   },
   "internal/agent/sysinfo.go": {
@@ -25,8 +25,8 @@
     "semantic_hash": ""
   },
   "internal/models/device.go": {
-    "mtime": 1790610765.571195,
-    "ast_hash": "5481e9cd611dcdca0fa634fcbd5f58c8",
+    "mtime": 1790611354.3328507,
+    "ast_hash": "922c4a0089e46a28868e1b1feee15997",
     "semantic_hash": ""
   },
   "internal/server/db.go": {
@@ -45,8 +45,8 @@
     "semantic_hash": ""
   },
   "internal/server/server.go": {
-    "mtime": 1790610850.1405509,
-    "ast_hash": "3936de891431cc940873ebe961601132",
+    "mtime": 1790611354.363047,
+    "ast_hash": "b33588ce54e28423f0a17d1fa6775d32",
     "semantic_hash": ""
   },
   "scripts/build.ps1": {
@@ -65,8 +65,8 @@
     "semantic_hash": "8c9cb5d1b967f64d6abc8c1ca0fe3e90"
   },
   "web/static/app.js": {
-    "mtime": 1790610756.2644024,
-    "ast_hash": "05eb2e852a59a9b1144f30133b19faaf",
+    "mtime": 1790611341.019593,
+    "ast_hash": "2485d18fc120add82674e955331057e4",
     "semantic_hash": ""
   },
   ".codex/hooks.json": {
@@ -125,8 +125,8 @@
     "semantic_hash": ""
   },
   "web/index.html": {
-    "mtime": 1790610756.2628837,
-    "ast_hash": "4974b6f0d0a59c5428a2a74e85251ebd",
+    "mtime": 1790611341.017018,
+    "ast_hash": "ea8cf1e6ec01720dc4749c50c54c0349",
     "semantic_hash": ""
   },
   "scripts/update-server.sh": {
@@ -707,6 +707,16 @@
   "internal/agent/process_meta.go": {
     "mtime": 1790610765.5695128,
     "ast_hash": "587547979270facfd3aa7bd709e09572",
+    "semantic_hash": ""
+  },
+  "internal/agent/process_usage_other.go": {
+    "mtime": 1790611283.8703654,
+    "ast_hash": "fa56189760d9e1886e0f601014c94a42",
+    "semantic_hash": ""
+  },
+  "internal/agent/process_usage_windows.go": {
+    "mtime": 1790611354.332292,
+    "ast_hash": "1e38e827fc7660a13bae03ec3e075eb8",
     "semantic_hash": ""
   }
 }

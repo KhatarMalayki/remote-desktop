@@ -10,7 +10,7 @@ import (
 	"github.com/user/remote-desktop/internal/agent"
 )
 
-var version = "0.2.47"
+var version = "0.2.48"
 
 func main() {
 	serverURL := flag.String("server", envOr("RD_SERVER_URL", ""), "server URL")
@@ -23,6 +23,7 @@ func main() {
 	systemService := flag.Bool("system-service", false, "run as the RemoteDesk Windows system service")
 	systemWorker := flag.Bool("system-worker", false, "run as a SYSTEM helper in the active console session")
 	secureRelay := flag.String("secure-relay", "", "run one remote relay directly on the Windows Winlogon desktop")
+	userRelay := flag.String("user-relay", "", "run one remote relay in the interactive Windows user session")
 	flag.Parse()
 	if *logFile != "" {
 		if file, err := os.OpenFile(*logFile, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600); err == nil {
@@ -40,7 +41,7 @@ func main() {
 		runSystemService(*configFile)
 		return
 	}
-	if *systemWorker && *secureRelay == "" {
+	if *systemWorker && *secureRelay == "" && *userRelay == "" {
 		release, acquired, err := acquireSystemWorkerLock()
 		if err != nil {
 			log.Fatalf("[agent] cannot acquire SYSTEM worker lock: %v", err)
@@ -111,16 +112,21 @@ func main() {
 	}
 	a := agent.NewAgent(cfg, version, configPath)
 	a.SetServiceManaged(*systemWorker)
-	if *secureRelay != "" {
+	if *secureRelay != "" || *userRelay != "" {
 		log.Printf("[agent] secure Winlogon relay v%s starting", version)
-		a.SetSecureDesktopOnly(true)
-		a.RunRemoteRelay(*secureRelay)
+		a.SetSecureDesktopOnly(*secureRelay != "")
+		relayID := *secureRelay
+		if relayID == "" {
+			relayID = *userRelay
+		}
+		a.RunRemoteRelay(relayID)
 		return
 	}
 	if *systemWorker {
 		a.SetSecureRelayStarter(func(sessionID string) error {
 			return startSecureDesktopRelay(configPath, sessionID)
 		})
+		a.SetUserRelayStarter(func(sessionID string) error { return startUserDesktopRelay(configPath, sessionID) })
 	}
 	a.Run()
 }

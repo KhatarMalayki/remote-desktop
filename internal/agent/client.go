@@ -50,6 +50,7 @@ type Agent struct {
 	// Windows. It starts a short-lived child directly on Winlogon when Windows
 	// has switched away from the normal desktop.
 	secureRelayStarter func(string) error
+	userRelayStarter   func(string) error
 	secureDesktopOnly  bool
 	forceSecureUntil   atomic.Int64
 	remoteMu           sync.Mutex
@@ -63,6 +64,8 @@ func (a *Agent) SetServiceManaged(managed bool) {
 func (a *Agent) SetSecureRelayStarter(starter func(string) error) {
 	a.secureRelayStarter = starter
 }
+
+func (a *Agent) SetUserRelayStarter(starter func(string) error) { a.userRelayStarter = starter }
 
 func (a *Agent) SetSecureDesktopOnly(secureOnly bool) {
 	a.secureDesktopOnly = secureOnly
