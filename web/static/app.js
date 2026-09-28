@@ -160,6 +160,8 @@ function updateUserUI() {
   if (updateAllBtn) updateAllBtn.style.display = isTech ? 'inline-flex' : 'none';
   const rustDeskSettingsBtn = document.getElementById('rustDeskSettingsBtn');
   if (rustDeskSettingsBtn) rustDeskSettingsBtn.style.display = isTech ? 'inline-flex' : 'none';
+  const rustDeskResetAllBtn = document.getElementById('rustDeskResetAllBtn');
+  if (rustDeskResetAllBtn) rustDeskResetAllBtn.style.display = isTech ? 'inline-flex' : 'none';
   var navRoles = document.getElementById('navRoles');
   if (navRoles) navRoles.style.display = (currentUser.role === 'admin' || currentUser.role === 'it_support' || currentUser.role === 'ga_pusat') ? 'flex' : 'none';
   var adminHdr = document.getElementById('adminSectionHeader');
@@ -1156,6 +1158,19 @@ async function configureRustDesk() {
   config = '';
   if (!result || result.error) { appAlert((result && result.error) || 'Konfigurasi RustDesk gagal disimpan'); return; }
   showToast('Konfigurasi deployment RustDesk tersimpan');
+}
+
+var rustDeskManageTargetAll = false;
+
+function resetAllRustDeskPasswords() {
+  rustDeskManageTargetAll = true;
+  document.getElementById('rustDeskOperation').value = 'set_password';
+  document.getElementById('rustDeskManageTitle').textContent = 'Reset All Password RustDesk (Semua Perangkat Online)';
+  document.getElementById('rustDeskPassword').value = '';
+  document.getElementById('rustDeskPasswordConfirm').value = '';
+  document.getElementById('rustDeskManageError').style.display = 'none';
+  document.getElementById('rustDeskManageModal').style.display = 'flex';
+  document.getElementById('rustDeskPassword').focus();
 }
 
 function manageRustDesk(operation) {

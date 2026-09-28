@@ -369,6 +369,7 @@ func (s *Server) ListenAndServe() error {
 	mux.HandleFunc("/api/agent/reconfigure", s.authMiddleware(s.handleReconfigureAgents))
 	mux.HandleFunc("/api/rustdesk/settings", s.authMiddleware(s.handleRustDeskSettings))
 	mux.HandleFunc("/api/rustdesk/manage", s.authMiddleware(s.handleRustDeskManage))
+	mux.HandleFunc("/api/rustdesk/manage-all", s.authMiddleware(s.handleRustDeskManageAll))
 	mux.HandleFunc("/api/roles", s.authMiddleware(s.handleRoles))
 	mux.HandleFunc("/api/users", s.authMiddleware(s.handleUsers))
 	mux.HandleFunc("/api/users/", s.authMiddleware(s.handleUserSubroute))
@@ -2196,6 +2197,53 @@ func (s *Server) handleRustDeskManage(w http.ResponseWriter, r *http.Request) {
 	}
 	_ = s.db.RecordAuthLog(claims.Username, r.RemoteAddr, "rustdesk_manage", fmt.Sprintf("%s untuk device %s", req.Operation, req.DeviceID), r.UserAgent())
 	jsonResp(w, map[string]string{"status": "queued", "request_id": command.RequestID}, http.StatusAccepted)
+}
+
+func (s *Server) handleRustDeskManageAll(w http.ResponseWriter, r *http.Request) {
+	claims := getClaims(r)
+	if claims.Role != "admin" && claims.Role != "it_support" {
+		jsonError(w, "forbidden", http.StatusForbidden)
+		return
+	}
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req struct {
+		Password string `json:"password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonError(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+	if len(req.Password) < 8 || len(req.Password) > 64 || strings.ContainsAny(req.Password, "\r\n\x00") {
+		jsonError(w, "password harus 8-64 karakter tanpa baris baru", http.StatusBadRequest)
+		return
+	}
+	onlineIDs := s.hub.OnlineIDs()
+	if len(onlineIDs) == 0 {
+		jsonError(w, "tidak ada perangkat online saat ini", http.StatusConflict)
+		return
+	}
+	queuedCount := 0
+	for _, devID := range onlineIDs {
+		command := models.RustDeskCommand{
+			RequestID: randomHex(12),
+			Operation: "set_password",
+			Password:  req.Password,
+		}
+		raw, err := json.Marshal(map[string]interface{}{"action": "rustdesk_manage", "data": command})
+		if err == nil && s.hub.SendToAgent(devID, raw) {
+			queuedCount++
+			_ = s.db.RecordAuthLog(claims.Username, r.RemoteAddr, "rustdesk_manage", fmt.Sprintf("batch set_password untuk device %s", devID), r.UserAgent())
+		}
+	}
+	_ = s.db.RecordAuthLog(claims.Username, r.RemoteAddr, "rustdesk_manage_all", fmt.Sprintf("reset password massal dikirim ke %d perangkat", queuedCount), r.UserAgent())
+	jsonResp(w, map[string]interface{}{
+		"status":        "queued",
+		"total_online":  len(onlineIDs),
+		"agents_queued": queuedCount,
+	}, http.StatusAccepted)
 }
 
 func randomHex(byteCount int) string {

@@ -211,3 +211,35 @@ func TestRegistrationDoesNotBootstrapUnsupportedAgent(t *testing.T) {
 	default:
 	}
 }
+
+func TestRustDeskManageAll(t *testing.T) {
+	db, err := NewDB(t.TempDir() + "/test.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	hub := NewHub(db)
+	hub.agents["pc-1"] = &Client{DeviceID: "pc-1", Send: make(chan []byte, 1)}
+	hub.agents["pc-2"] = &Client{DeviceID: "pc-2", Send: make(chan []byte, 1)}
+	s := &Server{db: db, hub: hub}
+
+	call := func(handler http.HandlerFunc, body string) *httptest.ResponseRecorder {
+		req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(body))
+		req = req.WithContext(context.WithValue(req.Context(), userClaimsKey, &UserClaims{Username: "admin", Role: "admin"}))
+		w := httptest.NewRecorder()
+		handler(w, req)
+		return w
+	}
+
+	w := call(s.handleRustDeskManageAll, "{\"password\":\"NewBatchPassword123!\"}")
+	if w.Code != http.StatusAccepted {
+		t.Fatalf("manage all status=%d body=%s", w.Code, w.Body.String())
+	}
+	var res map[string]interface{}
+	if err := json.Unmarshal(w.Body.Bytes(), &res); err != nil {
+		t.Fatal(err)
+	}
+	if res["agents_queued"] != float64(2) {
+		t.Fatalf("expected 2 queued, got %#v", res)
+	}
+}

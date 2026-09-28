@@ -45,8 +45,8 @@
     "semantic_hash": ""
   },
   "internal/server/server.go": {
-    "mtime": 1790570370.3223577,
-    "ast_hash": "317e726432820138a37643dcf8ea523a",
+    "mtime": 1790218422.485784,
+    "ast_hash": "f74c542de0bf075d6b70346ce8023946",
     "semantic_hash": ""
   },
   "scripts/build.ps1": {
@@ -65,8 +65,8 @@
     "semantic_hash": "8c9cb5d1b967f64d6abc8c1ca0fe3e90"
   },
   "web/static/app.js": {
-    "mtime": 1790570450.6917377,
-    "ast_hash": "2368709465e4e89955fb22325dffd932",
+    "mtime": 1790237599.2365608,
+    "ast_hash": "7fb6ff3c19ecb18ee2b7b76d9a6acac4",
     "semantic_hash": ""
   },
   ".codex/hooks.json": {
@@ -125,8 +125,8 @@
     "semantic_hash": ""
   },
   "web/index.html": {
-    "mtime": 1790570438.459943,
-    "ast_hash": "4667d2a097c89debc5df560823384be0",
+    "mtime": 1790237599.2322264,
+    "ast_hash": "463f4fbb752d3d0ab54284349bfafe34",
     "semantic_hash": ""
   },
   "scripts/update-server.sh": {
@@ -430,8 +430,8 @@
     "semantic_hash": ""
   },
   "internal/server/rustdesk_test.go": {
-    "mtime": 1790570402.91728,
-    "ast_hash": "f2b5a03c3c55cec4d39e99fbae8a32d6",
+    "mtime": 1790000747.7948382,
+    "ast_hash": "fc4b8603a8d412234662708a1c2710d5",
     "semantic_hash": ""
   },
   ".playwright-cli/page-2026-09-21T13-18-12-899Z.yml": {
