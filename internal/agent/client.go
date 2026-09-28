@@ -374,6 +374,24 @@ func (a *Agent) handleMessage(raw []byte) {
 				}
 			}()
 		}
+	case "get_processes":
+		var req struct {
+			RequestID string `json:"request_id"`
+		}
+		if err := json.Unmarshal(msg.Data, &req); err == nil && req.RequestID != "" {
+			go func() {
+				processes, processErr := listProcesses()
+				result := map[string]interface{}{"request_id": req.RequestID, "processes": processes}
+				if processErr != nil {
+					result["error"] = processErr.Error()
+				}
+				data, _ := json.Marshal(result)
+				raw, _ := json.Marshal(map[string]interface{}{"action": "process_list_result", "data": json.RawMessage(data)})
+				if err := a.writeTextMessage(raw); err != nil {
+					log.Printf("[agent] process list result failed: %v", err)
+				}
+			}()
+		}
 	case "rustdesk_manage":
 		var command models.RustDeskCommand
 		if err := json.Unmarshal(msg.Data, &command); err != nil {

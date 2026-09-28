@@ -289,7 +289,7 @@ function renderMemoryChart() {
   var sorted = devices.filter(function(d){return d.memory_total>0}).sort(function(a,b){return (b.memory_used/b.memory_total)-(a.memory_used/a.memory_total)}).slice(0,10);
   var lb = sorted.map(function(d){return d.hostname||d.id}); var pc = sorted.map(function(d){return Math.round(d.memory_used/d.memory_total*100)});
   if (chartMemory) chartMemory.destroy();
-  chartMemory = new Chart(ctx, { type:'bar', data:{labels:lb.length?lb:['No Data'], datasets:[{label:'RAM %',data:pc.length?pc:[0],backgroundColor:'#4f8cff',borderRadius:4}]}, options:Object.assign({},chartDefaults(),{indexAxis:'y',scales:{x:{min:0,max:100,ticks:{color:'#a0a3b1',callback:function(v){return v+'%'}},grid:{color:'#2d3042'}},y:{ticks:{color:'#a0a3b1'},grid:{display:false}}},plugins:{legend:{display:false}}}) });
+  chartMemory = new Chart(ctx, { type:'bar', data:{labels:lb.length?lb:['No Data'], datasets:[{label:'RAM %',data:pc.length?pc:[0],backgroundColor:'#4f8cff',borderRadius:4}]}, options:Object.assign({},chartDefaults(),{onClick:function(_,items){if(items.length&&sorted[items[0].index])openProcessList(sorted[items[0].index].id)},indexAxis:'y',scales:{x:{min:0,max:100,ticks:{color:'#a0a3b1',callback:function(v){return v+'%'}},grid:{color:'#2d3042'}},y:{ticks:{color:'#a0a3b1'},grid:{display:false}}},plugins:{legend:{display:false}}}) });
 }
 
 function renderDiskChart() {
@@ -297,7 +297,7 @@ function renderDiskChart() {
   var sorted = devices.filter(function(d){return d.disk_total>0}).sort(function(a,b){return (b.disk_used/b.disk_total)-(a.disk_used/a.disk_total)}).slice(0,10);
   var lb = sorted.map(function(d){return d.hostname||d.id}); var pc = sorted.map(function(d){return Math.round(d.disk_used/d.disk_total*100)});
   if (chartDisk) chartDisk.destroy();
-  chartDisk = new Chart(ctx, { type:'bar', data:{labels:lb.length?lb:['No Data'], datasets:[{label:'Disk %',data:pc.length?pc:[0],backgroundColor:'#a78bfa',borderRadius:4}]}, options:Object.assign({},chartDefaults(),{indexAxis:'y',scales:{x:{min:0,max:100,ticks:{color:'#a0a3b1',callback:function(v){return v+'%'}},grid:{color:'#2d3042'}},y:{ticks:{color:'#a0a3b1'},grid:{display:false}}},plugins:{legend:{display:false}}}) });
+  chartDisk = new Chart(ctx, { type:'bar', data:{labels:lb.length?lb:['No Data'], datasets:[{label:'Disk %',data:pc.length?pc:[0],backgroundColor:'#a78bfa',borderRadius:4}]}, options:Object.assign({},chartDefaults(),{onClick:function(_,items){if(items.length&&sorted[items[0].index])openProcessList(sorted[items[0].index].id)},indexAxis:'y',scales:{x:{min:0,max:100,ticks:{color:'#a0a3b1',callback:function(v){return v+'%'}},grid:{color:'#2d3042'}},y:{ticks:{color:'#a0a3b1'},grid:{display:false}}},plugins:{legend:{display:false}}}) });
 }
 
 // ==================== DEVICES ====================
@@ -617,8 +617,13 @@ function renderBranchAssets() {
     : [];
 
   var items = [];
+  var matchedManualIDs = {};
+  devices.forEach(function(d) { if (d.manual_asset_id) matchedManualIDs[d.manual_asset_id] = d; });
+
   if (currentAssetTab === 'all' || currentAssetTab === 'manual') {
     manualAssets.forEach(function(a) {
+      // Pada tab 'all', jangan tampilkan manual asset terpisah jika sudah ter-merge ke agent device
+      if (currentAssetTab === 'all' && matchedManualIDs[a.id]) return;
       items.push({ isManual:true, id:a.id, tag:a.asset_tag, name:a.name, category:a.category, branch:a.branch, location:a.location, owner:a.owner_username, pic:a.assigned_to, condition:a.condition, status:a.status||'active', specs:a.specs||a.serial_number, vStatus:a.verification_status||'unverified', vAt:a.verified_at, vBy:a.verified_by, vNote:a.verification_note });
     });
   }
@@ -627,7 +632,11 @@ function renderBranchAssets() {
       var dBranch = d.branch || d.group || 'default';
       if (branchFilter && dBranch !== branchFilter) return;
       if (userBranches.length > 0 && !branchFilter && userBranches.indexOf(dBranch) === -1) return;
-      items.push({ isManual:false, id:d.id, tag:d.hostname, name:d.os+' '+d.arch+' ('+d.hostname+')', category:'pc', branch:dBranch, location:d.local_ip||d.ip, owner:d.owner_username, pic:d.assigned_to||d.note||'', condition:d.condition||(d.online?'good':'fair'), status:d.status||'active', specs:d.cpu_model+' ('+d.cpu_cores+'c) | '+fmtBytes(d.memory_total), vStatus:d.verification_status||'unverified', vAt:d.verified_at, vBy:d.verified_by, vNote:d.verification_note });
+      var linkedManual = d.manual_asset_id ? manualAssets.find(function(m){ return m.id === d.manual_asset_id; }) : null;
+      var displayName = linkedManual ? (linkedManual.name + ' (' + d.hostname + ')') : (d.os + ' ' + d.arch + ' (' + d.hostname + ')');
+      var displayTag = linkedManual ? (linkedManual.asset_tag + ' · ' + d.hostname) : d.hostname;
+      var displayCategory = linkedManual ? linkedManual.category : 'pc';
+      items.push({ isManual:false, id:d.id, tag:displayTag, name:displayName, category:displayCategory, branch:dBranch, location:d.local_ip||d.ip, owner:d.owner_username, pic:d.assigned_to||d.note||'', condition:d.condition||(d.online?'good':'fair'), status:d.status||'active', specs:d.cpu_model+' ('+d.cpu_cores+'c) | '+fmtBytes(d.memory_total), vStatus:d.verification_status||'unverified', vAt:d.verified_at, vBy:d.verified_by, vNote:d.verification_note, isMatched: !!linkedManual });
     });
   }
 
@@ -1135,7 +1144,8 @@ async function openDeviceModal(id) {
     '<div class="detail-item"><div class="label">Status</div><div class="value"><span class="status-dot '+(dev.online?'online':'offline')+'"></span>'+(dev.online?'Online':'Offline')+'</div></div>' +
     '<div class="detail-item"><div class="label">RustDesk Self-host</div><div class="value">'+(rustDeskID ? esc(rustDeskID)+' <button class="btn btn-warning btn-sm" onclick="openRustDesk(\''+rustDeskID+'\')">Buka</button>' : 'Belum terdeteksi')+'</div></div>' +
     '<div class="detail-item"><div class="label">Cabang</div><div class="value">'+esc(dev.branch||dev.group||'-')+'</div></div>' +
-    '<div class="detail-item"><div class="label">Registered</div><div class="value">'+new Date(dev.registered_at).toLocaleString()+'</div></div>';
+    '<div class="detail-item"><div class="label">Registered</div><div class="value">'+new Date(dev.registered_at).toLocaleString()+'</div></div>' +
+    (dev.manual_asset_id ? '<div class="detail-item"><div class="label">Link Aset Manual</div><div class="value">'+esc(dev.manual_asset_id)+' <button class="btn btn-warning btn-sm" onclick="unlinkManualAsset()">Lepas Link</button></div></div>' : '');
   document.getElementById('modalTags').value = dev.tags || '';
   document.getElementById('modalGroup').value = dev.group || 'default';
   document.getElementById('modalNote').value = dev.note || '';
@@ -1148,7 +1158,40 @@ async function openDeviceModal(id) {
   var canManageRustDesk = currentUser && (currentUser.role === 'admin' || currentUser.role === 'it_support');
   document.getElementById('btnInstallRustDesk').style.display = canManageRustDesk ? 'inline-flex' : 'none';
   document.getElementById('btnRustDeskPassword').style.display = canManageRustDesk && rustDeskID ? 'inline-flex' : 'none';
+  var canViewProcesses = currentUser && ['admin','it_support','ga_pusat'].indexOf(currentUser.role) >= 0;
+  document.getElementById('btnViewProcesses').style.display = canViewProcesses && dev.online ? 'inline-flex' : 'none';
   document.getElementById('deviceModal').style.display = 'flex';
+}
+
+async function openProcessList(deviceID) {
+  var id = deviceID || (currentDevice && currentDevice.id);
+  if (!id) return;
+  var dev = devices.find(function(item){ return item.id === id; }) || currentDevice || {};
+  document.getElementById('processListTitle').textContent = 'Aplikasi Aktif - ' + (dev.hostname || id);
+  document.getElementById('processListBody').innerHTML = '<tr><td colspan="3">Mengambil snapshot...</td></tr>';
+  document.getElementById('processListModal').style.display = 'flex';
+  var result = await api('/api/devices/' + encodeURIComponent(id) + '/processes');
+  if (!result || result.error) {
+    document.getElementById('processListBody').innerHTML = '<tr><td colspan="3">'+esc((result && result.error) || 'Gagal mengambil daftar proses')+'</td></tr>';
+    return;
+  }
+  var processes = result.processes || [];
+  document.getElementById('processListBody').innerHTML = processes.length ? processes.map(function(process){
+    return '<tr><td>'+esc(process.name)+'</td><td>'+process.pid+'</td><td>'+fmtBytes(process.memory_bytes)+'</td></tr>';
+  }).join('') : '<tr><td colspan="3">Tidak ada data proses.</td></tr>';
+}
+
+function closeProcessList() { document.getElementById('processListModal').style.display = 'none'; }
+
+async function unlinkManualAsset() {
+  if (!currentDevice || !currentDevice.manual_asset_id) return;
+  if (!await appConfirm('Lepas link perangkat ini dari aset manual? Kedua data tetap ada dan akan tampil terpisah.')) return;
+  var result = await api('/api/devices/' + encodeURIComponent(currentDevice.id) + '/unlink', { method:'POST' });
+  if (!result || result.error) { appAlert((result && result.error) || 'Gagal melepas link aset'); return; }
+  closeDeviceModal();
+  await loadDevices();
+  await loadBranchAssets();
+  showToast('Link aset manual berhasil dilepas');
 }
 
 async function configureRustDesk() {
@@ -1281,24 +1324,43 @@ async function deleteDevice() {
 
 // ==================== ASSET INVENTORY (GLOBAL) ====================
 
+function unifiedAssetRows() {
+  var matchedManualIDs = {};
+  devices.forEach(function(d) { if (d.manual_asset_id) matchedManualIDs[d.manual_asset_id] = true; });
+  var rows = devices.map(function(d) {
+    var manual = d.manual_asset_id ? manualAssets.find(function(a) { return a.id === d.manual_asset_id; }) : null;
+    return {
+      source: manual ? 'Agent (Matched)' : 'Agent', tag: manual ? manual.asset_tag + ' · ' + d.hostname : d.hostname,
+      id: d.id, name: manual ? manual.name : d.hostname, category: manual ? manual.category : 'Komputer',
+      branch: d.branch || d.group, location: (manual && manual.location) || d.local_ip || d.ip,
+      pic: d.owner_username || (manual && manual.owner_username), user: d.assigned_to || (manual && manual.assigned_to),
+      specs: (d.cpu_model || '-') + ' · ' + fmtBytes(d.memory_total) + ' RAM · ' + fmtBytes(d.disk_total) + ' disk',
+      status: d.verification_status || 'unverified'
+    };
+  });
+  manualAssets.forEach(function(a) {
+    if (matchedManualIDs[a.id]) return;
+    rows.push({source:'Manual', tag:a.asset_tag, id:a.id, name:a.name, category:a.category, branch:a.branch, location:a.location, pic:a.owner_username, user:a.assigned_to, specs:a.specs||a.serial_number, status:a.verification_status||'unverified'});
+  });
+  return rows;
+}
+
 function renderAssets() {
   var search = ((document.getElementById('assetSearch')||{}).value || '').toLowerCase();
-  var filtered = devices.map(function(d){return {source:'Agent',tag:d.hostname,id:d.id,name:d.hostname,category:'Komputer',branch:d.branch||d.group,location:d.local_ip||d.ip,pic:d.owner_username,specs:(d.cpu_model||'-')+' · '+fmtBytes(d.memory_total)+' RAM · '+fmtBytes(d.disk_total)+' disk',status:d.verification_status||'unverified'}})
-    .concat(manualAssets.map(function(a){return {source:'Manual',tag:a.asset_tag,id:a.id,name:a.name,category:a.category,branch:a.branch,location:a.location,pic:a.owner_username||a.assigned_to,specs:a.specs||a.serial_number,status:a.verification_status||'unverified'}}));
-  if (search) filtered = filtered.filter(function(a){return [a.tag,a.name,a.category,a.branch,a.location,a.pic,a.specs].join(' ').toLowerCase().includes(search)});
+  var filtered = unifiedAssetRows();
+  if (search) filtered = filtered.filter(function(a){return [a.tag,a.name,a.category,a.branch,a.location,a.pic,a.user,a.specs].join(' ').toLowerCase().includes(search)});
   if (filtered.length === 0) { document.getElementById('assetsTable').innerHTML = '<div class="empty-state"><p>No assets found</p></div>'; return; }
-  document.getElementById('assetsTable').innerHTML = '<table class="device-table"><thead><tr><th>Sumber</th><th>Tag / Hostname</th><th>Nama</th><th>Kategori</th><th>Cabang & Lokasi</th><th>PIC</th><th>Spesifikasi</th><th>Status Audit</th></tr></thead><tbody>' +
+  document.getElementById('assetsTable').innerHTML = '<table class="device-table"><thead><tr><th>Sumber</th><th>Tag / Hostname</th><th>Nama</th><th>Kategori</th><th>Cabang & Lokasi</th><th>PIC</th><th>Pemakai</th><th>Spesifikasi</th><th>Status Audit</th></tr></thead><tbody>' +
     filtered.map(function(a){
-      return '<tr><td><span class="tag">'+esc(a.source)+'</span></td><td>'+esc(a.tag||'-')+'</td><td>'+esc(a.name||'-')+'</td><td>'+esc(a.category||'-')+'</td><td>'+esc(a.branch||'-')+'<br><small>'+esc(a.location||'-')+'</small></td><td>'+esc(a.pic||'Belum ditugaskan')+'</td><td>'+esc(a.specs||'-')+'</td><td>'+esc(a.status)+'</td></tr>';
+      return '<tr><td><span class="tag">'+esc(a.source)+'</span></td><td>'+esc(a.tag||'-')+'</td><td>'+esc(a.name||'-')+'</td><td>'+esc(a.category||'-')+'</td><td>'+esc(a.branch||'-')+'<br><small>'+esc(a.location||'-')+'</small></td><td>'+esc(a.pic||'Belum ada PIC')+'</td><td>'+esc(a.user||'Belum ada pemakai')+'</td><td>'+esc(a.specs||'-')+'</td><td>'+esc(a.status)+'</td></tr>';
     }).join('') + '</tbody></table>';
 }
 
 function exportAssets() {
-  var rows = [['Sumber','Tag/Hostname','ID','Nama','Kategori','Cabang','Lokasi','PIC','Spesifikasi','Status Verifikasi']];
-  devices.forEach(function(d){ rows.push(['Agent',d.hostname,d.id,d.hostname,'Komputer',d.branch||d.group,d.local_ip||d.ip,d.owner_username,(d.cpu_model||'')+'; RAM '+fmtBytes(d.memory_total)+'; Disk '+fmtBytes(d.disk_total),d.verification_status]); });
-  manualAssets.forEach(function(a){ rows.push(['Manual',a.asset_tag,a.id,a.name,a.category,a.branch,a.location,a.owner_username||a.assigned_to,a.specs||a.serial_number,a.verification_status]); });
+  var rows = [['Sumber','Tag/Hostname','ID','Nama','Kategori','Cabang','Lokasi','PIC','Nama Pemakai','Spesifikasi','Status Verifikasi']];
+  unifiedAssetRows().forEach(function(a){ rows.push([a.source,a.tag,a.id,a.name,a.category,a.branch,a.location,a.pic,a.user,a.specs,a.status]); });
   var csv = '';
-  rows.forEach(function(r){ csv += r.map(function(v){ return '\"'+String(v||'').replace(/\"/g, '\"\"')+'\"'; }).join(',') + '\n'; });
+  rows.forEach(function(r){ csv += r.map(function(v){ return '"'+String(v||'').replace(/"/g, '""')+'"'; }).join(',') + '\n'; });
   var blob = new Blob([csv], { type: 'text/csv' });
   var url = URL.createObjectURL(blob);
   var a = document.createElement('a'); a.href = url; a.download = 'assets_' + new Date().toISOString().slice(0,10) + '.csv'; a.click(); URL.revokeObjectURL(url);

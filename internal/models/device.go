@@ -36,6 +36,7 @@ type Device struct {
 	Recommendation     string     `json:"recommendation"`
 	LastSeen           time.Time  `json:"last_seen"`
 	RegisteredAt       time.Time  `json:"registered_at"`
+	ManualAssetID      string     `json:"manual_asset_id,omitempty"`
 	Online             bool       `json:"online"`
 }
 
@@ -215,6 +216,12 @@ type SignalMessage struct {
 type WSMessage struct {
 	Action string          `json:"action"`
 	Data   json.RawMessage `json:"data,omitempty"`
+}
+
+type ProcessInfo struct {
+	PID         int    `json:"pid"`
+	Name        string `json:"name"`
+	MemoryBytes uint64 `json:"memory_bytes"`
 }
 
 type NetworkScanHost struct {

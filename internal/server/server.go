@@ -271,6 +271,8 @@ type Server struct {
 	webFS          fs.FS
 	scanMu         sync.RWMutex
 	scans          map[string]*models.NetworkScan
+	processMu      sync.Mutex
+	processReplies map[string]chan []models.ProcessInfo
 	attachmentsDir string
 }
 
@@ -310,6 +312,7 @@ func New(cfg Config, webFS embed.FS) (*Server, error) {
 		hub:            NewHub(db),
 		webFS:          sub,
 		scans:          make(map[string]*models.NetworkScan),
+		processReplies: make(map[string]chan []models.ProcessInfo),
 		attachmentsDir: filepath.Join(filepath.Dir(cfg.DBPath), "attachments"),
 		upgrader: websocket.Upgrader{
 			ReadBufferSize:  4096,
@@ -545,7 +548,12 @@ func (s *Server) handleDevices(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleDevice(w http.ResponseWriter, r *http.Request) {
-	id := strings.TrimPrefix(r.URL.Path, "/api/devices/")
+	subPath := strings.TrimPrefix(r.URL.Path, "/api/devices/")
+	action := ""
+	id := subPath
+	if slash := strings.IndexByte(subPath, '/'); slash >= 0 {
+		id, action = subPath[:slash], subPath[slash+1:]
+	}
 	if id == "" {
 		jsonError(w, "missing device id", 400)
 		return
@@ -571,6 +579,66 @@ func (s *Server) handleDevice(w http.ResponseWriter, r *http.Request) {
 	}
 	if isAssetHolderRole(claims.Role) && dev.OwnerUsername != claims.Username {
 		jsonError(w, "forbidden: asset bukan milik user ini", 403)
+		return
+	}
+
+	if action == "processes" {
+		if r.Method != http.MethodGet {
+			http.Error(w, "method not allowed", 405)
+			return
+		}
+		if claims.Role != "admin" && claims.Role != "it_support" && claims.Role != "ga_pusat" {
+			jsonError(w, "forbidden", 403)
+			return
+		}
+		if !s.hub.IsOnline(id) {
+			jsonError(w, "agent sedang offline", 409)
+			return
+		}
+		requestID := fmt.Sprintf("proc-%x", time.Now().UnixNano())
+		reply := make(chan []models.ProcessInfo, 1)
+		s.processMu.Lock()
+		s.processReplies[requestID] = reply
+		s.processMu.Unlock()
+		defer func() {
+			s.processMu.Lock()
+			delete(s.processReplies, requestID)
+			s.processMu.Unlock()
+		}()
+		payload, _ := json.Marshal(map[string]interface{}{"action": "get_processes", "data": map[string]string{"request_id": requestID}})
+		if !s.hub.SendToAgent(id, payload) {
+			jsonError(w, "agent sedang offline", 409)
+			return
+		}
+		select {
+		case processes := <-reply:
+			s.db.AddLog(id, "processes_viewed", "daftar proses dilihat oleh "+claims.Username)
+			jsonResp(w, map[string]interface{}{"processes": processes}, 200)
+		case <-time.After(10 * time.Second):
+			jsonError(w, "agent tidak merespons", 504)
+		}
+		return
+	}
+
+	if action == "unlink" {
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", 405)
+			return
+		}
+		if claims.Role == "viewer" || isAssetHolderRole(claims.Role) {
+			jsonError(w, "forbidden", 403)
+			return
+		}
+		if dev.ManualAssetID == "" {
+			jsonError(w, "perangkat tidak terhubung ke aset manual", 400)
+			return
+		}
+		if err := s.db.UnlinkDeviceManualAsset(id); err != nil {
+			jsonError(w, err.Error(), 500)
+			return
+		}
+		s.db.AddLog(id, "unlink_asset", "hubungan dengan aset manual "+dev.ManualAssetID+" dilepas")
+		jsonResp(w, map[string]string{"status": "unlinked"}, 200)
 		return
 	}
 
@@ -1746,7 +1814,17 @@ func (s *Server) handleAgentMessage(c *Client, raw []byte) {
 			dev.GroupName = "default"
 		}
 		previous, previousErr := s.db.GetDevice(dev.ID)
-		s.db.UpsertDevice(&dev)
+		if err := s.db.UpsertDevice(&dev); err != nil {
+			log.Printf("[server] device registration failed for %s: %v", dev.ID, err)
+			return
+		}
+		if previousErr == nil && !strings.EqualFold(previous.Hostname, dev.Hostname) {
+			if err := s.db.RelinkManualAssetOnHostnameChange(dev.ID); err != nil {
+				log.Printf("[server] hostname relink failed for %s: %v", dev.ID, err)
+			} else {
+				s.db.AddLog(dev.ID, "asset_relink", fmt.Sprintf("hostname berubah %s menjadi %s; link aset dievaluasi ulang", previous.Hostname, dev.Hostname))
+			}
+		}
 		s.db.AddLog(dev.ID, "register", fmt.Sprintf("%s %s v%s", dev.Hostname, dev.OS, dev.Version))
 		if previousErr == nil {
 			var changes []string
@@ -1833,6 +1911,24 @@ func (s *Server) handleAgentMessage(c *Client, raw []byte) {
 			}
 		}
 		s.scanMu.Unlock()
+
+	case "process_list_result":
+		var result struct {
+			RequestID string               `json:"request_id"`
+			Processes []models.ProcessInfo `json:"processes"`
+		}
+		if err := json.Unmarshal(msg.Data, &result); err != nil || result.RequestID == "" {
+			return
+		}
+		s.processMu.Lock()
+		reply := s.processReplies[result.RequestID]
+		s.processMu.Unlock()
+		if reply != nil {
+			select {
+			case reply <- result.Processes:
+			default:
+			}
+		}
 	}
 }
 

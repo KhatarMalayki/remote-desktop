@@ -58,6 +58,7 @@ func migrate(db *sql.DB) error {
 		verification_note TEXT NOT NULL DEFAULT '',
 		note TEXT NOT NULL DEFAULT '',
 		owner_username TEXT NOT NULL DEFAULT '',
+		manual_asset_id TEXT NOT NULL DEFAULT '',
 		last_seen DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 		registered_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 	);
@@ -244,6 +245,7 @@ func migrate(db *sql.DB) error {
 		`ALTER TABLE manual_assets ADD COLUMN owner_username TEXT NOT NULL DEFAULT ''`,
 		`ALTER TABLE devices ADD COLUMN assigned_to TEXT NOT NULL DEFAULT ''`,
 		`ALTER TABLE devices ADD COLUMN condition TEXT NOT NULL DEFAULT 'good'`,
+		`ALTER TABLE devices ADD COLUMN manual_asset_id TEXT NOT NULL DEFAULT ''`,
 		`ALTER TABLE asset_switch_requests ADD COLUMN assigned_to TEXT NOT NULL DEFAULT ''`,
 	}
 	for _, q := range alters {
@@ -284,7 +286,87 @@ func (d *DB) UpsertDevice(dev *models.Device) error {
 		dev.DiskTotal, dev.DiskUsed, dev.Version, dev.RustDeskID, dev.Status,
 		dev.Tags, dev.GroupName, branch, dev.Note, dev.LastSeen, dev.RegisteredAt,
 	)
-	return err
+	if err != nil {
+		return err
+	}
+	return d.matchManualAsset(dev.ID)
+}
+
+func (d *DB) matchManualAsset(deviceID string) error {
+	tx, err := d.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	var hostname, branch, linked string
+	if err := tx.QueryRow(`SELECT hostname, COALESCE(NULLIF(branch,''),group_name), manual_asset_id FROM devices WHERE id=?`, deviceID).Scan(&hostname, &branch, &linked); err != nil || linked != "" {
+		return err
+	}
+
+	type candidate struct {
+		id, owner, assigned, verification, condition string
+		year                                         int
+	}
+
+	find := func(where string, args ...interface{}) ([]candidate, error) {
+		rows, err := tx.Query(`SELECT id, owner_username, assigned_to, verification_status, condition, acquisition_year FROM manual_assets WHERE `+where, args...)
+		if err != nil {
+			return nil, err
+		}
+		defer rows.Close()
+		var out []candidate
+		for rows.Next() {
+			var c candidate
+			if err := rows.Scan(&c.id, &c.owner, &c.assigned, &c.verification, &c.condition, &c.year); err != nil {
+				return nil, err
+			}
+			out = append(out, c)
+		}
+		return out, rows.Err()
+	}
+
+	base := `NOT EXISTS (SELECT 1 FROM devices d WHERE d.manual_asset_id=manual_assets.id) AND branch=?`
+	// Prioritas 1: asset_tag atau serial_number cocok dengan hostname (case-insensitive)
+	candidates, err := find(base+` AND (LOWER(asset_tag)=LOWER(?) OR (serial_number<>'' AND LOWER(serial_number)=LOWER(?)))`, branch, hostname, hostname)
+	matchType := "identifier"
+	if err != nil {
+		return err
+	}
+
+	// Prioritas 2: nama aset manual sama dengan hostname
+	if len(candidates) == 0 {
+		var duplicateCount int
+		if err := tx.QueryRow(`SELECT COUNT(*) FROM devices WHERE id<>? AND LOWER(hostname)=LOWER(?)`, deviceID, hostname).Scan(&duplicateCount); err != nil {
+			return err
+		}
+		if duplicateCount > 0 {
+			_, _ = tx.Exec(`INSERT INTO device_logs(device_id,action,detail) VALUES (?, 'asset_match_warning', ?)`, deviceID, "hostname duplikat terdeteksi; auto-match aset manual dilewati")
+			return tx.Commit()
+		}
+		candidates, err = find(base+` AND LOWER(name)=LOWER(?)`, branch, hostname)
+		matchType = "hostname"
+		if err != nil {
+			return err
+		}
+	}
+
+	if len(candidates) != 1 {
+		if len(candidates) > 1 {
+			_, _ = tx.Exec(`INSERT INTO device_logs(device_id,action,detail) VALUES (?, 'asset_match_warning', ?)`, deviceID, "kandidat aset manual ambigu; auto-match dilewati")
+		}
+		return tx.Commit()
+	}
+
+	c := candidates[0]
+	result, err := tx.Exec(`UPDATE devices SET manual_asset_id=?, owner_username=CASE WHEN owner_username='' THEN ? ELSE owner_username END, assigned_to=CASE WHEN assigned_to='' THEN ? ELSE assigned_to END, verification_status=CASE WHEN verification_status='unverified' THEN ? ELSE verification_status END, condition=CASE WHEN condition='good' THEN ? ELSE condition END, acquisition_year=CASE WHEN acquisition_year=0 THEN ? ELSE acquisition_year END WHERE id=? AND manual_asset_id=''`, c.id, c.owner, c.assigned, c.verification, c.condition, c.year, deviceID)
+	if err != nil {
+		return err
+	}
+	if n, _ := result.RowsAffected(); n == 1 {
+		_, _ = tx.Exec(`INSERT INTO device_logs(device_id,action,detail) VALUES (?, 'asset_matched', ?)`, deviceID, fmt.Sprintf("aset manual %s terhubung via %s", c.id, matchType))
+	}
+	return tx.Commit()
 }
 
 func (d *DB) UpdateHeartbeat(hb *models.DeviceHeartbeat) error {
@@ -317,7 +399,7 @@ func (d *DB) GetDevice(id string) (*models.Device, error) {
 		memory_total, memory_used, disk_total, disk_used, version, rustdesk_id, status, tags, group_name,
 		branch, verification_status, verified_at, verified_by, verification_note, note,
 		owner_username, acquisition_year, last_seen, registered_at,
-		COALESCE(assigned_to, ''), COALESCE(condition, 'good') FROM devices WHERE id=?`, id)
+		COALESCE(assigned_to, ''), COALESCE(condition, 'good'), manual_asset_id FROM devices WHERE id=?`, id)
 	return scanDevice(row)
 }
 
@@ -356,7 +438,7 @@ func (d *DB) ListDevices(group, search string, limit, offset int) ([]*models.Dev
 		memory_total, memory_used, disk_total, disk_used, version, rustdesk_id, status, tags, group_name,
 		branch, verification_status, verified_at, verified_by, verification_note, note,
 		owner_username, acquisition_year, last_seen, registered_at,
-		COALESCE(assigned_to, ''), COALESCE(condition, 'good') FROM devices WHERE %s ORDER BY last_seen DESC LIMIT ? OFFSET ?`, where)
+		COALESCE(assigned_to, ''), COALESCE(condition, 'good'), manual_asset_id FROM devices WHERE %s ORDER BY last_seen DESC LIMIT ? OFFSET ?`, where)
 	args = append(args, limit, offset)
 	rows, err := d.db.Query(query, args...)
 	if err != nil {
@@ -393,7 +475,7 @@ func (d *DB) ListDevicesForOwner(username, search string, limit, offset int) ([]
 		memory_total, memory_used, disk_total, disk_used, version, rustdesk_id, status, tags, group_name,
 		branch, verification_status, verified_at, verified_by, verification_note, note,
 		owner_username, acquisition_year, last_seen, registered_at,
-		COALESCE(assigned_to, ''), COALESCE(condition, 'good') FROM devices WHERE %s ORDER BY last_seen DESC LIMIT ? OFFSET ?`, where)
+		COALESCE(assigned_to, ''), COALESCE(condition, 'good'), manual_asset_id FROM devices WHERE %s ORDER BY last_seen DESC LIMIT ? OFFSET ?`, where)
 	args = append(args, limit, offset)
 	rows, err := d.db.Query(query, args...)
 	if err != nil {
@@ -420,6 +502,18 @@ func (d *DB) UpdateDeviceMeta(id, tags, group, note, ownerUsername string) error
 func (d *DB) UpdateDeviceOwner(id, ownerUsername string) error {
 	_, err := d.db.Exec(`UPDATE devices SET owner_username=? WHERE id=?`, strings.TrimSpace(ownerUsername), id)
 	return err
+}
+
+func (d *DB) UnlinkDeviceManualAsset(deviceID string) error {
+	_, err := d.db.Exec(`UPDATE devices SET manual_asset_id='' WHERE id=?`, deviceID)
+	return err
+}
+
+func (d *DB) RelinkManualAssetOnHostnameChange(deviceID string) error {
+	if _, err := d.db.Exec(`UPDATE devices SET manual_asset_id='' WHERE id=?`, deviceID); err != nil {
+		return err
+	}
+	return d.matchManualAsset(deviceID)
 }
 
 func (d *DB) DeleteDevice(id string) error {
@@ -1355,7 +1449,7 @@ func scanDevice(row scanner) (*models.Device, error) {
 		&dev.DiskTotal, &dev.DiskUsed, &dev.Version, &dev.RustDeskID, &dev.Status,
 		&dev.Tags, &dev.GroupName, &dev.Branch, &dev.VerificationStatus, &vAt,
 		&dev.VerifiedBy, &dev.VerificationNote, &dev.Note, &dev.OwnerUsername, &dev.AcquisitionYear, &dev.LastSeen, &dev.RegisteredAt,
-		&dev.AssignedTo, &dev.Condition)
+		&dev.AssignedTo, &dev.Condition, &dev.ManualAssetID)
 	if err != nil {
 		return nil, err
 	}

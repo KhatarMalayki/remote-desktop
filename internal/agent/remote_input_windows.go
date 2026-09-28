@@ -16,6 +16,8 @@ import (
 var (
 	user32DLL             = syscall.NewLazyDLL("user32.dll")
 	setCursorPos          = user32DLL.NewProc("SetCursorPos")
+	mouseEventProc        = user32DLL.NewProc("mouse_event")
+	keybdEventProc        = user32DLL.NewProc("keybd_event")
 	openInputDesktopProc  = user32DLL.NewProc("OpenInputDesktop")
 	setThreadDesktopProc  = user32DLL.NewProc("SetThreadDesktop")
 	closeDesktopProc      = user32DLL.NewProc("CloseDesktop")
@@ -171,6 +173,10 @@ func sendKeyboardInput(vk uint16, flags uint32) error {
 	input.Ki.WVk = vk
 	input.Ki.DwFlags = flags
 	if sent := win.SendInput(1, unsafe.Pointer(&input), int32(unsafe.Sizeof(input))); sent != 1 {
+		if shouldUseLegacyInputFallback(activeInputDesktopName()) {
+			keybdEventProc.Call(uintptr(vk), 0, uintptr(flags), 0)
+			return nil
+		}
 		return fmt.Errorf("Windows menolak input keyboard (SendInput: %d, error: %d)", sent, win.GetLastError())
 	}
 	return nil
@@ -181,9 +187,17 @@ func sendMouseInput(flags uint32, data int32) error {
 	input.Mi.DwFlags = flags
 	input.Mi.MouseData = uint32(data)
 	if sent := win.SendInput(1, unsafe.Pointer(&input), int32(unsafe.Sizeof(input))); sent != 1 {
+		if shouldUseLegacyInputFallback(activeInputDesktopName()) {
+			mouseEventProc.Call(uintptr(flags), 0, 0, uintptr(data), 0)
+			return nil
+		}
 		return fmt.Errorf("Windows menolak input mouse (SendInput: %d, error: %d)", sent, win.GetLastError())
 	}
 	return nil
+}
+
+func shouldUseLegacyInputFallback(desktopName string) bool {
+	return desktopName != "" && !strings.EqualFold(desktopName, "Winlogon")
 }
 
 func setRemoteCursor(x, y float64, bounds image.Rectangle) {

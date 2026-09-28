@@ -15,8 +15,8 @@
     "semantic_hash": ""
   },
   "internal/agent/client.go": {
-    "mtime": 1789997470.1739516,
-    "ast_hash": "fd71c97931bd6375bdf62e927f635721",
+    "mtime": 1790581944.7027376,
+    "ast_hash": "3ad9d21bd5c7165813ceb1888a9dfd08",
     "semantic_hash": ""
   },
   "internal/agent/sysinfo.go": {
@@ -25,13 +25,13 @@
     "semantic_hash": ""
   },
   "internal/models/device.go": {
-    "mtime": 1790156832.23236,
-    "ast_hash": "13e70c87ec4b03db0ec63aaa26862731",
+    "mtime": 1790582088.8484418,
+    "ast_hash": "b8ec44c7e7b50964bdf9e96bd14dd7b2",
     "semantic_hash": ""
   },
   "internal/server/db.go": {
-    "mtime": 1790218283.2089946,
-    "ast_hash": "d0487fbebede97fe90504f214cc2ceb0",
+    "mtime": 1790582088.8573792,
+    "ast_hash": "ea0aea4ba38ea153794a1bcc6a3578c9",
     "semantic_hash": ""
   },
   "internal/server/hub.go": {
@@ -45,8 +45,8 @@
     "semantic_hash": ""
   },
   "internal/server/server.go": {
-    "mtime": 1790218422.485784,
-    "ast_hash": "f74c542de0bf075d6b70346ce8023946",
+    "mtime": 1790582088.8646734,
+    "ast_hash": "f362c095d15825ca62dfc9be179fa9f5",
     "semantic_hash": ""
   },
   "scripts/build.ps1": {
@@ -65,8 +65,8 @@
     "semantic_hash": "8c9cb5d1b967f64d6abc8c1ca0fe3e90"
   },
   "web/static/app.js": {
-    "mtime": 1790237599.2365608,
-    "ast_hash": "7fb6ff3c19ecb18ee2b7b76d9a6acac4",
+    "mtime": 1790582069.1135335,
+    "ast_hash": "5d068ecd2b4f630733459169499d0dd4",
     "semantic_hash": ""
   },
   ".codex/hooks.json": {
@@ -125,8 +125,8 @@
     "semantic_hash": ""
   },
   "web/index.html": {
-    "mtime": 1790237599.2322264,
-    "ast_hash": "463f4fbb752d3d0ab54284349bfafe34",
+    "mtime": 1790582069.1095192,
+    "ast_hash": "f35a1cf1a41f3e3239dbc4768b315642",
     "semantic_hash": ""
   },
   "scripts/update-server.sh": {
@@ -430,8 +430,8 @@
     "semantic_hash": ""
   },
   "internal/server/rustdesk_test.go": {
-    "mtime": 1790000747.7948382,
-    "ast_hash": "fc4b8603a8d412234662708a1c2710d5",
+    "mtime": 1790570402.91728,
+    "ast_hash": "f2b5a03c3c55cec4d39e99fbae8a32d6",
     "semantic_hash": ""
   },
   ".playwright-cli/page-2026-09-21T13-18-12-899Z.yml": {
@@ -687,6 +687,21 @@
   "internal/server/holder_permissions_test.go": {
     "mtime": 1790218389.9927692,
     "ast_hash": "222deae84d3e3dacecd07b34d5013465",
+    "semantic_hash": ""
+  },
+  "internal/server/match_asset_test.go": {
+    "mtime": 1790582199.3105104,
+    "ast_hash": "d45cd6d65f7d99a4c65d3e04f925a5ab",
+    "semantic_hash": ""
+  },
+  "internal/agent/process_other.go": {
+    "mtime": 1790581944.7001529,
+    "ast_hash": "9d4ca19a2df82193d5d26e232e90f9e9",
+    "semantic_hash": ""
+  },
+  "internal/agent/process_windows.go": {
+    "mtime": 1790581944.6988914,
+    "ast_hash": "e3103f4e64844bfe6c88d354ac86b3ac",
     "semantic_hash": ""
   }
 }
