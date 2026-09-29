@@ -44,16 +44,19 @@ func (protection *remoteProtection) state() map[string]interface{} {
 	return map[string]interface{}{"type": "protection_state", "blocked": protection.blocked, "privacy": protection.privacy != nil}
 }
 
-func (protection *remoteProtection) desktopChanged() bool {
-	if protection.privacy != nil {
-		select {
-		case <-protection.privacy.done:
-			return true
-		default:
+func (protection *remoteProtection) onDesktopChange(newDesktop string) {
+	protection.desktop = newDesktop
+	if protection.blocked {
+		if result, _, err := blockRemoteInputCall(1); result == 0 {
+			log.Printf("[remote] re-assert BlockInput on %s failed: %v", newDesktop, err)
 		}
+	}
+}
+
+func (protection *remoteProtection) heartbeat() {
+	if protection.privacy != nil {
 		protection.privacy.deadline.Store(time.Now().Add(20 * time.Second).UnixNano())
 	}
-	return protection.active() && !strings.EqualFold(activeInputDesktopName(), protection.desktop)
 }
 
 func (protection *remoteProtection) set(kind string, enabled bool) error {
@@ -177,8 +180,11 @@ func startRemotePrivacy() (*remotePrivacyWindow, error) {
 			case <-privacy.stop:
 				return
 			case <-ticker.C:
-				if time.Now().UnixNano() > privacy.deadline.Load() || !strings.EqualFold(activeInputDesktopName(), "Default") {
+				if time.Now().UnixNano() > privacy.deadline.Load() {
 					return
+				}
+				if !strings.EqualFold(activeInputDesktopName(), "Default") {
+					continue
 				}
 				var message win.MSG
 				for win.PeekMessage(&message, 0, 0, 0, win.PM_REMOVE) {

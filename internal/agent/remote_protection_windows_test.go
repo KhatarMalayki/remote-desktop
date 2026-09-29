@@ -32,3 +32,20 @@ func TestRemoteInputProtectionCleanup(t *testing.T) {
 		t.Fatal("failed BlockInput advertised as active")
 	}
 }
+
+func TestRemoteProtectionDesktopTransitionReassertsBlockInput(t *testing.T) {
+	original := blockRemoteInputCall
+	defer func() { blockRemoteInputCall = original }()
+	var calls []uintptr
+	blockRemoteInputCall = func(args ...uintptr) (uintptr, uintptr, error) { calls = append(calls, args[0]); return 1, 0, nil }
+	var protection remoteProtection
+	_ = protection.block(true)
+	calls = nil
+	protection.onDesktopChange("Winlogon")
+	if len(calls) != 1 || calls[0] != 1 {
+		t.Fatalf("expected BlockInput(1) on desktop change, got %v", calls)
+	}
+	if protection.desktop != "Winlogon" {
+		t.Fatalf("expected desktop 'Winlogon', got %q", protection.desktop)
+	}
+}

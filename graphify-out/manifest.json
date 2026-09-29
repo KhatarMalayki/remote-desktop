@@ -1,12 +1,12 @@
 {
   "cmd/agent/main.go": {
-    "mtime": 1790664982.29258,
-    "ast_hash": "99f1993b4a9d1cb9a8179c2f4e53ea15",
+    "mtime": 1790666669.6771286,
+    "ast_hash": "fde6b8575ebfc3687d892db7feb2d3d4",
     "semantic_hash": ""
   },
   "cmd/server/main.go": {
-    "mtime": 1790664982.29258,
-    "ast_hash": "844a7f5ec8665c231a0f089443f25c37",
+    "mtime": 1790666669.6685967,
+    "ast_hash": "7305d96a3407f39b19e40c463d952f8e",
     "semantic_hash": ""
   },
   "go.mod": {
@@ -175,8 +175,8 @@
     "semantic_hash": ""
   },
   "internal/agent/remote.go": {
-    "mtime": 1790651343.006671,
-    "ast_hash": "60ac178a7ac66cfd7a42efd848aa0574",
+    "mtime": 1790666669.668031,
+    "ast_hash": "49c04c3a97f2a7c07569a910cdb54863",
     "semantic_hash": ""
   },
   "internal/agent/remote_input_other.go": {
@@ -400,18 +400,18 @@
     "semantic_hash": ""
   },
   "internal/agent/remote_protection_other.go": {
-    "mtime": 1790651103.498472,
-    "ast_hash": "57d6d762b4048a3b5491b0e7d51ac7d5",
+    "mtime": 1790666683.0111675,
+    "ast_hash": "9052f31411eec8a3a1fe3803bc2cc559",
     "semantic_hash": ""
   },
   "internal/agent/remote_protection_windows.go": {
-    "mtime": 1790651343.006671,
-    "ast_hash": "c783df0b6035ed6ce65fc6ad94486ca8",
+    "mtime": 1790666728.5928235,
+    "ast_hash": "27d288a7d2ac977fea1af5c429bfe55d",
     "semantic_hash": ""
   },
   "internal/agent/remote_protection_windows_test.go": {
-    "mtime": 1790651103.501089,
-    "ast_hash": "c7310daaae3049bad76d54480835bf3b",
+    "mtime": 1790666669.6685967,
+    "ast_hash": "df85deae12847ecbb246b0d6fbceecf9",
     "semantic_hash": ""
   },
   "web/remote.test.cjs": {
@@ -420,8 +420,8 @@
     "semantic_hash": ""
   },
   "docs/remote-session-controls.md": {
-    "mtime": 1790651309.1068184,
-    "ast_hash": "fb2a46c728de3cd6c08f1c8230a413c8",
+    "mtime": 1790666776.7244954,
+    "ast_hash": "0b34b620ac9b9d8196b23a0ad09037da",
     "semantic_hash": ""
   }
 }

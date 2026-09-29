@@ -23,8 +23,10 @@ Turn privacy off, then use Lepas Blokir Input to restore local input.
 
 This is a best-effort visual curtain, NOT a confidentiality boundary. Lock screen,
 UAC, exclusive fullscreen, display drivers and other topmost windows can behave
-differently. Desktop changes end the protected session instead of silently
-continuing. The overlay has an independent 20-second expiry if the capture loop
+differently. Desktop changes (such as Win+L locking the PC to Winlogon) do NOT disconnect the
+remote relay. The agent dynamically follows to Winlogon on the same connection,
+re-asserts BlockInput on Winlogon so the local user cannot enter PIN/password physically,
+and keeps the privacy overlay ready on Default so it covers the screen immediately upon unlock. The overlay has an independent 20-second expiry if the capture loop
 stops servicing it. Notify the local user before enabling it. Verify physical
 monitors and the viewer on the actual endpoint before using it for sensitive work.
 

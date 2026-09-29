@@ -127,6 +127,7 @@ func (a *Agent) startRemoteRelay(sessionID string) {
 		a.remoteMu.Unlock()
 	}()
 
+	currentDesktopName := activeInputDesktopName()
 	state := &remoteScreenState{monitor: 0, bounds: screenshot.GetDisplayBounds(0), quality: 52, maxWidth: 1600, frameInterval: 60 * time.Millisecond}
 	var writeMu sync.Mutex
 	writeMessage := func(messageType int, payload []byte) error {
@@ -257,6 +258,7 @@ func (a *Agent) startRemoteRelay(sessionID string) {
 			if command.Type == "protection_heartbeat" {
 				if !protectionDeadline.IsZero() {
 					protectionDeadline = time.Now().Add(15 * time.Second)
+					protection.heartbeat()
 				}
 				continue
 			}
@@ -268,6 +270,7 @@ func (a *Agent) startRemoteRelay(sessionID string) {
 				protectionDeadline = time.Time{}
 				if protection.active() {
 					protectionDeadline = time.Now().Add(15 * time.Second)
+					protection.heartbeat()
 				}
 				_ = sendJSON(protection.state())
 				continue
@@ -294,29 +297,28 @@ func (a *Agent) startRemoteRelay(sessionID string) {
 				_ = sendJSON(map[string]string{"type": "input_error", "message": inputErr.Error()})
 			}
 		case <-ticker.C:
-			if !protectionDeadline.IsZero() && (time.Now().After(protectionDeadline) || protection.desktopChanged()) {
+			if !protectionDeadline.IsZero() && time.Now().After(protectionDeadline) {
 				protection.close()
 				protectionDeadline = time.Time{}
 				_ = sendJSON(protection.state())
-				_ = sendJSON(map[string]string{"type": "protection_error", "message": "Proteksi dilepas: heartbeat timeout atau desktop berubah. Sesi ditutup demi keamanan."})
+				_ = sendJSON(map[string]string{"type": "protection_error", "message": "Proteksi dilepas: heartbeat timeout."})
 				return
 			}
-			secureDesktop := isSecureInputDesktop()
-			// A worker created directly on Winlogon must not infer an unlock from
-			// OpenInputDesktop. On some Windows 11 builds that API reports Default
-			// to a UIAccess process even while the credential screen is visible,
-			// which previously caused an endless normal/secure reconnect loop.
-			// Keep the secure relay until the viewer disconnects; after an actual
-			// unlock the operator can reconnect explicitly to return to Default.
-			if !a.secureDesktopOnly && a.secureRelayStarter != nil && secureDesktop {
-				log.Printf("[remote] Winlogon desktop became active; requesting secure relay reconnect")
-				_ = sendJSON(map[string]string{"type": "desktop_transition", "message": "Windows terkunci; menyambungkan kontrol lock screen…"})
-				return
+			activeDesktop := activeInputDesktopName()
+			if activeDesktop != "" && !strings.EqualFold(activeDesktop, currentDesktopName) {
+				currentDesktopName = activeDesktop
+				protection.onDesktopChange(activeDesktop)
 			}
 			// On Windows this re-attaches the current OS thread to the desktop
 			// that is actually receiving input. A SYSTEM console worker can then
 			// follow Default <-> Winlogon transitions without dropping the relay.
 			if desktopErr := desktop.prepare(); desktopErr != nil {
+				secureDesktop := isSecureInputDesktop()
+				if !a.secureDesktopOnly && a.secureRelayStarter != nil && secureDesktop {
+					log.Printf("[remote] Winlogon desktop requires secure worker delegate: %v", desktopErr)
+					_ = sendJSON(map[string]string{"type": "desktop_transition", "message": "Windows terkunci; menyambungkan kontrol lock screen…"})
+					return
+				}
 				log.Printf("[remote] input desktop unavailable: %v", desktopErr)
 				continue
 			}
