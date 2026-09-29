@@ -10,7 +10,7 @@ import (
 	"github.com/user/remote-desktop/internal/agent"
 )
 
-var version = "0.2.49"
+var version = "0.2.50"
 
 func main() {
 	serverURL := flag.String("server", envOr("RD_SERVER_URL", ""), "server URL")
@@ -115,7 +115,7 @@ func main() {
 	if *secureRelay != "" || *userRelay != "" {
 		log.Printf("[agent] secure Winlogon relay v%s starting", version)
 		a.SetSecureDesktopOnly(*secureRelay != "")
-		a.SetInteractiveUserRelay(*userRelay != "")
+		a.SetInteractiveInputMode(*userRelay != "")
 		relayID := *secureRelay
 		if relayID == "" {
 			relayID = *userRelay
@@ -124,10 +124,10 @@ func main() {
 		return
 	}
 	if *systemWorker {
+		a.SetInteractiveInputMode(true)
 		a.SetSecureRelayStarter(func(sessionID string) error {
 			return startSecureDesktopRelay(configPath, sessionID)
 		})
-		a.SetUserRelayStarter(func(sessionID string) error { return startUserDesktopRelay(configPath, sessionID) })
 	}
 	a.Run()
 }
