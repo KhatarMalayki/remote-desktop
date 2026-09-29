@@ -14,7 +14,6 @@ import (
 	"runtime"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -51,7 +50,6 @@ type Agent struct {
 	// has switched away from the normal desktop.
 	secureRelayStarter func(string) error
 	secureDesktopOnly  bool
-	forceSecureUntil   atomic.Int64
 	remoteMu           sync.Mutex
 	remoteConn         *websocket.Conn
 }

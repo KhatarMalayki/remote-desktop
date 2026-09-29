@@ -2,4 +2,8 @@
 
 package agent
 
-func prepareRemoteDesktop() error { return nil }
+type remoteDesktop struct{}
+
+func newRemoteDesktop() *remoteDesktop { return &remoteDesktop{} }
+func (*remoteDesktop) prepare() error  { return nil }
+func (*remoteDesktop) close()          {}

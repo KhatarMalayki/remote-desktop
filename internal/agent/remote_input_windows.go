@@ -19,26 +19,27 @@ var interactiveUserInput atomic.Bool
 func setInteractiveInputMode(enabled bool) { interactiveUserInput.Store(enabled) }
 
 var (
-	user32DLL             = syscall.NewLazyDLL("user32.dll")
-	setCursorPos          = user32DLL.NewProc("SetCursorPos")
-	mouseEventProc        = user32DLL.NewProc("mouse_event")
-	keybdEventProc        = user32DLL.NewProc("keybd_event")
-	openInputDesktopProc  = user32DLL.NewProc("OpenInputDesktop")
-	setThreadDesktopProc  = user32DLL.NewProc("SetThreadDesktop")
-	closeDesktopProc      = user32DLL.NewProc("CloseDesktop")
-	getUserObjectInfoProc = user32DLL.NewProc("GetUserObjectInformationW")
+	user32DLL              = syscall.NewLazyDLL("user32.dll")
+	setCursorPos           = user32DLL.NewProc("SetCursorPos")
+	mouseEventProc         = user32DLL.NewProc("mouse_event")
+	keybdEventProc         = user32DLL.NewProc("keybd_event")
+	openInputDesktopProc   = user32DLL.NewProc("OpenInputDesktop")
+	setThreadDesktopProc   = user32DLL.NewProc("SetThreadDesktop")
+	closeDesktopProc       = user32DLL.NewProc("CloseDesktop")
+	getUserObjectInfoProc  = user32DLL.NewProc("GetUserObjectInformationW")
+	getThreadDesktopProc   = user32DLL.NewProc("GetThreadDesktop")
+	getCurrentThreadIDProc = syscall.NewLazyDLL("kernel32.dll").NewProc("GetCurrentThreadId")
+	sendInputCall          = user32DLL.NewProc("SendInput").Call
 )
 
 func handleRemoteInput(command remoteCommand, bounds image.Rectangle) error {
-	if err := prepareRemoteDesktop(); err != nil {
-		return err
-	}
 	switch command.Type {
 	case "mouse_move":
-		setRemoteCursor(command.X, command.Y, bounds)
-		return nil
+		return setRemoteCursor(command.X, command.Y, bounds)
 	case "mouse_down", "mouse_up":
-		setRemoteCursor(command.X, command.Y, bounds)
+		if err := setRemoteCursor(command.X, command.Y, bounds); err != nil {
+			return err
+		}
 		down, up := mouseFlags(command.Button)
 		flag := down
 		if command.Type == "mouse_up" {
@@ -46,7 +47,9 @@ func handleRemoteInput(command remoteCommand, bounds image.Rectangle) error {
 		}
 		return sendMouseInput(uint32(flag), 0)
 	case "mouse_wheel":
-		setRemoteCursor(command.X, command.Y, bounds)
+		if err := setRemoteCursor(command.X, command.Y, bounds); err != nil {
+			return err
+		}
 		if command.DeltaY != 0 {
 			if err := sendMouseInput(win.MOUSEEVENTF_WHEEL, int32(-command.DeltaY)); err != nil {
 				return err
@@ -73,10 +76,6 @@ func handleRemoteInput(command remoteCommand, bounds image.Rectangle) error {
 	}
 }
 
-// isSecureInputDesktop reports whether Windows has made the protected
-// Winlogon desktop active. A relay process must be created on that desktop to
-// inject input there; merely changing the desktop of an existing process is
-// blocked by UIPI.
 func activeInputDesktopName() string {
 	const desktopReadObjects = 0x0001
 	const userObjectName = 2
@@ -101,24 +100,46 @@ func isSecureInputDesktop() bool {
 	return strings.EqualFold(activeInputDesktopName(), "Winlogon")
 }
 
-// prepareRemoteDesktop binds the calling thread to whichever desktop Windows
-// currently exposes for keyboard/mouse input.  A normal user process cannot
-// open Winlogon; the system-worker installed by the service can.  Keeping this
-// here (rather than faking a password field in the web UI) preserves Windows'
-// own credential provider and never sends credentials to our server.
-func prepareRemoteDesktop() error {
-	const desktopReadObjects = 0x0001
-	const desktopWriteObjects = 0x0080
-	const desktopSwitchDesktop = 0x0100
-	desktop, _, openErr := openInputDesktopProc.Call(0, 0, desktopReadObjects|desktopWriteObjects|desktopSwitchDesktop)
+const remoteDesktopAccess = 0x0001 | 0x0002 | 0x0004 | 0x0008 | 0x0040 | 0x0080 | 0x0100 | 0x40000000
+
+type remoteDesktop struct {
+	original uintptr
+	current  uintptr
+}
+
+func newRemoteDesktop() *remoteDesktop {
+	threadID, _, _ := getCurrentThreadIDProc.Call()
+	original, _, _ := getThreadDesktopProc.Call(threadID)
+	return &remoteDesktop{original: original}
+}
+
+func (binding *remoteDesktop) prepare() error {
+	if binding.original == 0 {
+		return fmt.Errorf("cannot identify Windows thread desktop")
+	}
+	desktop, _, openErr := openInputDesktopProc.Call(0, 0, remoteDesktopAccess)
 	if desktop == 0 {
 		return fmt.Errorf("cannot access active Windows desktop: %v", openErr)
 	}
-	defer closeDesktopProc.Call(desktop)
 	if ok, _, setErr := setThreadDesktopProc.Call(desktop); ok == 0 {
+		closeDesktopProc.Call(desktop)
 		return fmt.Errorf("cannot attach active Windows desktop: %v", setErr)
 	}
+	if binding.current != 0 {
+		closeDesktopProc.Call(binding.current)
+	}
+	binding.current = desktop
 	return nil
+}
+
+func (binding *remoteDesktop) close() {
+	if binding.current == 0 {
+		return
+	}
+	if ok, _, _ := setThreadDesktopProc.Call(binding.original); ok != 0 {
+		closeDesktopProc.Call(binding.current)
+		binding.current = 0
+	}
 }
 
 func mouseFlags(button int) (uintptr, uintptr) {
@@ -144,12 +165,6 @@ func releaseRemoteInputs() {
 func sendRemoteHotkey(keys []string) error {
 	if len(keys) == 0 || len(keys) > 6 {
 		return fmt.Errorf("shortcut remote tidak valid")
-	}
-	// Shortcuts are also input. Attach to Winlogon when the machine is locked,
-	// otherwise a key combination can be delivered to the invisible Default
-	// desktop instead of the active login screen.
-	if err := prepareRemoteDesktop(); err != nil {
-		return err
 	}
 	virtualKeys := make([]uintptr, 0, len(keys))
 	for _, code := range keys {
@@ -181,10 +196,7 @@ func sendKeyboardInput(vk uint16, flags uint32) error {
 	input := win.KEYBD_INPUT{Type: win.INPUT_KEYBOARD}
 	input.Ki.WVk = vk
 	input.Ki.DwFlags = flags
-	if sent := win.SendInput(1, unsafe.Pointer(&input), int32(unsafe.Sizeof(input))); sent != 1 {
-		return fmt.Errorf("Windows menolak input keyboard (SendInput: %d, error: %d)", sent, win.GetLastError())
-	}
-	return nil
+	return sendNativeInput("keyboard", unsafe.Pointer(&input), unsafe.Sizeof(input))
 }
 
 func sendMouseInput(flags uint32, data int32) error {
@@ -195,8 +207,13 @@ func sendMouseInput(flags uint32, data int32) error {
 	input := win.MOUSE_INPUT{Type: win.INPUT_MOUSE}
 	input.Mi.DwFlags = flags
 	input.Mi.MouseData = uint32(data)
-	if sent := win.SendInput(1, unsafe.Pointer(&input), int32(unsafe.Sizeof(input))); sent != 1 {
-		return fmt.Errorf("Windows menolak input mouse (SendInput: %d, error: %d)", sent, win.GetLastError())
+	return sendNativeInput("mouse", unsafe.Pointer(&input), unsafe.Sizeof(input))
+}
+
+func sendNativeInput(kind string, input unsafe.Pointer, size uintptr) error {
+	sent, _, callErr := sendInputCall(1, uintptr(input), size)
+	if sent != 1 {
+		return fmt.Errorf("Windows menolak input %s (SendInput: %d, error: %v, desktop: %s)", kind, sent, callErr, activeInputDesktopName())
 	}
 	return nil
 }
@@ -205,7 +222,7 @@ func shouldUseLegacyInputFallback(desktopName string, interactiveUser bool) bool
 	return !interactiveUser && desktopName != "" && !strings.EqualFold(desktopName, "Winlogon")
 }
 
-func setRemoteCursor(x, y float64, bounds image.Rectangle) {
+func setRemoteCursor(x, y float64, bounds image.Rectangle) error {
 	if x < 0 {
 		x = 0
 	}
@@ -220,7 +237,10 @@ func setRemoteCursor(x, y float64, bounds image.Rectangle) {
 	}
 	px := bounds.Min.X + int(x*float64(bounds.Dx()-1))
 	py := bounds.Min.Y + int(y*float64(bounds.Dy()-1))
-	setCursorPos.Call(uintptr(int32(px)), uintptr(int32(py)))
+	if ok, _, callErr := setCursorPos.Call(uintptr(int32(px)), uintptr(int32(py))); ok == 0 {
+		return fmt.Errorf("Windows menolak posisi mouse (SetCursorPos: %v)", callErr)
+	}
+	return nil
 }
 
 func windowsVirtualKey(code, key string) (uintptr, bool) {

@@ -48,6 +48,8 @@
   "46": "Daftar API",
   "47": "Hitungan Memori: Kok Bisa 1000 Device di 1 GB?",
   "48": "README.md",
+  "49": "AssetSwitchRequest",
+  "50": "Skenario: Server di VPS Linux, Agent di Komputer Windows",
   "51": "authentication.md",
   "52": "Hitungan Memori: Kok Bisa 1000 Device di 1 GB?",
   "53": "rustdesk_other.go",
@@ -55,5 +57,6 @@
   "55": "mfa_management.go",
   "56": "dialogs.test.cjs",
   "57": "dialogs.js",
+  "58": "main",
   "59": "process_usage_windows.go"
 }

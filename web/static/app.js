@@ -1436,6 +1436,7 @@ function startRemote() {
   var decodingFrame = false;
   var pendingFrame = null;
   var frameCount = 0;
+  var relayAgentVersion = 'belum diketahui';
   var fpsStarted = performance.now();
   var pressedKeys = {};
   var pendingMove = null;
@@ -1471,7 +1472,7 @@ function startRemote() {
       frameCount++;
       var elapsed = performance.now() - fpsStarted;
       if (elapsed >= 1000) {
-        document.getElementById('remoteStats').textContent = Math.round(frameCount * 1000 / elapsed) + ' FPS • ' + img.width + '×' + img.height;
+        document.getElementById('remoteStats').textContent = 'Agent ' + relayAgentVersion + ' • ' + Math.round(frameCount * 1000 / elapsed) + ' FPS • ' + img.width + '×' + img.height;
         frameCount = 0; fpsStarted = performance.now();
       }
       if (pendingFrame) { var newest = pendingFrame; pendingFrame = null; renderLatestFrame(newest); }
@@ -1499,6 +1500,7 @@ function startRemote() {
       try {
         var relayMessage = JSON.parse(e.data);
         if (relayMessage.type === 'ready') {
+          relayAgentVersion = relayMessage.agent_version || 'belum diketahui';
           var monitorSelect = document.getElementById('remoteMonitorSelect');
           monitorSelect.innerHTML = '';
           (relayMessage.monitors || [{ index: 0, width: relayMessage.width, height: relayMessage.height }]).forEach(function(m) {

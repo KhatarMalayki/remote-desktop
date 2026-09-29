@@ -62,12 +62,8 @@ func validRemoteSessionID(value string) bool {
 }
 
 func (a *Agent) startRemoteRelay(sessionID string) {
-	// SendInput is subject to UIPI and cannot cross from a process born on the
-	// normal desktop to Winlogon. Hand the relay to a LocalSystem child that was
-	// created directly on winsta0\\Winlogon instead.
 	desktopName := activeInputDesktopName()
-	forceSecure := time.Now().UnixNano() < a.forceSecureUntil.Load()
-	if a.secureRelayStarter != nil && (strings.EqualFold(desktopName, "Winlogon") || forceSecure) {
+	if a.secureRelayStarter != nil && strings.EqualFold(desktopName, "Winlogon") {
 		if err := a.secureRelayStarter(sessionID); err == nil {
 			log.Printf("[remote] delegated locked-screen relay to Winlogon worker")
 			return
@@ -80,6 +76,8 @@ func (a *Agent) startRemoteRelay(sessionID string) {
 	// attached when Windows switches Default <-> Winlogon on lock/unlock.
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
+	desktop := newRemoteDesktop()
+	defer desktop.close()
 
 	monitorCount := screenshot.NumActiveDisplays()
 	if monitorCount == 0 {
@@ -145,7 +143,7 @@ func (a *Agent) startRemoteRelay(sessionID string) {
 			item := screenshot.GetDisplayBounds(i)
 			monitors = append(monitors, map[string]int{"index": i, "width": item.Dx(), "height": item.Dy()})
 		}
-		return sendJSON(map[string]interface{}{"type": "ready", "width": bounds.Dx(), "height": bounds.Dy(), "monitor": monitor, "monitors": monitors})
+		return sendJSON(map[string]interface{}{"type": "ready", "agent_version": a.version, "width": bounds.Dx(), "height": bounds.Dy(), "monitor": monitor, "monitors": monitors})
 	}
 	if err := sendScreenInfo(); err != nil {
 		return
@@ -157,7 +155,9 @@ func (a *Agent) startRemoteRelay(sessionID string) {
 	if desktopName == "" {
 		desktopName = "tidak terdeteksi"
 	}
-	_ = sendJSON(map[string]string{"type": "relay_info", "message": "Desktop input Windows: " + desktopName + " (" + mode + ")"})
+	relayInfo := "Agent v" + a.version + ": desktop input Windows " + desktopName + " (" + mode + ")"
+	log.Printf("[remote] %s", relayInfo)
+	_ = sendJSON(map[string]string{"type": "relay_info", "message": relayInfo})
 
 	readDone := make(chan struct{})
 	inputCommands := make(chan remoteCommand, 128)
@@ -229,7 +229,7 @@ func (a *Agent) startRemoteRelay(sessionID string) {
 			// successfully attached that thread to the active input desktop. Run
 			// all mouse/keyboard injection here as well; a separate goroutine can
 			// otherwise remain on Default while capture is on Winlogon.
-			if desktopErr := prepareRemoteDesktop(); desktopErr != nil {
+			if desktopErr := desktop.prepare(); desktopErr != nil {
 				_ = sendJSON(map[string]string{"type": "input_error", "message": desktopErr.Error()})
 				continue
 			}
@@ -245,14 +245,6 @@ func (a *Agent) startRemoteRelay(sessionID string) {
 			if inputErr := handleRemoteInput(command, bounds); inputErr != nil {
 				log.Printf("[remote] input ignored: %v", inputErr)
 				_ = sendJSON(map[string]string{"type": "input_error", "message": inputErr.Error()})
-				if !a.secureDesktopOnly && a.secureRelayStarter != nil && strings.Contains(inputErr.Error(), "SendInput") {
-					// Windows deliberately reports zero/ERROR_SUCCESS when UIPI
-					// blocks injection. Remember this briefly so the replacement
-					// viewer session is delegated directly to Winlogon.
-					a.forceSecureUntil.Store(time.Now().Add(15 * time.Second).UnixNano())
-					_ = sendJSON(map[string]string{"type": "desktop_transition", "message": "Beralih ke kontrol lock screen Windows…"})
-					return
-				}
 			}
 		case <-ticker.C:
 			secureDesktop := isSecureInputDesktop()
@@ -263,7 +255,6 @@ func (a *Agent) startRemoteRelay(sessionID string) {
 			// Keep the secure relay until the viewer disconnects; after an actual
 			// unlock the operator can reconnect explicitly to return to Default.
 			if !a.secureDesktopOnly && a.secureRelayStarter != nil && secureDesktop {
-				a.forceSecureUntil.Store(time.Now().Add(15 * time.Second).UnixNano())
 				log.Printf("[remote] Winlogon desktop became active; requesting secure relay reconnect")
 				_ = sendJSON(map[string]string{"type": "desktop_transition", "message": "Windows terkunci; menyambungkan kontrol lock screen…"})
 				return
@@ -271,7 +262,7 @@ func (a *Agent) startRemoteRelay(sessionID string) {
 			// On Windows this re-attaches the current OS thread to the desktop
 			// that is actually receiving input. A SYSTEM console worker can then
 			// follow Default <-> Winlogon transitions without dropping the relay.
-			if desktopErr := prepareRemoteDesktop(); desktopErr != nil {
+			if desktopErr := desktop.prepare(); desktopErr != nil {
 				log.Printf("[remote] input desktop unavailable: %v", desktopErr)
 				continue
 			}
