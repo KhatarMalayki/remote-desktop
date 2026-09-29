@@ -1,12 +1,12 @@
 {
   "cmd/agent/main.go": {
-    "mtime": 1790666669.6771286,
-    "ast_hash": "fde6b8575ebfc3687d892db7feb2d3d4",
+    "mtime": 1790675015.7270634,
+    "ast_hash": "b13ad0707d78cbc9486b97934a1addec",
     "semantic_hash": ""
   },
   "cmd/server/main.go": {
-    "mtime": 1790666669.6685967,
-    "ast_hash": "7305d96a3407f39b19e40c463d952f8e",
+    "mtime": 1790675015.7270634,
+    "ast_hash": "e9414891394edb087f260d0cfb3cb3a0",
     "semantic_hash": ""
   },
   "go.mod": {
@@ -35,8 +35,8 @@
     "semantic_hash": ""
   },
   "internal/server/hub.go": {
-    "mtime": 1789742906.8181458,
-    "ast_hash": "dc3f094883d2e3fc06b26c0e4448daae",
+    "mtime": 1790674944.4048035,
+    "ast_hash": "bbd4fdb6805d5358719c41b870b063a6",
     "semantic_hash": ""
   },
   "internal/server/relay.go": {
@@ -45,8 +45,8 @@
     "semantic_hash": ""
   },
   "internal/server/server.go": {
-    "mtime": 1790662503.0477934,
-    "ast_hash": "91da0944e43d66a33e370f7aa118571b",
+    "mtime": 1790675118.7530153,
+    "ast_hash": "d818c3aa917ace435a6e8c05e8eb00de",
     "semantic_hash": ""
   },
   "scripts/build.ps1": {
@@ -65,8 +65,8 @@
     "semantic_hash": "8c9cb5d1b967f64d6abc8c1ca0fe3e90"
   },
   "web/static/app.js": {
-    "mtime": 1790655071.0630665,
-    "ast_hash": "c1cd0ce2b5612c75725f1af69def7d23",
+    "mtime": 1790674944.4083152,
+    "ast_hash": "a7f8097dbfcd2c14298fc31b69afdb2f",
     "semantic_hash": ""
   },
   ".codex/hooks.json": {

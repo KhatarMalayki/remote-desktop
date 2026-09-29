@@ -362,7 +362,7 @@ function buildDeviceTable(list) {
       return '<tr><td><span class="status-dot '+(d.online?'online':'offline')+'"></span>'+(d.online?'Online':'Offline')+'</td>' +
         '<td><strong>'+esc(d.hostname)+'</strong><br><small style="color:var(--fg2)">'+esc(d.id)+'</small></td>' +
         '<td>'+osIcon(d.os)+' '+esc(d.os)+' '+esc(d.arch)+'</td>' +
-        '<td>'+esc(d.ip)+'</td>' +
+        '<td><strong>'+esc(d.local_ip || d.ip || '-')+'</strong>'+(d.ip && d.local_ip && d.ip !== d.local_ip ? '<br><small style="color:var(--fg2)">Publik: '+esc(d.ip)+'</small>' : '')+(d.all_ips ? '<br><small style="color:var(--accent)" title="'+esc(d.all_ips)+'">VPN/Multi-IP</small>' : '')+'</td>' +
         '<td>'+d.cpu_cores+' cores</td>' +
         '<td><div class="progress-bar"><div class="fill '+(ramPct>80?'danger':'')+'" style="width:'+ramPct+'%"></div></div>'+ramPct+'%</td>' +
         '<td><div class="progress-bar"><div class="fill '+(diskPct>80?'danger':'')+'" style="width:'+diskPct+'%"></div></div>'+diskPct+'%</td>' +

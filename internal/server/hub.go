@@ -16,6 +16,7 @@ type Client struct {
 	Send     chan []byte
 	Hub      *Hub
 	IsAgent  bool
+	RemoteIP string
 }
 
 type Hub struct {

@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"io/fs"
 	"log"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -1775,12 +1776,22 @@ func (s *Server) handleAgentWS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	remoteIP := r.RemoteAddr
+	if f := r.Header.Get("X-Forwarded-For"); f != "" {
+		remoteIP = strings.TrimSpace(strings.Split(f, ",")[0])
+	} else if realIP := r.Header.Get("X-Real-IP"); realIP != "" {
+		remoteIP = strings.TrimSpace(realIP)
+	} else if host, _, err := net.SplitHostPort(remoteIP); err == nil {
+		remoteIP = host
+	}
+
 	client := &Client{
 		DeviceID: deviceID,
 		Conn:     conn,
 		Send:     make(chan []byte, 64),
 		Hub:      s.hub,
 		IsAgent:  true,
+		RemoteIP: remoteIP,
 	}
 
 	s.hub.RegisterAgent(client)
@@ -1923,6 +1934,9 @@ func (s *Server) handleAgentMessage(c *Client, raw []byte) {
 			return
 		}
 		dev.ID = c.DeviceID
+		if dev.IP == "" {
+			dev.IP = c.RemoteIP
+		}
 		dev.LastSeen = time.Now()
 		if dev.RegisteredAt.IsZero() {
 			dev.RegisteredAt = time.Now()
