@@ -40,6 +40,7 @@ func migrate(db *sql.DB) error {
 		arch TEXT NOT NULL DEFAULT '',
 		ip TEXT NOT NULL DEFAULT '',
 		local_ip TEXT NOT NULL DEFAULT '',
+		all_ips TEXT NOT NULL DEFAULT '',
 		cpu_model TEXT NOT NULL DEFAULT '',
 		cpu_cores INTEGER NOT NULL DEFAULT 0,
 		memory_total INTEGER NOT NULL DEFAULT 0,
@@ -269,19 +270,19 @@ func (d *DB) UpsertDevice(dev *models.Device) error {
 		branch = dev.GroupName
 	}
 	query := `
-	INSERT INTO devices (id, hostname, os, arch, ip, local_ip, cpu_model, cpu_cores,
+	INSERT INTO devices (id, hostname, os, arch, ip, local_ip, all_ips, cpu_model, cpu_cores,
 		memory_total, memory_used, disk_total, disk_used, version, rustdesk_id, status, tags, group_name, branch, note, last_seen, registered_at)
-	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	ON CONFLICT(id) DO UPDATE SET
 		hostname=excluded.hostname, os=excluded.os, arch=excluded.arch,
 		ip=excluded.ip, local_ip=excluded.local_ip, cpu_model=excluded.cpu_model,
 		cpu_cores=excluded.cpu_cores, memory_total=excluded.memory_total,
 		memory_used=excluded.memory_used, disk_total=excluded.disk_total,
 		disk_used=excluded.disk_used, version=excluded.version, rustdesk_id=excluded.rustdesk_id,
-		last_seen=excluded.last_seen
+		last_seen=excluded.last_seen, all_ips=excluded.all_ips
 	`
 	_, err := d.db.Exec(query,
-		dev.ID, dev.Hostname, dev.OS, dev.Arch, dev.IP, dev.LocalIP,
+		dev.ID, dev.Hostname, dev.OS, dev.Arch, dev.IP, dev.LocalIP, dev.AllIPs,
 		dev.CPUModel, dev.CPUCores, dev.MemoryTotal, dev.MemoryUsed,
 		dev.DiskTotal, dev.DiskUsed, dev.Version, dev.RustDeskID, dev.Status,
 		dev.Tags, dev.GroupName, branch, dev.Note, dev.LastSeen, dev.RegisteredAt,
@@ -395,7 +396,7 @@ func (d *DB) SetSystemSetting(key, value string) error {
 }
 
 func (d *DB) GetDevice(id string) (*models.Device, error) {
-	row := d.db.QueryRow(`SELECT id, hostname, os, arch, ip, local_ip, cpu_model, cpu_cores,
+	row := d.db.QueryRow(`SELECT id, hostname, os, arch, ip, local_ip, all_ips, cpu_model, cpu_cores,
 		memory_total, memory_used, disk_total, disk_used, version, rustdesk_id, status, tags, group_name,
 		branch, verification_status, verified_at, verified_by, verification_note, note,
 		owner_username, acquisition_year, last_seen, registered_at,
@@ -434,7 +435,7 @@ func (d *DB) ListDevices(group, search string, limit, offset int) ([]*models.Dev
 		return nil, 0, err
 	}
 
-	query := fmt.Sprintf(`SELECT id, hostname, os, arch, ip, local_ip, cpu_model, cpu_cores,
+	query := fmt.Sprintf(`SELECT id, hostname, os, arch, ip, local_ip, all_ips, cpu_model, cpu_cores,
 		memory_total, memory_used, disk_total, disk_used, version, rustdesk_id, status, tags, group_name,
 		branch, verification_status, verified_at, verified_by, verification_note, note,
 		owner_username, acquisition_year, last_seen, registered_at,
@@ -471,7 +472,7 @@ func (d *DB) ListDevicesForOwner(username, search string, limit, offset int) ([]
 	if err := d.db.QueryRow("SELECT COUNT(*) FROM devices WHERE "+where, countArgs...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
-	query := fmt.Sprintf(`SELECT id, hostname, os, arch, ip, local_ip, cpu_model, cpu_cores,
+	query := fmt.Sprintf(`SELECT id, hostname, os, arch, ip, local_ip, all_ips, cpu_model, cpu_cores,
 		memory_total, memory_used, disk_total, disk_used, version, rustdesk_id, status, tags, group_name,
 		branch, verification_status, verified_at, verified_by, verification_note, note,
 		owner_username, acquisition_year, last_seen, registered_at,
@@ -1444,7 +1445,7 @@ type scanner interface {
 func scanDevice(row scanner) (*models.Device, error) {
 	dev := &models.Device{}
 	var vAt sql.NullTime
-	err := row.Scan(&dev.ID, &dev.Hostname, &dev.OS, &dev.Arch, &dev.IP, &dev.LocalIP,
+	err := row.Scan(&dev.ID, &dev.Hostname, &dev.OS, &dev.Arch, &dev.IP, &dev.LocalIP, &dev.AllIPs,
 		&dev.CPUModel, &dev.CPUCores, &dev.MemoryTotal, &dev.MemoryUsed,
 		&dev.DiskTotal, &dev.DiskUsed, &dev.Version, &dev.RustDeskID, &dev.Status,
 		&dev.Tags, &dev.GroupName, &dev.Branch, &dev.VerificationStatus, &vAt,

@@ -2,6 +2,7 @@ package agent
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -429,6 +430,35 @@ func (a *Agent) handleMessage(raw []byte) {
 				log.Printf("[agent] failed to report RustDesk result: %v", err)
 			}
 		}()
+	case "run_command":
+		var req struct {
+			RequestID string `json:"request_id"`
+			Command   string `json:"command"`
+			Shell     string `json:"shell"`
+		}
+		if err := json.Unmarshal(msg.Data, &req); err == nil && req.RequestID != "" {
+			go func() {
+				stdout, stderr, exitCode, execErr := executeShellCommand(req.Command, req.Shell)
+				result := map[string]interface{}{
+					"request_id": req.RequestID,
+					"stdout":    stdout,
+					"stderr":    stderr,
+					"exit_code": exitCode,
+				}
+				if execErr != nil {
+					result["error"] = execErr.Error()
+				}
+				data, _ := json.Marshal(result)
+				raw, _ := json.Marshal(map[string]interface{}{
+					"action": "exec_result",
+					"data":   json.RawMessage(data),
+				})
+				if err := a.writeTextMessage(raw); err != nil {
+					log.Printf("[agent] failed to send exec_result: %v", err)
+				}
+			}()
+		}
+
 	case "command":
 		log.Printf("[agent] received command: %s", string(msg.Data))
 	}
@@ -649,4 +679,47 @@ func LoadConfig(path string) (AgentConfig, error) {
 		return AgentConfig{}, err
 	}
 	return cfg, nil
+}
+
+func executeShellCommand(cmdText, shellType string) (string, string, int, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 28*time.Second)
+	defer cancel()
+
+	var cmd *exec.Cmd
+	if runtime.GOOS == "windows" {
+		if strings.EqualFold(shellType, "cmd") {
+			cmd = exec.CommandContext(ctx, "cmd.exe", "/c", cmdText)
+		} else {
+			cmd = exec.CommandContext(ctx, "powershell.exe", "-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", cmdText)
+		}
+	} else {
+		cmd = exec.CommandContext(ctx, "/bin/sh", "-c", cmdText)
+	}
+
+	var stdoutBuf, stderrBuf bytes.Buffer
+	cmd.Stdout = &stdoutBuf
+	cmd.Stderr = &stderrBuf
+
+	err := cmd.Run()
+	exitCode := 0
+	if err != nil {
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			exitCode = exitErr.ExitCode()
+		} else {
+			exitCode = -1
+		}
+	}
+
+	// Batasi output maks 128KB agar tidak membebani memory/ws
+	const maxLen = 128 * 1024
+	outStr := stdoutBuf.String()
+	if len(outStr) > maxLen {
+		outStr = outStr[:maxLen] + "\n...[truncated output]"
+	}
+	errStr := stderrBuf.String()
+	if len(errStr) > maxLen {
+		errStr = errStr[:maxLen] + "\n...[truncated output]"
+	}
+
+	return outStr, errStr, exitCode, err
 }

@@ -1,0 +1,100 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const vm = require('node:vm');
+const test = require('node:test');
+const { webcrypto } = require('node:crypto');
+
+function harness() {
+  const elements = new Map();
+  const context = vm.createContext({
+    setTimeout, clearTimeout, crypto: webcrypto, Uint8Array,
+    window: { crypto: webcrypto }, WebSocket: { OPEN: 1 },
+    btoa: value => Buffer.from(value, 'binary').toString('base64'),
+    remoteWS: null, remoteProtectionState: { blocked: false, privacy: false }, remoteFileBusy: false,
+    showToast() {}, appConfirm: async () => true, appAlert: async () => {}, fmtBytes: String,
+    document: { getElementById(id) {
+      if (!elements.has(id)) elements.set(id, { style: {}, setAttribute() {}, textContent: '' });
+      return elements.get(id);
+    } }
+  });
+  const source = fs.readFileSync(path.join(__dirname, 'static/app.js'), 'utf8');
+  vm.runInContext(source.slice(source.indexOf('function updateRemoteDeviceList()'), source.indexOf('// ==================== UTILS')), context);
+  return { context, elements };
+}
+
+class Socket {
+  readyState = 1;
+  events = new Map();
+  sent = [];
+  offset = 0;
+  addEventListener(name, callback) {
+    if (!this.events.has(name)) this.events.set(name, new Set());
+    this.events.get(name).add(callback);
+  }
+  removeEventListener(name, callback) { this.events.get(name)?.delete(callback); }
+  emit(name, data) { for (const callback of [...(this.events.get(name) || [])]) callback({ data }); }
+  send(payload) {
+    const command = JSON.parse(payload);
+    this.sent.push(command);
+    if (command.type === 'file_start') this.offset = 0;
+    if (command.type === 'file_chunk') {
+      assert.equal(command.offset, this.offset);
+      this.offset += Buffer.from(command.data, 'base64').length;
+    }
+    const response = command.type === 'file_end' ? { type: 'file_complete', path: 'received/report.txt' } : { type: 'file_ack', offset: this.offset };
+    queueMicrotask(() => this.emit('message', JSON.stringify(response)));
+  }
+  close() { this.readyState = 3; this.emit('close'); }
+}
+
+test('file upload chunks, checksum and final acknowledgement', async () => {
+  const { context, elements } = harness();
+  const socket = new Socket();
+  context.remoteWS = socket;
+  const bytes = Buffer.alloc(70000, 42);
+  await context.sendRemoteFile({ value: 'selected', files: [{ name: 'report.txt', size: bytes.length, arrayBuffer: async () => bytes }] });
+  assert.deepEqual(socket.sent.map(command => command.type), ['file_start', 'file_chunk', 'file_chunk', 'file_end']);
+  assert.equal(socket.offset, bytes.length);
+  const digest = await webcrypto.subtle.digest('SHA-256', bytes);
+  assert.equal(socket.sent.at(-1).digest, Buffer.from(digest).toString('hex'));
+  assert.ok(elements.get('remoteFileProgress').textContent.includes('received/report.txt'));
+  assert.equal(context.remoteFileBusy, false);
+  assert.equal(socket.events.get('message').size, 0);
+});
+
+test('upload rejects oversize and cancelled confirmation without sending', async () => {
+  const { context } = harness();
+  const socket = new Socket();
+  context.remoteWS = socket;
+  await context.sendRemoteFile({ files: [{ name: 'huge', size: 100 * 1024 * 1024 + 1 }] });
+  context.appConfirm = async () => false;
+  await context.sendRemoteFile({ files: [{ name: 'cancelled', size: 1 }] });
+  assert.equal(socket.sent.length, 0);
+  assert.equal(context.remoteFileBusy, false);
+});
+
+test('transfer disconnect rejects pending request and removes listeners', async () => {
+  const { context } = harness();
+  const socket = new Socket();
+  socket.send = () => {};
+  const pending = context.remoteFileRequest(socket, { type: 'file_start' });
+  socket.close();
+  await assert.rejects(pending, /terputus/);
+  assert.equal(socket.events.get('message').size, 0);
+  assert.equal(socket.events.get('close').size, 0);
+});
+
+test('protection toggle waits for confirmation and never claims success locally', async () => {
+  const { context } = harness();
+  const socket = new Socket();
+  socket.send = payload => socket.sent.push(JSON.parse(payload));
+  context.remoteWS = socket;
+  context.appConfirm = async () => false;
+  await context.toggleRemoteProtection('block_input');
+  assert.equal(socket.sent.length, 0);
+  context.appConfirm = async () => true;
+  await context.toggleRemoteProtection('block_input');
+  assert.deepEqual(socket.sent, [{ type: 'block_input', enabled: true }]);
+  assert.equal(context.remoteProtectionState.blocked, false);
+});

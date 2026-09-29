@@ -22,6 +22,12 @@ import (
 const remoteFrameTick = 25 * time.Millisecond
 
 type remoteCommand struct {
+	Enabled bool     `json:"enabled"`
+	Name    string   `json:"name"`
+	Size    int64    `json:"size"`
+	Offset  int64    `json:"offset"`
+	Data    string   `json:"data"`
+	Digest  string   `json:"digest"`
 	Type    string   `json:"type"`
 	X       float64  `json:"x"`
 	Y       float64  `json:"y"`
@@ -78,6 +84,8 @@ func (a *Agent) startRemoteRelay(sessionID string) {
 	defer runtime.UnlockOSThread()
 	desktop := newRemoteDesktop()
 	defer desktop.close()
+	var protection remoteProtection
+	defer protection.close()
 
 	monitorCount := screenshot.NumActiveDisplays()
 	if monitorCount == 0 {
@@ -143,7 +151,7 @@ func (a *Agent) startRemoteRelay(sessionID string) {
 			item := screenshot.GetDisplayBounds(i)
 			monitors = append(monitors, map[string]int{"index": i, "width": item.Dx(), "height": item.Dy()})
 		}
-		return sendJSON(map[string]interface{}{"type": "ready", "agent_version": a.version, "width": bounds.Dx(), "height": bounds.Dy(), "monitor": monitor, "monitors": monitors})
+		return sendJSON(map[string]interface{}{"type": "ready", "agent_version": a.version, "width": bounds.Dx(), "height": bounds.Dy(), "monitor": monitor, "monitors": monitors, "capabilities": map[string]bool{"file_transfer": true, "protection": runtime.GOOS == "windows"}})
 	}
 	if err := sendScreenInfo(); err != nil {
 		return
@@ -160,10 +168,20 @@ func (a *Agent) startRemoteRelay(sessionID string) {
 	_ = sendJSON(map[string]string{"type": "relay_info", "message": relayInfo})
 
 	readDone := make(chan struct{})
+	stopping := make(chan struct{})
+	defer close(stopping)
+	conn.SetReadLimit(128 * 1024)
 	inputCommands := make(chan remoteCommand, 128)
 	go func() {
 		defer close(readDone)
+		var transfer remoteFileTransfer
+		defer transfer.abort()
 		for {
+			deadline := time.Time{}
+			if transfer.file != nil {
+				deadline = transfer.updated.Add(45 * time.Second)
+			}
+			_ = conn.SetReadDeadline(deadline)
 			messageType, payload, readErr := conn.ReadMessage()
 			if readErr != nil {
 				return
@@ -176,6 +194,14 @@ func (a *Agent) startRemoteRelay(sessionID string) {
 				continue
 			}
 			switch command.Type {
+			case "file_start", "file_chunk", "file_end", "file_cancel":
+				response, transferErr := transfer.handle(command)
+				if transferErr != nil {
+					transfer.abort()
+					_ = sendJSON(map[string]string{"type": "file_error", "message": transferErr.Error()})
+				} else {
+					_ = sendJSON(response)
+				}
 			case "set_monitor":
 				if command.Monitor >= 0 && command.Monitor < monitorCount {
 					state.Lock()
@@ -206,10 +232,12 @@ func (a *Agent) startRemoteRelay(sessionID string) {
 					state.quality, state.maxWidth, state.frameInterval = 52, 1600, 60*time.Millisecond
 				}
 				state.Unlock()
-			case "hotkey":
-				inputCommands <- command
 			default:
-				inputCommands <- command
+				select {
+				case inputCommands <- command:
+				case <-stopping:
+					return
+				}
 			}
 		}
 	}()
@@ -220,11 +248,30 @@ func (a *Agent) startRemoteRelay(sessionID string) {
 	hasChecksum := false
 	lastSent := time.Time{}
 	lastCapture := time.Time{}
+	protectionDeadline := time.Time{}
 	for {
 		select {
 		case <-readDone:
 			return
 		case command := <-inputCommands:
+			if command.Type == "protection_heartbeat" {
+				if !protectionDeadline.IsZero() {
+					protectionDeadline = time.Now().Add(15 * time.Second)
+				}
+				continue
+			}
+			if command.Type == "block_input" || command.Type == "privacy_mode" {
+				err := protection.set(command.Type, command.Enabled)
+				if err != nil {
+					_ = sendJSON(map[string]string{"type": "protection_error", "message": err.Error()})
+				}
+				protectionDeadline = time.Time{}
+				if protection.active() {
+					protectionDeadline = time.Now().Add(15 * time.Second)
+				}
+				_ = sendJSON(protection.state())
+				continue
+			}
 			// The capture goroutine is pinned to a Windows OS thread and has
 			// successfully attached that thread to the active input desktop. Run
 			// all mouse/keyboard injection here as well; a separate goroutine can
@@ -247,6 +294,13 @@ func (a *Agent) startRemoteRelay(sessionID string) {
 				_ = sendJSON(map[string]string{"type": "input_error", "message": inputErr.Error()})
 			}
 		case <-ticker.C:
+			if !protectionDeadline.IsZero() && (time.Now().After(protectionDeadline) || protection.desktopChanged()) {
+				protection.close()
+				protectionDeadline = time.Time{}
+				_ = sendJSON(protection.state())
+				_ = sendJSON(map[string]string{"type": "protection_error", "message": "Proteksi dilepas: heartbeat timeout atau desktop berubah. Sesi ditutup demi keamanan."})
+				return
+			}
 			secureDesktop := isSecureInputDesktop()
 			// A worker created directly on Winlogon must not infer an unlock from
 			// OpenInputDesktop. On some Windows 11 builds that API reports Default

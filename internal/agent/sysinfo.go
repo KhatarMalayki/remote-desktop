@@ -2,6 +2,7 @@ package agent
 
 import (
 	"fmt"
+	"net"
 	"os"
 	"os/exec"
 	"runtime"
@@ -20,6 +21,7 @@ type SystemInfo struct {
 	DiskTotal   uint64 `json:"disk_total"`
 	DiskUsed    uint64 `json:"disk_used"`
 	LocalIP     string `json:"local_ip"`
+	AllIPs      string `json:"all_ips"`
 	Version     string `json:"version"`
 	Branch      string `json:"branch"`
 	RustDeskID  string `json:"rustdesk_id"`
@@ -37,6 +39,7 @@ func CollectSystemInfo() SystemInfo {
 	info.MemoryTotal, info.MemoryUsed = getMemoryInfo()
 	info.DiskTotal, info.DiskUsed = getDiskInfo()
 	info.LocalIP = getLocalIP()
+	info.AllIPs = getAllIPs()
 	info.RustDeskID = getRustDeskID()
 
 	return info
@@ -211,6 +214,31 @@ func getLocalIP() string {
 		}
 	}
 	return "127.0.0.1"
+}
+
+func getAllIPs() string {
+	ifaces, err := net.Interfaces()
+	if err != nil {
+		return ""
+	}
+	var ips []string
+	for _, iface := range ifaces {
+		if iface.Flags&net.FlagLoopback != 0 || iface.Flags&net.FlagUp == 0 {
+			continue
+		}
+		addrs, err := iface.Addrs()
+		if err != nil {
+			continue
+		}
+		for _, addr := range addrs {
+			ip, _, err := net.ParseCIDR(addr.String())
+			if err != nil || ip.IsLoopback() || ip.IsLinkLocalUnicast() {
+				continue
+			}
+			ips = append(ips, iface.Name+":"+ip.String())
+		}
+	}
+	return strings.Join(ips, ", ")
 }
 
 func GetCPUUsage() float64 {

@@ -1,6 +1,7 @@
 package server
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"sync"
@@ -21,8 +22,9 @@ type relaySession struct {
 }
 
 type relayAudit struct {
-	onStart func()
-	onEnd   func(time.Duration)
+	onStart   func()
+	onEnd     func(time.Duration)
+	onControl func(string)
 }
 
 var (
@@ -96,6 +98,20 @@ func pipeRelay(sessionID string, sess *relaySession, src, dst *websocket.Conn) {
 			log.Printf("[relay] %s write ended: %v", sessionID, err)
 			closeRelaySession(sessionID, sess)
 			return
+		}
+		if src == sess.viewer && msgType == websocket.TextMessage && sess.audit.onControl != nil {
+			var command struct {
+				Type    string
+				Enabled bool
+			}
+			if json.Unmarshal(data, &command) == nil {
+				switch command.Type {
+				case "block_input", "privacy_mode":
+					sess.audit.onControl(fmt.Sprintf("%s requested enabled=%t", command.Type, command.Enabled))
+				case "file_start", "file_end", "file_cancel":
+					sess.audit.onControl(command.Type + " requested")
+				}
+			}
 		}
 	}
 }

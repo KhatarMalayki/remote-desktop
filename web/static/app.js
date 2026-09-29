@@ -10,6 +10,8 @@ let manualAssets = [];
 let currentDevice = null;
 let ws = null;
 let remoteWS = null;
+let remoteProtectionState = { blocked: false, privacy: false };
+let remoteFileBusy = false;
 let remoteTransitionHistory = [];
 let searchTimeout = null;
 let idleTimer = null;
@@ -1158,7 +1160,8 @@ async function openDeviceModal(id) {
   document.getElementById('modalTitle').textContent = dev.hostname + ' - ' + dev.id;
   document.getElementById('modalDetails').innerHTML =
     '<div class="detail-item"><div class="label">OS</div><div class="value">'+esc(dev.os)+' '+esc(dev.arch)+'</div></div>' +
-    '<div class="detail-item"><div class="label">IP Address</div><div class="value">'+esc(dev.ip)+' / '+esc(dev.local_ip)+'</div></div>' +
+    '<div class="detail-item"><div class="label">IP Publik / Utama</div><div class="value">'+esc(dev.ip)+' / '+esc(dev.local_ip)+'</div></div>' +
+    (dev.all_ips ? '<div class="detail-item" style="grid-column:1/-1"><div class="label">Semua IP / Interface / VPN</div><div class="value" style="font-family:monospace;font-size:12px;background:var(--bg3);padding:4px 8px;border-radius:4px;word-break:break-all">'+esc(dev.all_ips)+'</div></div>' : '') +
     '<div class="detail-item"><div class="label">CPU</div><div class="value">'+esc(dev.cpu_model)+' ('+dev.cpu_cores+' cores)</div></div>' +
     '<div class="detail-item"><div class="label">Memory</div><div class="value">'+fmtBytes(dev.memory_used)+' / '+fmtBytes(dev.memory_total)+'</div></div>' +
     '<div class="detail-item"><div class="label">Disk</div><div class="value">'+fmtBytes(dev.disk_used)+' / '+fmtBytes(dev.disk_total)+'</div></div>' +
@@ -1181,6 +1184,8 @@ async function openDeviceModal(id) {
   document.getElementById('btnRustDeskPassword').style.display = canManageRustDesk && rustDeskID ? 'inline-flex' : 'none';
   var canViewProcesses = currentUser && ['admin','it_support','ga_pusat'].indexOf(currentUser.role) >= 0;
   document.getElementById('btnViewProcesses').style.display = canViewProcesses && dev.online ? 'inline-flex' : 'none';
+  var canExec = currentUser && (currentUser.role === 'admin' || currentUser.role === 'it_support');
+  document.getElementById('btnOpenTerminal').style.display = canExec && dev.online ? 'inline-flex' : 'none';
   document.getElementById('deviceModal').style.display = 'flex';
 }
 
@@ -1491,6 +1496,7 @@ function startRemote() {
   };
 
   sessionSocket.onmessage = function(e) {
+    if (remoteWS !== sessionSocket) return;
     if (e.data instanceof ArrayBuffer) {
       receivedFrame = true;
       clearTimeout(connectTimer);
@@ -1500,6 +1506,10 @@ function startRemote() {
       try {
         var relayMessage = JSON.parse(e.data);
         if (relayMessage.type === 'ready') {
+          var capabilities = relayMessage.capabilities || {};
+          document.getElementById('btnRemoteBlock').disabled = !capabilities.protection;
+          document.getElementById('btnRemotePrivacy').disabled = !capabilities.protection;
+          document.getElementById('btnRemoteFile').disabled = !capabilities.file_transfer || remoteFileBusy;
           relayAgentVersion = relayMessage.agent_version || 'belum diketahui';
           var monitorSelect = document.getElementById('remoteMonitorSelect');
           monitorSelect.innerHTML = '';
@@ -1511,6 +1521,11 @@ function startRemote() {
         if (relayMessage.type === 'clipboard') {
           navigator.clipboard.writeText(relayMessage.text || '').then(function(){ showToast('Clipboard komputer remote sudah disalin ke perangkat ini'); }).catch(function(){ showToast('Browser menolak akses clipboard'); });
         }
+        if (relayMessage.type === 'protection_state') {
+          remoteProtectionState = { blocked: !!relayMessage.blocked, privacy: !!relayMessage.privacy };
+          renderRemoteProtection();
+        }
+        if (relayMessage.type === 'protection_error') showToast(relayMessage.message || 'Proteksi gagal');
         if (relayMessage.type === 'clipboard_error' || relayMessage.type === 'input_error' || relayMessage.type === 'error' || relayMessage.type === 'relay_info') showToast(relayMessage.message || 'Remote session mengalami masalah');
 		if (relayMessage.type === 'desktop_transition') {
 		  var transitionNow = Date.now();
@@ -1529,7 +1544,11 @@ function startRemote() {
   };
 
   sessionSocket.onerror = function() { if (remoteWS === sessionSocket) showToast('Koneksi remote gagal. Periksa hak akses dan status agent.'); };
+  var protectionHeartbeat = setInterval(function() {
+    if (remoteWS === sessionSocket && sessionSocket.readyState === WebSocket.OPEN && (remoteProtectionState.blocked || remoteProtectionState.privacy)) sendRemote({type: 'protection_heartbeat'});
+  }, 5000);
   sessionSocket.onclose = function() {
+    clearInterval(protectionHeartbeat);
     if (remoteWS !== sessionSocket) return;
     remoteWS = null;
     clearTimeout(connectTimer);
@@ -1572,7 +1591,98 @@ function setRemoteControls(active) {
   document.getElementById('btnConnect').style.display = active ? 'none' : '';
   document.getElementById('btnDisconnect').style.display = active ? '' : 'none';
   ['remoteMonitorSelect','remoteQualitySelect','remoteShortcutSelect','btnClipboardSend','btnClipboardGet','btnRemoteFullscreen'].forEach(function(id){ document.getElementById(id).style.display = active ? '' : 'none'; });
+  var canExec = currentUser && (currentUser.role === 'admin' || currentUser.role === 'it_support');
+  document.getElementById('btnRemoteTerminal').style.display = active && canExec ? '' : 'none';
+  ['btnRemoteBlock', 'btnRemotePrivacy', 'btnRemoteFile'].forEach(function(id) {
+    document.getElementById(id).style.display = active ? '' : 'none';
+    document.getElementById(id).disabled = true;
+  });
+  remoteProtectionState = { blocked: false, privacy: false };
+  renderRemoteProtection();
   if (!active) document.getElementById('remoteStats').textContent = '';
+}
+
+function renderRemoteProtection() {
+  var block = document.getElementById('btnRemoteBlock');
+  var privacy = document.getElementById('btnRemotePrivacy');
+  block.textContent = remoteProtectionState.blocked ? 'Lepas Blokir Input' : 'Blokir Input';
+  privacy.textContent = remoteProtectionState.privacy ? 'Privacy: Aktif' : 'Privacy: Mati';
+  block.setAttribute('aria-pressed', String(remoteProtectionState.blocked));
+  privacy.setAttribute('aria-pressed', String(remoteProtectionState.privacy));
+}
+
+async function toggleRemoteProtection(type) {
+  var socket = remoteWS;
+  if (!socket || socket.readyState !== WebSocket.OPEN) return;
+  var enabled = !(type === 'privacy_mode' ? remoteProtectionState.privacy : remoteProtectionState.blocked);
+  if (enabled && !await appConfirm(type === 'privacy_mode'
+    ? 'Aktifkan layar hitam dan blokir input lokal? Hanya desktop normal Windows 10 2004+. Ini overlay, bukan jaminan kerahasiaan untuk UAC, lock screen, atau aplikasi fullscreen eksklusif. Pastikan pengguna lokal mengetahui sesi ini. Ctrl+Alt+Del lokal tetap menjadi jalan keluar.'
+    : 'Blokir mouse dan keyboard lokal? Kontrol remote tetap aktif. Pengguna lokal dapat menekan Ctrl+Alt+Del untuk melepas blokir.')) return;
+  if (remoteWS === socket && socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify({type: type, enabled: enabled}));
+}
+
+function remoteFileRequest(socket, payload) {
+  return new Promise(function(resolve, reject) {
+    var timer;
+    function cleanup() { clearTimeout(timer); socket.removeEventListener('message', receive); socket.removeEventListener('close', closed); }
+    function closed() { cleanup(); reject(new Error('Koneksi terputus; file belum terkonfirmasi selesai.')); }
+    function receive(event) {
+      if (typeof event.data !== 'string') return;
+      var response;
+      try { response = JSON.parse(event.data); } catch (_) { return; }
+      if (!['file_ack','file_complete','file_error'].includes(response.type)) return;
+      cleanup();
+      if (response.type === 'file_error') reject(new Error(response.message || 'Transfer gagal'));
+      else resolve(response);
+    }
+    socket.addEventListener('message', receive);
+    socket.addEventListener('close', closed);
+    timer = setTimeout(function() { cleanup(); socket.close(); reject(new Error('Transfer timeout; koneksi ditutup untuk membatalkan file parsial.')); }, 30000);
+    if (socket.readyState !== WebSocket.OPEN) { closed(); return; }
+    try { socket.send(JSON.stringify(payload)); } catch (error) { cleanup(); reject(error); }
+  });
+}
+
+async function sendRemoteFile(input) {
+  var file = input.files && input.files[0];
+  input.value = '';
+  var socket = remoteWS;
+  if (!file || remoteFileBusy || !socket || socket.readyState !== WebSocket.OPEN) return;
+  if (file.size > 100 * 1024 * 1024) { showToast('Maksimum file 100 MiB'); return; }
+  if (!window.crypto || !window.crypto.subtle) { showToast('Kirim file membutuhkan HTTPS atau localhost untuk verifikasi checksum.'); return; }
+  remoteFileBusy = true;
+  var button = document.getElementById('btnRemoteFile');
+  var progress = document.getElementById('remoteFileProgress');
+  button.disabled = true;
+  try {
+    if (!await appConfirm('Kirim ' + file.name + ' (' + fmtBytes(file.size) + ') ke komputer remote? Disimpan ke folder penerimaan sementara agent, tidak dijalankan. Lokasi lengkap ditampilkan setelah selesai.')) return;
+    if (remoteWS !== socket || socket.readyState !== WebSocket.OPEN) throw new Error('Sesi remote sudah berubah.');
+    progress.textContent = 'Memeriksa file…';
+    var bytes = new Uint8Array(await file.arrayBuffer());
+    var checksum = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))).map(function(value) { return value.toString(16).padStart(2, '0'); }).join('');
+    var response = await remoteFileRequest(socket, {type:'file_start', name:file.name, size:file.size});
+    if (response.type !== 'file_ack' || response.offset !== 0) throw new Error('Respons awal transfer tidak valid');
+    for (var offset = 0; offset < bytes.length; offset += 48 * 1024) {
+      var chunk = bytes.subarray(offset, Math.min(offset + 48 * 1024, bytes.length));
+      var data = btoa(String.fromCharCode.apply(null, chunk));
+      response = await remoteFileRequest(socket, {type:'file_chunk', offset:offset, data:data});
+      if (response.type !== 'file_ack' || response.offset !== offset + chunk.length) throw new Error('Offset transfer tidak cocok');
+      progress.textContent = 'Mengirim ' + Math.round(response.offset * 100 / bytes.length) + '%';
+    }
+    response = await remoteFileRequest(socket, {type:'file_end', digest:checksum});
+    if (response.type !== 'file_complete' || !response.path) throw new Error('Transfer belum terkonfirmasi');
+    progress.textContent = 'Terkirim: ' + response.path;
+    await appAlert('File diterima, checksum SHA-256 cocok. Simpan/pindahkan dari folder sementara bila ingin disimpan permanen. Lokasi di komputer remote: ' + response.path);
+  } catch (error) {
+    if (socket.readyState === WebSocket.OPEN) {
+      try { await remoteFileRequest(socket, {type:'file_cancel'}); } catch (_) {}
+    }
+    progress.textContent = error.message || 'Transfer gagal';
+    showToast(progress.textContent);
+  } finally {
+    remoteFileBusy = false;
+    if (remoteWS === socket && socket.readyState === WebSocket.OPEN) button.disabled = false;
+  }
 }
 
 function changeRemoteMonitor() {
@@ -1630,6 +1740,81 @@ function setRemoteStatus(status) {
 }
 
 function handleSignal(data) { console.log('Signal received:', data); }
+
+
+// ==================== REMOTE TERMINAL (CLI) ====================
+let currentTerminalDeviceID = null;
+
+function openRemoteTerminalModal(deviceID) {
+  var id = deviceID || (currentDevice && currentDevice.id);
+  if (!id) return;
+  var dev = devices.find(function(item){ return item.id === id; }) || currentDevice || {};
+  currentTerminalDeviceID = id;
+  document.getElementById('remoteTerminalTitle').textContent = 'Terminal CLI - ' + (dev.hostname || id);
+  document.getElementById('remoteTerminalModal').style.display = 'flex';
+  var output = document.getElementById('terminalOutput');
+  if (!output.textContent.trim()) {
+    output.textContent = 'Remote Terminal siap. PC Target: ' + (dev.hostname || id) + ' (' + (dev.os || 'OS') + ')\nKetik perintah lalu tekan Enter atau klik Jalankan.\n';
+  }
+  setTimeout(function() {
+    var input = document.getElementById('terminalInput');
+    if (input) input.focus();
+  }, 100);
+}
+
+function openRemoteTerminalFromSession() {
+  var devSelect = document.getElementById('remoteDeviceSelect');
+  var id = devSelect ? devSelect.value : null;
+  if (!id) { showToast('Pilih perangkat terlebih dahulu'); return; }
+  openRemoteTerminalModal(id);
+}
+
+function closeRemoteTerminalModal() {
+  document.getElementById('remoteTerminalModal').style.display = 'none';
+}
+
+function clearTerminalOutput() {
+  document.getElementById('terminalOutput').textContent = '';
+}
+
+async function runTerminalCommand() {
+  var id = currentTerminalDeviceID;
+  if (!id) return;
+  var input = document.getElementById('terminalInput');
+  var cmd = (input.value || '').trim();
+  if (!cmd) return;
+  
+  var shell = document.getElementById('terminalShellSelect').value || 'powershell';
+  var output = document.getElementById('terminalOutput');
+  var btn = document.getElementById('btnRunCommand');
+  
+  output.textContent += '\n> ' + cmd + ' [' + shell + ']\n';
+  output.scrollTop = output.scrollHeight;
+  input.value = '';
+  btn.disabled = true;
+  btn.textContent = 'Menjalankan...';
+
+  try {
+    var res = await api('/api/devices/' + encodeURIComponent(id) + '/exec', {
+      method: 'POST',
+      body: JSON.stringify({ command: cmd, shell: shell })
+    });
+    if (!res || res.error) {
+      output.textContent += '[Error: ' + ((res && res.error) || 'Gagal mengeksekusi perintah') + ']\n';
+    } else {
+      if (res.stdout) output.textContent += res.stdout;
+      if (res.stderr) output.textContent += '\n[STDERR]\n' + res.stderr;
+      output.textContent += '\n[Exit code: ' + res.exit_code + ']\n';
+    }
+  } catch (err) {
+    output.textContent += '[Exception: ' + (err.message || err) + ']\n';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Jalankan';
+    output.scrollTop = output.scrollHeight;
+    input.focus();
+  }
+}
 
 // ==================== UTILS ====================
 

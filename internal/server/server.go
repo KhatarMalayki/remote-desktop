@@ -274,6 +274,8 @@ type Server struct {
 	scans          map[string]*models.NetworkScan
 	processMu      sync.Mutex
 	processReplies map[string]chan []models.ProcessInfo
+	execMu         sync.Mutex
+	execReplies    map[string]chan map[string]interface{}
 	appsMu         sync.RWMutex
 	deviceApps     map[string][]string
 	deviceAppUsage map[string]map[string]int64
@@ -317,6 +319,7 @@ func New(cfg Config, webFS embed.FS) (*Server, error) {
 		webFS:          sub,
 		scans:          make(map[string]*models.NetworkScan),
 		processReplies: make(map[string]chan []models.ProcessInfo),
+		execReplies:    make(map[string]chan map[string]interface{}),
 		deviceApps:     make(map[string][]string),
 		deviceAppUsage: make(map[string]map[string]int64),
 		attachmentsDir: filepath.Join(filepath.Dir(cfg.DBPath), "attachments"),
@@ -585,6 +588,62 @@ func (s *Server) handleDevice(w http.ResponseWriter, r *http.Request) {
 	}
 	if isAssetHolderRole(claims.Role) && dev.OwnerUsername != claims.Username {
 		jsonError(w, "forbidden: asset bukan milik user ini", 403)
+		return
+	}
+
+	if action == "exec" {
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", 405)
+			return
+		}
+		if claims.Role != "admin" && claims.Role != "it_support" {
+			jsonError(w, "forbidden: hanya admin dan it_support", 403)
+			return
+		}
+		if !s.hub.IsOnline(id) {
+			jsonError(w, "agent sedang offline", 409)
+			return
+		}
+		var req struct {
+			Command string `json:"command"`
+			Shell   string `json:"shell"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil || strings.TrimSpace(req.Command) == "" {
+			jsonError(w, "command wajib diisi", 400)
+			return
+		}
+		requestID := fmt.Sprintf("exec-%x", time.Now().UnixNano())
+		reply := make(chan map[string]interface{}, 1)
+		s.execMu.Lock()
+		s.execReplies[requestID] = reply
+		s.execMu.Unlock()
+		defer func() {
+			s.execMu.Lock()
+			delete(s.execReplies, requestID)
+			s.execMu.Unlock()
+		}()
+
+		payload, _ := json.Marshal(map[string]interface{}{
+			"action": "run_command",
+			"data": map[string]string{
+				"request_id": requestID,
+				"command":    req.Command,
+				"shell":      req.Shell,
+			},
+		})
+		if !s.hub.SendToAgent(id, payload) {
+			jsonError(w, "gagal mengirim ke agent", 500)
+			return
+		}
+
+		select {
+		case res := <-reply:
+			_ = s.db.RecordAuthLog(claims.Username, r.RemoteAddr, "remote_exec", fmt.Sprintf("Perangkat %s: %s", id, req.Command), r.UserAgent())
+			s.db.AddLog(id, "exec_command", fmt.Sprintf("[%s] %s", claims.Username, req.Command))
+			jsonResp(w, res, 200)
+		case <-time.After(30 * time.Second):
+			jsonError(w, "eksekusi timeout (30s)", 504)
+		}
 		return
 	}
 
@@ -1808,6 +1867,9 @@ func (s *Server) handleRelayWS(w http.ResponseWriter, r *http.Request) {
 			onEnd: func(duration time.Duration) {
 				_ = s.db.RecordAuthLog(username, ip, "remote_end", fmt.Sprintf("Remote desktop selesai: %s (%s)", deviceID, duration), userAgent)
 			},
+			onControl: func(action string) {
+				_ = s.db.RecordAuthLog(username, ip, "remote_control", deviceID+": "+action, userAgent)
+			},
 		}
 	case "agent":
 		if r.URL.Query().Get("key") != s.cfg.APIKey {
@@ -1824,6 +1886,7 @@ func (s *Server) handleRelayWS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if role == "viewer" {
+		conn.SetReadLimit(128 * 1024)
 		err = createViewerRelay(sessionID, deviceID, conn, audit)
 	} else {
 		err = attachAgentRelay(sessionID, deviceID, conn)
@@ -1986,6 +2049,32 @@ func (s *Server) handleAgentMessage(c *Client, raw []byte) {
 			}
 		}
 		s.scanMu.Unlock()
+
+	case "exec_result":
+		var result struct {
+			RequestID string `json:"request_id"`
+			Stdout    string `json:"stdout"`
+			Stderr    string `json:"stderr"`
+			ExitCode  int    `json:"exit_code"`
+			Error     string `json:"error"`
+		}
+		if err := json.Unmarshal(msg.Data, &result); err == nil && result.RequestID != "" {
+			s.execMu.Lock()
+			ch := s.execReplies[result.RequestID]
+			s.execMu.Unlock()
+			if ch != nil {
+				res := map[string]interface{}{
+					"stdout":    result.Stdout,
+					"stderr":    result.Stderr,
+					"exit_code": result.ExitCode,
+					"error":     result.Error,
+				}
+				select {
+				case ch <- res:
+				default:
+				}
+			}
+		}
 
 	case "process_list_result":
 		var result struct {

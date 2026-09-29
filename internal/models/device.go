@@ -12,6 +12,7 @@ type Device struct {
 	Arch               string     `json:"arch"`
 	IP                 string     `json:"ip"`
 	LocalIP            string     `json:"local_ip"`
+	AllIPs             string     `json:"all_ips"`
 	CPUModel           string     `json:"cpu_model"`
 	CPUCores           int        `json:"cpu_cores"`
 	MemoryTotal        uint64     `json:"memory_total"`
