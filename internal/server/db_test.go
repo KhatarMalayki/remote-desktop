@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -862,5 +863,73 @@ func TestEmptyDatabaseDoesNotSeedLocationsOnRestart(t *testing.T) {
 		if err != nil || len(branches) != 0 {
 			t.Fatalf("restart %d created locations: %#v, %v", attempt, branches, err)
 		}
+	}
+}
+
+func TestMigrationAddsAllIPsColumnToExistingDatabase(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "legacy.db")
+	rawDB, err := sql.Open("sqlite3", path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Create legacy devices table without all_ips column
+	legacySchema := `
+	CREATE TABLE devices (
+		id TEXT PRIMARY KEY,
+		hostname TEXT NOT NULL DEFAULT '',
+		os TEXT NOT NULL DEFAULT '',
+		arch TEXT NOT NULL DEFAULT '',
+		ip TEXT NOT NULL DEFAULT '',
+		local_ip TEXT NOT NULL DEFAULT '',
+		cpu_model TEXT NOT NULL DEFAULT '',
+		cpu_cores INTEGER NOT NULL DEFAULT 0,
+		memory_total INTEGER NOT NULL DEFAULT 0,
+		memory_used INTEGER NOT NULL DEFAULT 0,
+		disk_total INTEGER NOT NULL DEFAULT 0,
+		disk_used INTEGER NOT NULL DEFAULT 0,
+		version TEXT NOT NULL DEFAULT '',
+		rustdesk_id TEXT NOT NULL DEFAULT '',
+		status TEXT NOT NULL DEFAULT 'active',
+		tags TEXT NOT NULL DEFAULT '',
+		group_name TEXT NOT NULL DEFAULT 'default',
+		branch TEXT NOT NULL DEFAULT '',
+		verification_status TEXT NOT NULL DEFAULT 'unverified',
+		verified_at DATETIME,
+		verified_by TEXT NOT NULL DEFAULT '',
+		verification_note TEXT NOT NULL DEFAULT '',
+		note TEXT NOT NULL DEFAULT '',
+		owner_username TEXT NOT NULL DEFAULT '',
+		manual_asset_id TEXT NOT NULL DEFAULT '',
+		last_seen DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		registered_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+	);
+	INSERT INTO devices (id, hostname, ip, local_ip) VALUES ('legacy-dev-1', 'Legacy-PC', '1.2.3.4', '192.168.1.50');
+	`
+	if _, err := rawDB.Exec(legacySchema); err != nil {
+		rawDB.Close()
+		t.Fatal(err)
+	}
+	rawDB.Close()
+
+	// Open with NewDB, which runs migrate()
+	db, err := NewDB(path)
+	if err != nil {
+		t.Fatalf("NewDB on legacy db failed: %v", err)
+	}
+	defer db.Close()
+
+	// ListDevices must succeed and return the legacy device
+	devices, total, err := db.ListDevices("", "", 50, 0)
+	if err != nil {
+		t.Fatalf("ListDevices failed after migration: %v", err)
+	}
+	if total != 1 || len(devices) != 1 {
+		t.Fatalf("expected 1 device, got total=%d, count=%d", total, len(devices))
+	}
+	if devices[0].Hostname != "Legacy-PC" {
+		t.Fatalf("expected Hostname 'Legacy-PC', got %q", devices[0].Hostname)
+	}
+	if devices[0].AllIPs != "" {
+		t.Fatalf("expected empty AllIPs for legacy device, got %q", devices[0].AllIPs)
 	}
 }

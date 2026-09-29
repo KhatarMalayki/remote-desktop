@@ -248,6 +248,7 @@ func migrate(db *sql.DB) error {
 		`ALTER TABLE devices ADD COLUMN condition TEXT NOT NULL DEFAULT 'good'`,
 		`ALTER TABLE devices ADD COLUMN manual_asset_id TEXT NOT NULL DEFAULT ''`,
 		`ALTER TABLE asset_switch_requests ADD COLUMN assigned_to TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE devices ADD COLUMN all_ips TEXT NOT NULL DEFAULT ''`,
 	}
 	for _, q := range alters {
 		_, _ = db.Exec(q)
