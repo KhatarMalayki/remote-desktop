@@ -5,11 +5,62 @@ function endpointBadges(device) {
   const state = device.endpoint || {};
   const stale = !device.online || !state.checked_at || Date.now() / 1000 - state.checked_at > 900;
   const badges = (state.applications || []).map(app => {
-    const status = app.status === 'detected' ? 'terdeteksi' : app.status === 'not_detected' ? 'tidak terdeteksi (cakupan machine/service)' : 'belum diketahui';
-    const marker = app.status === 'detected' ? (stale ? ' ~' : '') : app.status === 'not_detected' ? ' —' : ' ?';
-    return '<span class="tag" title="' + esc(status + (stale ? '; data terakhir/lama, bukan status live' : '')) + '">' + esc(app.label + marker) + '</span> ';
+    let icon = '⚪';
+    let iconColor = '#94a3b8';
+    let badgeBg = 'rgba(160,163,177,0.15)';
+    let badgeBorder = '1px solid rgba(160,163,177,0.3)';
+    let statusText = 'status belum diketahui';
+
+    if (app.status === 'detected') {
+      icon = '✔';
+      iconColor = '#10b981';
+      badgeBg = 'rgba(16,185,129,0.15)';
+      badgeBorder = '1px solid rgba(16,185,129,0.35)';
+      statusText = 'terpasang';
+    } else if (app.status === 'not_detected') {
+      icon = '✖';
+      iconColor = '#ef4444';
+      badgeBg = 'rgba(239,68,68,0.12)';
+      badgeBorder = '1px solid rgba(239,68,68,0.25)';
+      statusText = 'tidak terpasang';
+    }
+
+    const title = esc(app.label + ': ' + statusText + (stale ? ' (data lama/offline)' : ''));
+    return '<span style="display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:4px;font-size:11px;font-weight:600;margin:2px 3px 2px 0;background:' + badgeBg + ';border:' + badgeBorder + '" title="' + title + '">' +
+      '<span style="font-weight:bold;color:' + iconColor + '">' + icon + '</span> ' +
+      esc(app.label) +
+    '</span>';
   }).join('');
-  return badges + '<br><button class="btn btn-ghost btn-sm" data-device="' + esc(device.id) + '" onclick="openEndpointDevice(this.dataset.device)">Aplikasi / Policy</button>';
+
+  return (badges || '<span style="color:var(--fg2);font-size:11px">-</span>') +
+    '<br><button class="btn btn-ghost btn-sm" style="margin-top:4px;padding:2px 8px;font-size:11px" data-device="' + esc(device.id) + '" onclick="openEndpointDevice(this.dataset.device)">🛡️ Kelola Policy</button>';
+}
+
+function updateEndpointDevicePicker(activeId) {
+  const select = document.getElementById('endpointDevicePicker');
+  if (!select) return;
+  select.replaceChildren();
+  const list = (typeof devices !== 'undefined' && Array.isArray(devices)) ? devices : [];
+  list.forEach(d => {
+    const opt = document.createElement('option');
+    opt.value = d.id;
+    opt.textContent = (d.hostname || d.id) + (d.online ? ' (Online)' : ' (Offline)') + (d.assigned_to ? ' — ' + d.assigned_to : '');
+    if (d.id === activeId) opt.selected = true;
+    select.append(opt);
+  });
+}
+
+function onEndpointDevicePickerChange(id) {
+  if (!id || id === endpointSelectedDevice) return;
+  openEndpointDevice(id);
+}
+
+async function openPolicyManagerModal() {
+  if (!currentUser || currentUser.role !== 'admin') return appAlert('Hanya admin dapat mengelola policy agent.');
+  const list = (typeof devices !== 'undefined' && Array.isArray(devices)) ? devices : [];
+  if (list.length === 0) return appAlert('Belum ada perangkat terdaftar.');
+  const targetId = endpointSelectedDevice || (list.find(d => d.online) || list[0]).id;
+  await openEndpointDevice(targetId);
 }
 
 function showEndpointModal(id) {
@@ -68,6 +119,7 @@ async function saveTrackedApplications() {
 
 async function openEndpointDevice(id) {
   endpointSelectedDevice = id;
+  updateEndpointDevicePicker(id);
   document.getElementById('endpointPolicyMode').value = 'audit';
   document.getElementById('endpointPolicyMessage').textContent = '';
   await refreshEndpointDevice();
@@ -80,13 +132,14 @@ async function refreshEndpointDevice() {
   if (id !== endpointSelectedDevice) return;
   if (!device || device.error) { document.getElementById('endpointDeviceInfo').textContent = device && device.error || 'Gagal membaca perangkat'; document.getElementById('endpointPolicyControls').style.display = 'none'; return; }
   const state = device.endpoint || {}, report = state.report || {}, policy = state.policy;
-  document.getElementById('endpointDeviceTitle').textContent = (device.hostname || device.id) + ' — Aplikasi / Policy';
+  document.getElementById('endpointDeviceTitle').textContent = (device.hostname || device.id) + ' — Kelola Policy Agent';
   const output = document.getElementById('endpointDeviceInfo'); output.replaceChildren();
   function line(text) { const element = document.createElement('p'); element.textContent = text; output.append(element); }
   line('Pemeriksaan terakhir: ' + (state.checked_at ? new Date(state.checked_at * 1000).toLocaleString() : 'belum ada; perlu agent 0.2.58+') + (device.online ? '' : ' — perangkat offline, data historis'));
   line('Cakupan: aplikasi machine-wide dan service Windows. Tidak terdeteksi bukan bukti aplikasi portable/per-user tidak ada. Service berjalan bukan bukti proteksi sehat/tersambung console.');
   for (const app of state.applications || []) {
-    line(app.label + ': ' + ({detected:'terdeteksi', not_detected:'tidak terdeteksi dalam cakupan', unknown:'belum diketahui'}[app.status] || 'belum diketahui'));
+    const icon = app.status === 'detected' ? '✔ ' : app.status === 'not_detected' ? '✖ ' : '⚪ ';
+    line(icon + app.label + ': ' + ({detected:'terdeteksi', not_detected:'tidak terdeteksi dalam cakupan', unknown:'belum diketahui'}[app.status] || 'belum diketahui'));
     for (const match of app.matches || []) line('  ' + match.name + (match.version ? ' v' + match.version : '') + (match.service ? ' — service ' + match.service : ''));
   }
   if (report.detail) line('Inventaris: ' + report.detail);

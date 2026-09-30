@@ -67,6 +67,9 @@
   "65": "AssetSwitchRequest",
   "66": "TestRemoteDestinationNoOverwrite",
   "67": "deploy.go",
+  "68": ".deployApplication",
+  "69": ".handleDeployments",
   "70": "AssetSwitchRequest",
+  "71": "main",
   "72": "Remote disconnect investigation — 2026-09-30"
 }

@@ -168,6 +168,8 @@ function updateUserUI() {
   if (deployButton) deployButton.style.display = isTech ? 'inline-flex' : 'none';
   const trackedAppsBtn = document.getElementById('trackedAppsBtn');
   if (trackedAppsBtn) trackedAppsBtn.style.display = currentUser.role === 'admin' ? 'inline-flex' : 'none';
+  const policyManagerBtn = document.getElementById('policyManagerBtn');
+  if (policyManagerBtn) policyManagerBtn.style.display = currentUser.role === 'admin' ? 'inline-flex' : 'none';
   const rustDeskResetAllBtn = document.getElementById('rustDeskResetAllBtn');
   if (rustDeskResetAllBtn) rustDeskResetAllBtn.style.display = isTech ? 'inline-flex' : 'none';
   var navRoles = document.getElementById('navRoles');
