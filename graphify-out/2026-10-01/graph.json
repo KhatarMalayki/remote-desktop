@@ -9859,7 +9859,7 @@
       "label": "submitLockPolicy()",
       "file_type": "code",
       "source_file": "web/static/endpoint.js",
-      "source_location": "L269",
+      "source_location": "L156",
       "_origin": "ast",
       "id": "web_static_endpoint_submitlockpolicy",
       "community": 32,
@@ -35748,7 +35748,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "web/static/endpoint.js",
-      "source_location": "L269",
+      "source_location": "L156",
       "weight": 1.0,
       "_origin": "ast",
       "source": "web_static_endpoint",
@@ -35855,7 +35855,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "web/static/endpoint.js",
-      "source_location": "L279",
+      "source_location": "L166",
       "weight": 1.0,
       "_origin": "ast",
       "source": "web_static_endpoint_submitlockpolicy",
@@ -38088,5 +38088,5 @@
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "b1b34399031497e067445f768f46c6064d22f092"
+  "built_at_commit": "203856986a573c022e9edfdba2e3b5298de2ade4"
 }

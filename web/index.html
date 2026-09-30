@@ -1030,19 +1030,41 @@
 </div>
 <div id="endpointDeviceModal" class="modal-overlay" style="display:none" role="dialog" aria-modal="true" aria-labelledby="endpointDeviceTitle">
  <div class="modal" style="max-width:850px">
-  <h3 id="endpointDeviceTitle">Aplikasi dan policy perangkat</h3>
-  <div class="form-group" id="endpointDevicePickerGroup" style="margin-bottom:12px"><label for="endpointDevicePicker">Pilih Komputer Target</label><select id="endpointDevicePicker" onchange="onEndpointDevicePickerChange(this.value)"></select></div>
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;border-bottom:1px solid var(--border);padding-bottom:10px">
+    <h3 id="endpointDeviceTitle" style="margin:0;font-size:16px;display:flex;align-items:center;gap:8px">🛡️ Kelola Policy & Deteksi Endpoint</h3>
+    <button class="btn btn-ghost btn-sm" onclick="closeEndpointModal('endpointDeviceModal')" aria-label="Tutup modal" style="padding:4px 8px">✕</button>
+  </div>
+  <div class="form-group" id="endpointDevicePickerGroup" style="margin-bottom:12px">
+    <label for="endpointDevicePicker" style="font-size:12px;font-weight:600">Pilih Komputer Target</label>
+    <select id="endpointDevicePicker" onchange="onEndpointDevicePickerChange(this.value)"></select>
+  </div>
   <div id="endpointDeviceInfo" aria-live="polite"></div>
-  <section id="endpointPolicyControls" style="display:none">
-   <h4>Penguncian layar otomatis</h4>
-   <p>Default audit: tidak mengubah PC. Apply/restore hanya untuk Windows yang tidak terindikasi dikelola domain, MDM, atau ManageEngine. Policy yang sudah diatur pihak lain tidak ditimpa. SentinelOne tidak diubah. Pemeriksaan ini tidak menjamin semua konflik terdeteksi.</p>
-   <div class="form-group"><label for="endpointPolicyMode">Operasi</label><select id="endpointPolicyMode"><option value="audit">Audit saja</option><option value="apply">Terapkan</option><option value="restore">Pulihkan nilai sebelum RemoteDesk</option></select></div>
-   <div class="form-group"><label for="endpointPolicyMinutes">Batas tidak aktif (menit, 1–1440)</label><input id="endpointPolicyMinutes" type="number" min="1" max="1440" step="1" value="15"></div>
-   <p>Target hanya perangkat ini. Jika offline, job menunggu maksimal 24 jam. Apply/restore memerlukan hak administrator agent dan restart Windows; tidak ada restart otomatis. Status configured hanya membuktikan nilai registry, bukan penguncian sesi.</p>
-   <button id="endpointPolicySend" class="btn btn-primary" onclick="submitLockPolicy()">Konfirmasi operasi</button>
+  <section id="endpointPolicyControls" class="endpoint-policy-box" style="display:none">
+   <h4>⚙️ Konfigurasi Penguncian Layar (Screen Lock)</h4>
+   <div class="endpoint-policy-form-row">
+     <div class="form-group" style="margin-bottom:0">
+       <label for="endpointPolicyMode">Operasi Kebijakan</label>
+       <select id="endpointPolicyMode">
+         <option value="audit">Audit Saja (Cek status tanpa mengubah PC)</option>
+         <option value="apply">Terapkan Kebijakan (Enforce Screen Lock)</option>
+         <option value="restore">Pulihkan Nilai Awal (Sebelum RemoteDesk)</option>
+       </select>
+     </div>
+     <div class="form-group" style="margin-bottom:0">
+       <label for="endpointPolicyMinutes">Batas Idle (Menit, 1–1440)</label>
+       <input id="endpointPolicyMinutes" type="number" min="1" max="1440" step="1" value="15">
+     </div>
+   </div>
+   <div style="font-size:11px;color:var(--fg2);line-height:1.4;margin:8px 0 14px">
+     Catatan: Mode audit tidak mengubah sistem. Mode apply/restore memerlukan privilege administrator pada agent. Perangkat Active Directory Domain, MDM, atau ManageEngine otomatis ditolak untuk mencegah konflik policy.
+   </div>
+   <button id="endpointPolicySend" class="btn btn-primary" onclick="submitLockPolicy()">Konfirmasi Operasi</button>
   </section>
-  <div class="modal-actions"><button class="btn btn-ghost" onclick="refreshEndpointDevice()">Refresh status</button><button class="btn btn-ghost" onclick="closeEndpointModal('endpointDeviceModal')">Tutup</button></div>
-  <p id="endpointPolicyMessage" role="status" aria-live="polite"></p>
+  <div class="modal-actions" style="margin-top:16px">
+    <button class="btn btn-ghost" onclick="refreshEndpointDevice()">🔄 Refresh Status</button>
+    <button class="btn btn-ghost" onclick="closeEndpointModal('endpointDeviceModal')">Tutup</button>
+  </div>
+  <p id="endpointPolicyMessage" role="status" aria-live="polite" style="margin-top:10px"></p>
  </div>
 </div>
 </body>

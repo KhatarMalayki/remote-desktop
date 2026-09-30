@@ -686,3 +686,103 @@ select.filter-select {
 .app-dialog .modal-actions { margin-top: 24px; gap: 10px; }
 .app-dialog :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .app-dialog [hidden] { display: none; }
+
+/* Endpoint Policy Modal Enhancement */
+.endpoint-overview-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 14px;
+  margin-bottom: 12px;
+  font-size: 12px;
+}
+.endpoint-apps-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 10px;
+  margin: 10px 0 14px;
+}
+.endpoint-app-card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.endpoint-app-card.detected {
+  border-color: rgba(16, 185, 129, 0.4);
+  background: linear-gradient(180deg, rgba(16, 185, 129, 0.05) 0%, var(--bg2) 100%);
+}
+.endpoint-app-card .app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.endpoint-app-card .app-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--fg);
+}
+.endpoint-app-card .app-meta {
+  font-size: 11px;
+  color: var(--fg2);
+  line-height: 1.4;
+  word-break: break-word;
+}
+.endpoint-callout {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: var(--radius);
+  font-size: 12px;
+  line-height: 1.4;
+  margin: 10px 0;
+}
+.endpoint-callout.warning {
+  background: rgba(251, 191, 36, 0.12);
+  border: 1px solid rgba(251, 191, 36, 0.3);
+  color: #fbbf24;
+}
+.endpoint-callout.danger {
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #ef4444;
+}
+.endpoint-callout.info {
+  background: rgba(79, 140, 255, 0.1);
+  border: 1px solid rgba(79, 140, 255, 0.25);
+  color: #93c5fd;
+}
+.endpoint-policy-box {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-top: 14px;
+}
+.endpoint-policy-box h4 {
+  margin: 0 0 10px 0;
+  font-size: 14px;
+  color: var(--fg);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.endpoint-policy-form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-bottom: 12px;
+}
+@media (max-width: 640px) {
+  .endpoint-policy-form-row { grid-template-columns: 1fr; }
+}

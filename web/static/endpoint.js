@@ -130,27 +130,140 @@ async function refreshEndpointDevice() {
   const id = endpointSelectedDevice;
   const device = await api('/api/devices/' + encodeURIComponent(id));
   if (id !== endpointSelectedDevice) return;
-  if (!device || device.error) { document.getElementById('endpointDeviceInfo').textContent = device && device.error || 'Gagal membaca perangkat'; document.getElementById('endpointPolicyControls').style.display = 'none'; return; }
-  const state = device.endpoint || {}, report = state.report || {}, policy = state.policy;
-  document.getElementById('endpointDeviceTitle').textContent = (device.hostname || device.id) + ' — Kelola Policy Agent';
-  const output = document.getElementById('endpointDeviceInfo'); output.replaceChildren();
-  function line(text) { const element = document.createElement('p'); element.textContent = text; output.append(element); }
-  line('Pemeriksaan terakhir: ' + (state.checked_at ? new Date(state.checked_at * 1000).toLocaleString() : 'belum ada; perlu agent 0.2.58+') + (device.online ? '' : ' — perangkat offline, data historis'));
-  line('Cakupan: aplikasi machine-wide dan service Windows. Tidak terdeteksi bukan bukti aplikasi portable/per-user tidak ada. Service berjalan bukan bukti proteksi sehat/tersambung console.');
-  for (const app of state.applications || []) {
-    const icon = app.status === 'detected' ? '✔ ' : app.status === 'not_detected' ? '✖ ' : '⚪ ';
-    line(icon + app.label + ': ' + ({detected:'terdeteksi', not_detected:'tidak terdeteksi dalam cakupan', unknown:'belum diketahui'}[app.status] || 'belum diketahui'));
-    for (const match of app.matches || []) line('  ' + match.name + (match.version ? ' v' + match.version : '') + (match.service ? ' — service ' + match.service : ''));
+  const output = document.getElementById('endpointDeviceInfo');
+  output.replaceChildren();
+
+  if (!device || device.error) {
+    const err = document.createElement('div');
+    err.className = 'endpoint-callout danger';
+    err.textContent = '⚠️ ' + (device && device.error || 'Gagal membaca data perangkat.');
+    output.append(err);
+    document.getElementById('endpointPolicyControls').style.display = 'none';
+    return;
   }
-  if (report.detail) line('Inventaris: ' + report.detail);
-  line('Lock-screen registry: ' + (state.report && report.status !== 'unsupported' ? (report.lock_present ? report.lock_seconds + ' detik' : 'belum diatur') : 'belum diketahui'));
-  if (report.policy_error) line('Pembatasan/pemeriksaan policy: ' + report.policy_error);
-  if (report.drift) line('PERHATIAN: pengaturan berubah di luar RemoteDesk. Tidak ditimpa otomatis.');
-  if (policy) line('Job terakhir: ' + policy.status + ' — ' + policy.detail);
+
+  const state = device.endpoint || {}, report = state.report || {}, policy = state.policy;
+  document.getElementById('endpointDeviceTitle').textContent = '🛡️ ' + (device.hostname || device.id) + ' — Kelola Policy Agent';
+
+  // 1. Overview Bar
+  const overview = document.createElement('div');
+  overview.className = 'endpoint-overview-bar';
+  const onlineTag = device.online
+    ? '<span style="color:#10b981;font-weight:600">● Online</span>'
+    : '<span style="color:var(--fg2);font-weight:600">○ Offline</span>';
+  const checkedTime = state.checked_at
+    ? new Date(state.checked_at * 1000).toLocaleString()
+    : 'Belum ada scan (perlu agent 0.2.58+)';
+  const assigned = device.assigned_to ? ' • PIC: <strong>' + esc(device.assigned_to) + '</strong>' : '';
+  const agentVer = device.version ? ' • Agent: v' + esc(device.version) : '';
+  overview.innerHTML = '<div>' + onlineTag + ' • <strong>' + esc(device.hostname || device.id) + '</strong>' + assigned + agentVer + '</div>' +
+    '<div style="color:var(--fg2);font-size:11px">Pemeriksaan: ' + esc(checkedTime) + '</div>';
+  output.append(overview);
+
+  // 2. Apps Header
+  const appsHeader = document.createElement('div');
+  appsHeader.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin:14px 0 6px';
+  appsHeader.innerHTML = '<span style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--fg)">Status Aplikasi Terpantau</span>' +
+    '<button class="btn btn-ghost btn-sm" onclick="openTrackedApplications()" style="padding:2px 8px;font-size:11px">⚙️ Atur Target Aplikasi</button>';
+  output.append(appsHeader);
+
+  // 3. Grid Apps
+  const grid = document.createElement('div');
+  grid.className = 'endpoint-apps-grid';
+  const apps = state.applications || [];
+  if (apps.length === 0) {
+    const empty = document.createElement('div');
+    empty.style.cssText = 'color:var(--fg2);font-size:12px;padding:8px 0';
+    empty.textContent = 'Belum ada aplikasi yang dipantau.';
+    grid.append(empty);
+  } else {
+    apps.forEach(app => {
+      const card = document.createElement('div');
+      const isDetected = app.status === 'detected';
+      card.className = 'endpoint-app-card' + (isDetected ? ' detected' : '');
+
+      let badgeHtml = '';
+      if (isDetected) {
+        badgeHtml = '<span class="badge badge-green"><span style="color:#10b981;font-weight:bold;margin-right:3px">✔</span>Terpasang</span>';
+      } else if (app.status === 'not_detected') {
+        badgeHtml = '<span class="badge badge-gray"><span style="color:#ef4444;font-weight:bold;margin-right:3px">✖</span>Tidak Ada</span>';
+      } else {
+        badgeHtml = '<span class="badge badge-gray"><span style="color:#94a3b8;font-weight:bold;margin-right:3px">⚪</span>Belum Scan</span>';
+      }
+
+      let matchesHtml = '';
+      if (Array.isArray(app.matches) && app.matches.length > 0) {
+        matchesHtml = app.matches.map(m => esc(m.name + (m.version ? ' v' + m.version : '') + (m.service ? ' (service: ' + m.service + ')' : ''))).join('<br>');
+      } else if (isDetected) {
+        matchesHtml = 'Terdeteksi pada sistem';
+      } else {
+        matchesHtml = 'Tidak ditemukan di registry machine atau service';
+      }
+
+      card.innerHTML = '<div class="app-header">' +
+        '<span class="app-name">' + esc(app.label) + '</span>' +
+        badgeHtml +
+      '</div>' +
+      '<div class="app-meta">' + matchesHtml + '</div>';
+      grid.append(card);
+    });
+  }
+  output.append(grid);
+
+  // 4. Panel Detail Ringkasan Status
+  const summaryPanel = document.createElement('div');
+  summaryPanel.className = 'detail-grid';
+  summaryPanel.style.cssText = 'background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:12px';
+
+  let lockVal = 'Belum diketahui';
+  if (state.report && report.status !== 'unsupported') {
+    lockVal = report.lock_present ? (Math.round(report.lock_seconds / 60) + ' Menit (' + report.lock_seconds + ' detik)') : 'Belum diatur';
+  }
+
+  let jobVal = 'Belum ada job';
+  if (policy) {
+    const jobColor = policy.status === 'applied' ? '#10b981' : policy.status === 'conflict' ? '#ef4444' : '#fbbf24';
+    jobVal = '<span style="color:' + jobColor + ';font-weight:600">' + esc(policy.status.toUpperCase()) + '</span> — ' + esc(policy.detail || '');
+  }
+
+  summaryPanel.innerHTML = '<div class="detail-item">' +
+    '<div class="label">Penguncian Layar Saat Ini</div>' +
+    '<div class="value" style="font-weight:600;font-size:13px">' + esc(lockVal) + '</div>' +
+  '</div>' +
+  '<div class="detail-item">' +
+    '<div class="label">Job Policy Terakhir</div>' +
+    '<div class="value" style="font-size:12px">' + jobVal + '</div>' +
+  '</div>';
+  output.append(summaryPanel);
+
+  // 5. Warning Callouts (Domain Restriction & Drift)
+  if (report.policy_error) {
+    const warn = document.createElement('div');
+    warn.className = 'endpoint-callout warning';
+    warn.innerHTML = '<span style="font-size:16px">⚠️</span><div><strong>Pembatasan Kebijakan:</strong> ' + esc(report.policy_error) + '</div>';
+    output.append(warn);
+  }
+
+  if (report.drift) {
+    const driftWarn = document.createElement('div');
+    driftWarn.className = 'endpoint-callout danger';
+    driftWarn.innerHTML = '<span style="font-size:16px">⚠️</span><div><strong>Peringatan Drift:</strong> Pengaturan registry penguncian layar telah berubah di luar RemoteDesk. Sistem tidak akan menimpa otomatis.</div>';
+    output.append(driftWarn);
+  }
+
+  // 6. Policy Controls Visibility
   const supported = device.os === 'windows' && !isVersionNewer('0.2.58', device.version || '');
-  document.getElementById('endpointPolicyControls').style.display = currentUser && currentUser.role === 'admin' ? 'block' : 'none';
-  document.getElementById('endpointPolicySend').disabled = !supported || !!(policy && ['pending','delivered'].includes(policy.status));
-  if (!supported) line('Policy memerlukan Windows agent >=0.2.58.');
+  const controls = document.getElementById('endpointPolicyControls');
+  controls.style.display = currentUser && currentUser.role === 'admin' ? 'block' : 'none';
+  const sendBtn = document.getElementById('endpointPolicySend');
+  sendBtn.disabled = !supported || !!(policy && ['pending','delivered'].includes(policy.status));
+
+  if (!supported) {
+    const notSup = document.createElement('div');
+    notSup.className = 'endpoint-callout info';
+    notSup.innerHTML = 'ℹ️ Fitur penerapan policy membutuhkan perangkat Windows dengan agent minimal v0.2.58.';
+    output.append(notSup);
+  }
 }
 
 async function submitLockPolicy() {
