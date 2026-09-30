@@ -805,3 +805,44 @@ select.filter-select:focus { border-color: var(--accent); outline: 2px solid var
 @media (max-width: 640px) {
   .endpoint-policy-form-row { grid-template-columns: 1fr; }
 }
+/* Enhanced Modern UI Classes (shadcn/ui & Tremor) */
+.badge-status.online {
+  background: rgba(16, 185, 129, 0.12);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.25);
+}
+.badge-status.offline {
+  background: rgba(148, 163, 184, 0.1);
+  color: #94a3b8;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+}
+.devices-action-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  padding: 8px 12px;
+  border-radius: var(--radius);
+  margin-bottom: 16px;
+  box-shadow: var(--shadow-sm);
+}
+.devices-action-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.nav-item {
+  margin: 1px 10px;
+  border-radius: 6px;
+  padding: 8px 12px;
+}
+.nav-item.active {
+  background: rgba(59, 130, 246, 0.12);
+  color: var(--accent);
+  border-left: 3px solid var(--accent);
+  font-weight: 600;
+}

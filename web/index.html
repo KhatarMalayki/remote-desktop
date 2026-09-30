@@ -260,24 +260,33 @@
     <!-- DEVICES PAGE -->
     <div id="page-devices" class="page">
       <div class="header"><h2>Devices</h2></div>
-      <div class="toolbar">
-        <input class="search-input" id="deviceSearch" placeholder="Search hostname, IP, ID, pemakai..." oninput="searchDevices()">
+      <!-- TOOLBAR 1: SEARCH & FILTERS -->
+      <div class="toolbar" style="margin-bottom:10px">
+        <input class="search-input" id="deviceSearch" placeholder="Cari hostname, IP, ID, pemakai..." oninput="searchDevices()">
         <select class="filter-select" id="groupFilter" onchange="filterDevices()">
-          <option value="">All Groups</option>
+          <option value="">Semua Grup</option>
         </select>
         <select class="filter-select" id="statusFilter" onchange="filterDevices()">
-          <option value="">All Status</option>
+          <option value="">Semua Status</option>
           <option value="online">Online</option>
           <option value="offline">Offline</option>
           <option value="outdated">Perlu Update</option>
         </select>
         <button class="btn btn-ghost" onclick="loadDevices()">&#8635; Refresh</button>
         <button class="btn btn-warning" id="updateOutdatedAgentsBtn" style="display:none" onclick="updateAllOutdatedAgents()">&#8679; Update Semua yang Tertinggal</button>
-        <button class="btn btn-ghost" id="rustDeskSettingsBtn" style="display:none" onclick="configureRustDesk()">Konfigurasi RustDesk</button>
-        <button id="deployApplicationsBtn" style="display:none" class="btn btn-primary" onclick="openDeployments()">Deploy aplikasi</button>
-        <button id="trackedAppsBtn" style="display:none" class="btn btn-ghost" onclick="openTrackedApplications()">Kelola Target Aplikasi</button>
-        <button id="policyManagerBtn" style="display:none" class="btn btn-ghost" onclick="openPolicyManagerModal()">🛡️ Kelola Policy Agent</button>
-        <button class="btn btn-ghost" id="rustDeskResetAllBtn" style="display:none" onclick="resetAllRustDeskPasswords()">Reset All Password RustDesk</button>
+      </div>
+
+      <!-- TOOLBAR 2: MANAGEMENT ACTION BAR -->
+      <div class="devices-action-bar">
+        <div class="devices-action-group">
+          <button id="deployApplicationsBtn" style="display:none" class="btn btn-primary btn-sm" onclick="openDeployments()">🚀 Deploy Aplikasi</button>
+          <button id="policyManagerBtn" style="display:none" class="btn btn-ghost btn-sm" onclick="openPolicyManagerModal()">🛡️ Kelola Policy Agent</button>
+          <button id="trackedAppsBtn" style="display:none" class="btn btn-ghost btn-sm" onclick="openTrackedApplications()">⚙️ Target Aplikasi</button>
+        </div>
+        <div class="devices-action-group">
+          <button class="btn btn-ghost btn-sm" id="rustDeskSettingsBtn" style="display:none" onclick="configureRustDesk()">🖥️ Konfigurasi RustDesk</button>
+          <button class="btn btn-ghost btn-sm" id="rustDeskResetAllBtn" style="display:none" onclick="resetAllRustDeskPasswords()">🔑 Reset All Password</button>
+        </div>
       </div>
       <div id="devicesTable"></div>
       <div class="pagination" id="pagination"></div>

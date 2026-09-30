@@ -65,8 +65,8 @@
     "semantic_hash": "8c9cb5d1b967f64d6abc8c1ca0fe3e90"
   },
   "web/static/app.js": {
-    "mtime": 1790787364.8083746,
-    "ast_hash": "bffa47ae1df08fd33926ee3eb04aa4f3",
+    "mtime": 1790789352.023537,
+    "ast_hash": "8fab01cb879348f7778b8ddc7f8fa8dc",
     "semantic_hash": ""
   },
   ".codex/hooks.json": {
@@ -125,8 +125,8 @@
     "semantic_hash": ""
   },
   "web/index.html": {
-    "mtime": 1790787684.3997946,
-    "ast_hash": "79246dd9a2a9aebb3606e05c886d44df",
+    "mtime": 1790789300.301823,
+    "ast_hash": "7d06980e7a85be516a7bf48342d7b1cc",
     "semantic_hash": ""
   },
   "scripts/update-server.sh": {
@@ -535,8 +535,8 @@
     "semantic_hash": ""
   },
   "web/static/endpoint.js": {
-    "mtime": 1790787712.911366,
-    "ast_hash": "08ff3786a80da6f94f431f154b5239ed",
+    "mtime": 1790789411.8319523,
+    "ast_hash": "9ac05dfe6e81a1134194fb5aeb3bb05a",
     "semantic_hash": ""
   }
 }

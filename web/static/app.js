@@ -355,7 +355,20 @@ function renderDevices() {
 }
 
 function buildDeviceTable(list) {
-  return '<table class="device-table"><thead><tr><th>Status</th><th>Hostname</th><th>Aplikasi / Policy</th><th>OS</th><th>IP</th><th>CPU</th><th>RAM</th><th>Disk</th><th>Group</th><th>Agent</th><th>Last Seen</th><th>Actions</th></tr></thead><tbody>' +
+  return '<table class="device-table"><thead><tr>' +
+    '<th style="width:105px">Status</th>' +
+    '<th>Hostname / PIC</th>' +
+    '<th style="min-width:130px">Aplikasi / Policy</th>' +
+    '<th>OS</th>' +
+    '<th>Alamat IP</th>' +
+    '<th>CPU</th>' +
+    '<th style="min-width:90px">RAM</th>' +
+    '<th style="min-width:90px">Disk</th>' +
+    '<th>Group</th>' +
+    '<th>Agent</th>' +
+    '<th>Last Seen</th>' +
+    '<th style="min-width:160px;text-align:right">Aksi</th>' +
+    '</tr></thead><tbody>' +
     list.map(function(d) {
       var ramPct = d.memory_total ? Math.round(d.memory_used / d.memory_total * 100) : 0;
       var diskPct = d.disk_total ? Math.round(d.disk_used / d.disk_total * 100) : 0;
@@ -363,24 +376,44 @@ function buildDeviceTable(list) {
       var pending = !!pendingAgentUpdates[d.id];
       var versionLabel = d.version ? 'v' + esc(d.version) : 'Tidak diketahui';
       var updateLabel = pending ? 'Memproses' : (outdated ? 'Perlu Update' : 'Terbaru');
-      var updateColor = pending ? '#fbbf24' : (outdated ? '#ef4444' : '#34d399');
+      var updateColor = pending ? '#fbbf24' : (outdated ? '#ef4444' : '#10b981');
       var rustDeskID = /^\d{6,20}$/.test(String(d.rustdesk_id || '')) ? String(d.rustdesk_id) : '';
-      return '<tr><td><span class="status-dot '+(d.online?'online':'offline')+'"></span>'+(d.online?'Online':'Offline')+'</td>' +
-        '<td><strong>'+esc(d.hostname)+'</strong>'+(d.assigned_to ? '<br><small style="color:var(--accent);font-weight:600">&#128100; '+esc(d.assigned_to)+'</small>' : '')+'<br><small style="color:var(--fg2)">'+esc(d.id)+'</small></td>' +
-        '<td>'+endpointBadges(d)+'</td>' +
-        '<td>'+osIcon(d.os)+' '+esc(d.os)+' '+esc(d.arch)+'</td>' +
-        '<td><strong>'+esc(d.local_ip || d.ip || '-')+'</strong>'+(d.ip && d.local_ip && d.ip !== d.local_ip ? '<br><small style="color:var(--fg2)">Publik: '+esc(d.ip)+'</small>' : '')+(d.all_ips ? '<br><small style="color:var(--accent)" title="'+esc(d.all_ips)+'">VPN/Multi-IP</small>' : '')+'</td>' +
-        '<td>'+d.cpu_cores+' cores</td>' +
-        '<td><div class="progress-bar"><div class="fill '+(ramPct>80?'danger':'')+'" style="width:'+ramPct+'%"></div></div>'+ramPct+'%</td>' +
-        '<td><div class="progress-bar"><div class="fill '+(diskPct>80?'danger':'')+'" style="width:'+diskPct+'%"></div></div>'+diskPct+'%</td>' +
-        '<td><span class="tag">'+esc(d.branch||d.group||'default')+'</span></td>' +
-        '<td><strong>'+versionLabel+'</strong><br><small style="color:'+updateColor+'">'+updateLabel+'</small></td>' +
-        '<td>'+timeAgo(d.last_seen)+'</td>' +
-        '<td><button class="btn btn-ghost btn-sm" onclick="openDeviceModal(\''+d.id+'\')">Details</button>' +
-        (d.online ? ' <button class="btn btn-primary btn-sm" onclick="quickRemote(\''+d.id+'\')">Remote Web</button>' : '') +
-        (rustDeskID ? ' <button class="btn btn-warning btn-sm" onclick="openRustDesk(\''+rustDeskID+'\')">RustDesk</button>' : '') +
-        (currentUser && (currentUser.role === 'admin' || currentUser.role === 'it_support') && outdated ? ' <button class="btn btn-warning btn-sm" '+(!d.online||pending?'disabled':'')+' onclick="updateDeviceAgent(\''+d.id+'\')">Update</button>' : '') +
-        '</td></tr>';
+      
+      var statusHtml = '<span class="badge-status ' + (d.online ? 'online' : 'offline') + '" style="white-space:nowrap;display:inline-flex;align-items:center;gap:6px">' +
+        '<span class="status-dot ' + (d.online ? 'online' : 'offline') + '"></span>' + (d.online ? 'Online' : 'Offline') + '</span>';
+      
+      var hostHtml = '<div style="font-weight:650;font-size:13px;color:var(--fg);line-height:1.3">' + esc(d.hostname) + '</div>' +
+        (d.assigned_to ? '<div style="margin:3px 0"><span style="display:inline-flex;align-items:center;gap:4px;background:rgba(59,130,246,0.12);color:#93c5fd;border:1px solid rgba(59,130,246,0.25);border-radius:4px;padding:1px 6px;font-size:11px;font-weight:550">&#128100; ' + esc(d.assigned_to) + '</span></div>' : '') +
+        '<div style="font-family:monospace;font-size:10.5px;color:var(--fg2)">' + esc(d.id) + '</div>';
+      
+      var osHtml = '<div style="display:inline-flex;align-items:center;gap:6px;font-size:12px;white-space:nowrap">' +
+        osIcon(d.os) + ' <span>' + esc(d.os) + ' ' + esc(d.arch) + '</span></div>';
+      
+      var ipHtml = '<div style="font-weight:600;font-size:13px;color:var(--fg)">' + esc(d.local_ip || d.ip || '-') + '</div>' +
+        (d.ip && d.local_ip && d.ip !== d.local_ip ? '<div style="font-size:11px;color:var(--fg2)">Publik: ' + esc(d.ip) + '</div>' : '') +
+        (d.all_ips ? '<div style="font-size:11px;color:var(--accent);font-weight:500" title="' + esc(d.all_ips) + '">VPN/Multi-IP</div>' : '');
+      
+      var actionsHtml = '<div style="display:flex;align-items:center;justify-content:flex-end;gap:5px;flex-wrap:nowrap">' +
+        '<button class="btn btn-ghost btn-sm" onclick="openDeviceModal(\'' + d.id + '\')">Details</button>' +
+        (d.online ? '<button class="btn btn-primary btn-sm" onclick="quickRemote(\'' + d.id + '\')">Remote Web</button>' : '') +
+        (rustDeskID ? '<button class="btn btn-warning btn-sm" onclick="openRustDesk(\'' + rustDeskID + '\')">RustDesk</button>' : '') +
+        (currentUser && (currentUser.role === 'admin' || currentUser.role === 'it_support') && outdated ? '<button class="btn btn-warning btn-sm" ' + (!d.online || pending ? 'disabled' : '') + ' onclick="updateDeviceAgent(\'' + d.id + '\')">Update</button>' : '') +
+        '</div>';
+
+      return '<tr>' +
+        '<td>' + statusHtml + '</td>' +
+        '<td>' + hostHtml + '</td>' +
+        '<td>' + endpointBadges(d) + '</td>' +
+        '<td>' + osHtml + '</td>' +
+        '<td>' + ipHtml + '</td>' +
+        '<td style="white-space:nowrap">' + d.cpu_cores + ' cores</td>' +
+        '<td><div class="progress-bar"><div class="fill ' + (ramPct > 80 ? 'danger' : '') + '" style="width:' + ramPct + '%"></div></div><div style="font-size:11px;color:var(--fg2);margin-top:2px">' + ramPct + '%</div></td>' +
+        '<td><div class="progress-bar"><div class="fill ' + (diskPct > 80 ? 'danger' : '') + '" style="width:' + diskPct + '%"></div></div><div style="font-size:11px;color:var(--fg2);margin-top:2px">' + diskPct + '%</div></td>' +
+        '<td><span class="tag" style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + esc(d.branch || d.group || 'default') + '">' + esc(d.branch || d.group || 'default') + '</span></td>' +
+        '<td><strong style="font-size:12px">' + versionLabel + '</strong><br><small style="color:' + updateColor + ';font-weight:600">' + updateLabel + '</small></td>' +
+        '<td style="font-size:12px;color:var(--fg2);white-space:nowrap">' + timeAgo(d.last_seen) + '</td>' +
+        '<td>' + actionsHtml + '</td>' +
+        '</tr>';
     }).join('') + '</tbody></table>';
 }
 

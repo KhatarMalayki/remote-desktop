@@ -125,8 +125,8 @@
     "semantic_hash": ""
   },
   "web/index.html": {
-    "mtime": 1790787354.4857187,
-    "ast_hash": "abfcfaf7436a0b46b6fd88fa882ef0d8",
+    "mtime": 1790787684.3997946,
+    "ast_hash": "79246dd9a2a9aebb3606e05c886d44df",
     "semantic_hash": ""
   },
   "scripts/update-server.sh": {
@@ -535,8 +535,8 @@
     "semantic_hash": ""
   },
   "web/static/endpoint.js": {
-    "mtime": 1790787385.2964454,
-    "ast_hash": "12718905f5c5434fa3deec9b6353d438",
+    "mtime": 1790787712.911366,
+    "ast_hash": "08ff3786a80da6f94f431f154b5239ed",
     "semantic_hash": ""
   }
 }

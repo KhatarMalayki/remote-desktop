@@ -7,33 +7,33 @@ function endpointBadges(device) {
   const badges = (state.applications || []).map(app => {
     let icon = '⚪';
     let iconColor = '#94a3b8';
-    let badgeBg = 'rgba(160,163,177,0.15)';
-    let badgeBorder = '1px solid rgba(160,163,177,0.3)';
+    let badgeBg = 'rgba(160,163,177,0.12)';
+    let badgeBorder = '1px solid rgba(160,163,177,0.25)';
     let statusText = 'status belum diketahui';
 
     if (app.status === 'detected') {
       icon = '✔';
       iconColor = '#10b981';
-      badgeBg = 'rgba(16,185,129,0.15)';
-      badgeBorder = '1px solid rgba(16,185,129,0.35)';
+      badgeBg = 'rgba(16,185,129,0.12)';
+      badgeBorder = '1px solid rgba(16,185,129,0.3)';
       statusText = 'terpasang';
     } else if (app.status === 'not_detected') {
       icon = '✖';
       iconColor = '#ef4444';
-      badgeBg = 'rgba(239,68,68,0.12)';
-      badgeBorder = '1px solid rgba(239,68,68,0.25)';
+      badgeBg = 'rgba(239,68,68,0.1)';
+      badgeBorder = '1px solid rgba(239,68,68,0.2)';
       statusText = 'tidak terpasang';
     }
 
     const title = esc(app.label + ': ' + statusText + (stale ? ' (data lama/offline)' : ''));
-    return '<span style="display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:4px;font-size:11px;font-weight:600;margin:2px 3px 2px 0;background:' + badgeBg + ';border:' + badgeBorder + '" title="' + title + '">' +
+    return '<span style="display:inline-flex;align-items:center;gap:3px;padding:2px 6px;border-radius:4px;font-size:11px;font-weight:600;background:' + badgeBg + ';border:' + badgeBorder + ';white-space:nowrap" title="' + title + '">' +
       '<span style="font-weight:bold;color:' + iconColor + '">' + icon + '</span> ' +
       esc(app.label) +
     '</span>';
   }).join('');
 
-  return (badges || '<span style="color:var(--fg2);font-size:11px">-</span>') +
-    '<br><button class="btn btn-ghost btn-sm" style="margin-top:4px;padding:2px 8px;font-size:11px" data-device="' + esc(device.id) + '" onclick="openEndpointDevice(this.dataset.device)">🛡️ Kelola Policy</button>';
+  return '<div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;margin-bottom:6px">' + (badges || '<span style="color:var(--fg2);font-size:11px">-</span>') + '</div>' +
+    '<button class="btn btn-ghost btn-sm" style="width:100%;white-space:nowrap;justify-content:center;padding:2px 6px;font-size:11px" data-device="' + esc(device.id) + '" onclick="openEndpointDevice(this.dataset.device)">🛡️ Kelola Policy</button>';
 }
 
 function updateEndpointDevicePicker(activeId) {
