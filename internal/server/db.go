@@ -423,9 +423,9 @@ func (d *DB) ListDevices(group, search string, limit, offset int) ([]*models.Dev
 		}
 	}
 	if search != "" {
-		where += " AND (hostname LIKE ? OR ip LIKE ? OR id LIKE ? OR branch LIKE ?)"
+		where += " AND (hostname LIKE ? OR ip LIKE ? OR id LIKE ? OR branch LIKE ? OR assigned_to LIKE ?)"
 		s := "%" + search + "%"
-		args = append(args, s, s, s, s)
+		args = append(args, s, s, s, s, s)
 	}
 
 	var total int
@@ -463,9 +463,9 @@ func (d *DB) ListDevicesForOwner(username, search string, limit, offset int) ([]
 	where := "owner_username=?"
 	args := []interface{}{username}
 	if search != "" {
-		where += " AND (hostname LIKE ? OR ip LIKE ? OR id LIKE ? OR branch LIKE ?)"
+		where += " AND (hostname LIKE ? OR ip LIKE ? OR id LIKE ? OR branch LIKE ? OR assigned_to LIKE ?)"
 		s := "%" + search + "%"
-		args = append(args, s, s, s, s)
+		args = append(args, s, s, s, s, s)
 	}
 	var total int
 	countArgs := make([]interface{}, len(args))

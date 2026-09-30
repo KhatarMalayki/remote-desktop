@@ -307,7 +307,7 @@ function renderOSChart() {
 function renderMemoryChart() {
   var ctx = document.getElementById('chartMemory'); if (!ctx) return;
   var sorted = devices.filter(function(d){return d.memory_total>0}).sort(function(a,b){return (b.memory_used/b.memory_total)-(a.memory_used/a.memory_total)}).slice(0,10);
-  var lb = sorted.map(function(d){return d.hostname||d.id}); var pc = sorted.map(function(d){return Math.round(d.memory_used/d.memory_total*100)});
+  var lb = sorted.map(function(d){var h=d.hostname||d.id; return d.assigned_to ? h+' ('+d.assigned_to+')' : h;}); var pc = sorted.map(function(d){return Math.round(d.memory_used/d.memory_total*100)});
   if (chartMemory) chartMemory.destroy();
   chartMemory = new Chart(ctx, { type:'bar', data:{labels:lb.length?lb:['No Data'], datasets:[{label:'RAM %',data:pc.length?pc:[0],backgroundColor:'#4f8cff',borderRadius:4}]}, options:Object.assign({},chartDefaults(),{onClick:function(_,items){if(items.length&&sorted[items[0].index])openProcessList(sorted[items[0].index].id)},indexAxis:'y',scales:{x:{min:0,max:100,ticks:{color:'#a0a3b1',callback:function(v){return v+'%'}},grid:{color:'#2d3042'}},y:{ticks:{color:'#a0a3b1'},grid:{display:false}}},plugins:{legend:{display:false}}}) });
 }
@@ -315,7 +315,7 @@ function renderMemoryChart() {
 function renderDiskChart() {
   var ctx = document.getElementById('chartDisk'); if (!ctx) return;
   var sorted = devices.filter(function(d){return d.disk_total>0}).sort(function(a,b){return (b.disk_used/b.disk_total)-(a.disk_used/a.disk_total)}).slice(0,10);
-  var lb = sorted.map(function(d){return d.hostname||d.id}); var pc = sorted.map(function(d){return Math.round(d.disk_used/d.disk_total*100)});
+  var lb = sorted.map(function(d){var h=d.hostname||d.id; return d.assigned_to ? h+' ('+d.assigned_to+')' : h;}); var pc = sorted.map(function(d){return Math.round(d.disk_used/d.disk_total*100)});
   if (chartDisk) chartDisk.destroy();
   chartDisk = new Chart(ctx, { type:'bar', data:{labels:lb.length?lb:['No Data'], datasets:[{label:'Disk %',data:pc.length?pc:[0],backgroundColor:'#a78bfa',borderRadius:4}]}, options:Object.assign({},chartDefaults(),{onClick:function(_,items){if(items.length&&sorted[items[0].index])openProcessList(sorted[items[0].index].id)},indexAxis:'y',scales:{x:{min:0,max:100,ticks:{color:'#a0a3b1',callback:function(v){return v+'%'}},grid:{color:'#2d3042'}},y:{ticks:{color:'#a0a3b1'},grid:{display:false}}},plugins:{legend:{display:false}}}) });
 }
@@ -362,7 +362,7 @@ function buildDeviceTable(list) {
       var updateColor = pending ? '#fbbf24' : (outdated ? '#ef4444' : '#34d399');
       var rustDeskID = /^\d{6,20}$/.test(String(d.rustdesk_id || '')) ? String(d.rustdesk_id) : '';
       return '<tr><td><span class="status-dot '+(d.online?'online':'offline')+'"></span>'+(d.online?'Online':'Offline')+'</td>' +
-        '<td><strong>'+esc(d.hostname)+'</strong><br><small style="color:var(--fg2)">'+esc(d.id)+'</small></td>' +
+        '<td><strong>'+esc(d.hostname)+'</strong>'+(d.assigned_to ? '<br><small style="color:var(--accent);font-weight:600">&#128100; '+esc(d.assigned_to)+'</small>' : '')+'<br><small style="color:var(--fg2)">'+esc(d.id)+'</small></td>' +
         '<td>'+osIcon(d.os)+' '+esc(d.os)+' '+esc(d.arch)+'</td>' +
         '<td><strong>'+esc(d.local_ip || d.ip || '-')+'</strong>'+(d.ip && d.local_ip && d.ip !== d.local_ip ? '<br><small style="color:var(--fg2)">Publik: '+esc(d.ip)+'</small>' : '')+(d.all_ips ? '<br><small style="color:var(--accent)" title="'+esc(d.all_ips)+'">VPN/Multi-IP</small>' : '')+'</td>' +
         '<td>'+d.cpu_cores+' cores</td>' +
@@ -1170,6 +1170,8 @@ async function openDeviceModal(id) {
     '<div class="detail-item"><div class="label">Status</div><div class="value"><span class="status-dot '+(dev.online?'online':'offline')+'"></span>'+(dev.online?'Online':'Offline')+'</div></div>' +
     '<div class="detail-item"><div class="label">RustDesk Self-host</div><div class="value">'+(rustDeskID ? esc(rustDeskID)+' <button class="btn btn-warning btn-sm" onclick="openRustDesk(\''+rustDeskID+'\')">Buka</button>' : 'Belum terdeteksi')+'</div></div>' +
     '<div class="detail-item"><div class="label">Cabang</div><div class="value">'+esc(dev.branch||dev.group||'-')+'</div></div>' +
+    '<div class="detail-item"><div class="label">Pemakai / User</div><div class="value">'+esc(dev.assigned_to || 'Belum diisi')+'</div></div>' +
+    '<div class="detail-item"><div class="label">Pemegang (PIC)</div><div class="value">'+esc(dev.owner_username || 'Belum ditugaskan')+'</div></div>' +
     '<div class="detail-item"><div class="label">Registered</div><div class="value">'+new Date(dev.registered_at).toLocaleString()+'</div></div>' +
     (dev.manual_asset_id ? '<div class="detail-item"><div class="label">Link Aset Manual</div><div class="value">'+esc(dev.manual_asset_id)+' <button class="btn btn-warning btn-sm" onclick="unlinkManualAsset()">Lepas Link</button></div></div>' : '');
   document.getElementById('modalTags').value = dev.tags || '';
