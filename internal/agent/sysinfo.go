@@ -192,27 +192,39 @@ func runPowerShell(script string) (string, error) {
 }
 
 func getLocalIP() string {
-	switch runtime.GOOS {
-	case "linux":
-		out, err := exec.Command("hostname", "-I").Output()
-		if err == nil {
-			fields := strings.Fields(string(out))
-			if len(fields) > 0 {
-				return fields[0]
+	// First choice: resolve outgoing interface via UDP dial (fast, native, detects active default route)
+	conn, err := net.Dial("udp", "8.8.8.8:80")
+	if err == nil {
+		defer conn.Close()
+		if localAddr, ok := conn.LocalAddr().(*net.UDPAddr); ok && localAddr.IP != nil {
+			ip := localAddr.IP.To4()
+			if ip != nil && !ip.IsLoopback() && !ip.IsLinkLocalUnicast() {
+				return ip.String()
 			}
 		}
-	case "windows":
-		out, err := exec.Command("powershell", "-Command",
-			"(Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.InterfaceAlias -notlike '*Loopback*' } | Select-Object -First 1).IPAddress").Output()
-		if err == nil {
-			return strings.TrimSpace(string(out))
-		}
-	case "darwin":
-		out, err := exec.Command("ipconfig", "getifaddr", "en0").Output()
-		if err == nil {
-			return strings.TrimSpace(string(out))
+	}
+
+	// Fallback: iterate interfaces, ignoring loopback, down, and link-local (169.254.x.x APIPA)
+	ifaces, err := net.Interfaces()
+	if err == nil {
+		for _, iface := range ifaces {
+			if iface.Flags&net.FlagLoopback != 0 || iface.Flags&net.FlagUp == 0 {
+				continue
+			}
+			addrs, err := iface.Addrs()
+			if err != nil {
+				continue
+			}
+			for _, addr := range addrs {
+				ip, _, err := net.ParseCIDR(addr.String())
+				if err != nil || ip.To4() == nil || ip.IsLoopback() || ip.IsLinkLocalUnicast() {
+					continue
+				}
+				return ip.String()
+			}
 		}
 	}
+
 	return "127.0.0.1"
 }
 
