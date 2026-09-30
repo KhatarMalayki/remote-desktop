@@ -63,5 +63,10 @@
   "61": "README.md",
   "62": "startRemote",
   "63": "Hitungan Memori: Kok Bisa 1000 Device di 1 GB?",
-  "64": "TestRemoteInputProtectionCleanup"
+  "64": "TestRemoteInputProtectionCleanup",
+  "65": "AssetSwitchRequest",
+  "66": "TestRemoteDestinationNoOverwrite",
+  "67": "deploy.go",
+  "68": "startRemote",
+  "69": "SecuritySettings"
 }

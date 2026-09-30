@@ -1,16 +1,16 @@
 # Graph Report - remote-desktop  (2026-09-30)
 
 ## Corpus Check
-- 81 files · ~76,780 words
+- 88 files · ~80,426 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 970 nodes · 2032 edges · 65 communities (55 shown, 10 thin omitted)
-- Extraction: 89% EXTRACTED · 11% INFERRED · 0% AMBIGUOUS · INFERRED: 231 edges (avg confidence: 0.79)
+- 1011 nodes · 2078 edges · 70 communities (59 shown, 11 thin omitted)
+- Extraction: 89% EXTRACTED · 11% INFERRED · 0% AMBIGUOUS · INFERRED: 234 edges (avg confidence: 0.79)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `4fd5cdf6`
+- Built from commit: `1266926f`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -69,16 +69,20 @@
 - startRemote
 - Hitungan Memori: Kok Bisa 1000 Device di 1 GB?
 - TestRemoteInputProtectionCleanup
+- AssetSwitchRequest
+- TestRemoteDestinationNoOverwrite
+- startRemote
+- SecuritySettings
 
 ## God Nodes (most connected - your core abstractions)
 1. `Server` - 73 edges
 2. `DB` - 72 edges
-3. `jsonError()` - 57 edges
-4. `getClaims()` - 51 edges
-5. `jsonResp()` - 51 edges
+3. `jsonError()` - 58 edges
+4. `getClaims()` - 52 edges
+5. `jsonResp()` - 52 edges
 6. `api()` - 49 edges
-7. `showToast()` - 42 edges
-8. `NewDB()` - 41 edges
+7. `NewDB()` - 42 edges
+8. `showToast()` - 42 edges
 9. `Agent` - 24 edges
 10. `userAllowsBranch()` - 21 edges
 
@@ -97,19 +101,19 @@
 ## Import Cycles
 - None detected.
 
-## Communities (65 total, 10 thin omitted)
+## Communities (70 total, 11 thin omitted)
 
 ### Community 0 - "Community 0"
-Cohesion: 0.06
-Nodes (37): AgentConfig, SystemInfo, envOr(), main(), CleanupOldExecutable(), executeShellCommand(), generateDeviceID(), Agent (+29 more)
+Cohesion: 0.05
+Nodes (41): AgentConfig, SystemInfo, envOr(), main(), CleanupOldExecutable(), executeShellCommand(), generateDeviceID(), Agent (+33 more)
 
 ### Community 1 - "Community 1"
 Cohesion: 0.07
-Nodes (38): FS, canAccessSwitch(), Request, ResponseWriter, Server, validatePassword(), verifyPassword(), Request (+30 more)
+Nodes (40): FS, canAccessSwitch(), Request, ResponseWriter, Server, validatePassword(), Request, ResponseWriter (+32 more)
 
 ### Community 3 - "Community 3"
-Cohesion: 0.10
-Nodes (11): Conn, DB, RWMutex, rustDeskBootstrapSetting(), IsNewer(), parse(), T, TestIsNewer() (+3 more)
+Cohesion: 0.15
+Nodes (6): Conn, DB, RWMutex, SignalMessage, Client, Hub
 
 ### Community 4 - "RemoteDesk"
 Cohesion: 0.18
@@ -120,11 +124,11 @@ Cohesion: 0.12
 Nodes (17): Auto-Start (LaunchDaemon), Cara 1: Langsung Jalankan (Paling Cepat), Cara 1: Langsung Jalankan (Tes Dulu), Cara 2: Jalan di Background (Sederhana), Cara 2: Pakai Task Scheduler (Jalan Otomatis Waktu Startup), Cara 3: Pakai NSSM (Jadi Windows Service), Cara 3: Systemd Service (Paling Benar, Auto Restart), Cara 4: Pakai Config File (+9 more)
 
 ### Community 6 - "Community 6"
-Cohesion: 0.18
-Nodes (11): 1. Login, 2. Dashboard, 4. Halaman Asset Inventory, 6. Logout, Apa Bedanya dengan Halaman Devices?, Cara Pakai RemoteDesk, Export ke CSV (Excel), Grafik (Tengah) (+3 more)
+Cohesion: 0.08
+Nodes (25): 1. Login, 2. Dashboard, 3. Halaman Devices, 4. Halaman Asset Inventory, 5. Halaman Remote Desktop, 6. Logout, Apa Bedanya dengan Halaman Devices?, Cara Cepat (+17 more)
 
 ### Community 7 - "Community 7"
-Cohesion: 0.19
+Cohesion: 0.20
 Nodes (16): attachAgentRelay(), closeRelaySession(), createViewerRelay(), Conn, Duration, Mutex, Time, pipeRelay() (+8 more)
 
 ### Community 8 - "Community 8"
@@ -132,12 +136,12 @@ Cohesion: 0.09
 Nodes (21): ❌ Agent connect tapi device tidak muncul di dashboard, ❌ Agent sering putus dan reconnect, ❌ Agent tidak mau connect, "connection failed", ❌ API return "unauthorized" (401), ❌ Buka browser tapi halaman tidak muncul, ❌ Container tidak start, ❌ Data hilang setelah restart container, ❌ Error "gcc not found" waktu build server (+13 more)
 
 ### Community 9 - "Community 9"
-Cohesion: 0.09
-Nodes (40): api(), checkAuth(), closeChangePasswordModal(), closeChangeUsernameModal(), closeEditUserModal(), closeMFAModal(), configureRustDesk(), copyDownloadAgentLink() (+32 more)
+Cohesion: 0.12
+Nodes (21): checkAuth(), closeChangePasswordModal(), closeMFAModal(), configureRustDesk(), copyDownloadAgentLink(), copyMFASecret(), doLogin(), doLoginMFA() (+13 more)
 
 ### Community 10 - "Community 10"
-Cohesion: 0.11
-Nodes (18): Activity Log Device, API Reference, Cara 1: Pakai Token dari Login, Cara 2: Pakai API Key Langsung, Cara Autentikasi, Contoh Script: Monitoring Otomatis, Daftar API, Detail Satu Device (+10 more)
+Cohesion: 0.20
+Nodes (9): API Reference, Cara 1: Pakai Token dari Login, Cara 2: Pakai API Key Langsung, Cara Autentikasi, Contoh Script: Monitoring Otomatis, Error yang Mungkin Muncul, Pengelolaan MFA, PIC dan pemegang fisik aset (+1 more)
 
 ### Community 11 - "Community 11"
 Cohesion: 0.09
@@ -145,11 +149,11 @@ Nodes (35): remoteDeskService, ChangeRequest, enableTokenPrivilege(), exeToUTF16
 
 ### Community 17 - "device.go"
 Cohesion: 0.11
-Nodes (13): ManageRustDesk(), Time, AssetActivity, AuthLog, BlockedIPInfo, Branch, DeviceHeartbeat, NetworkScan (+5 more)
+Nodes (14): ManageRustDesk(), RawMessage, Time, AssetActivity, AuthLog, BlockedIPInfo, Branch, DeviceHeartbeat (+6 more)
 
 ### Community 19 - "NewDB"
-Cohesion: 0.11
-Nodes (44): NewDB(), T, TestADHBranchIsolation(), TestAgentPackageDownload(), TestAgentRegistrationDoesNotAutoUpdate(), TestAgentVersionEndpoint(), TestAuditLogFilters(), TestAuthLogs() (+36 more)
+Cohesion: 0.05
+Nodes (75): envOr(), main(), Request, ResponseWriter, Server, hashPassword(), authRequest(), HandlerFunc (+67 more)
 
 ### Community 20 - "qrcode.min.js"
 Cohesion: 0.23
@@ -169,15 +173,15 @@ Nodes (7): assert, fs, path, Socket, test, vm, { webcrypto }
 
 ### Community 26 - "validBranchType"
 Cohesion: 0.06
-Nodes (23): closeDownloadAgentModal(), devices, loadHistoryLogs(), loadSecurityLogs(), manualAssets, openHistoryModal(), openRemoteTerminalFromSession(), openRemoteTerminalModal() (+15 more)
+Nodes (22): closeDownloadAgentModal(), closeVerificationModal(), devices, doLogout(), loadHistoryLogs(), loadSecurityLogs(), manualAssets, openHistoryModal() (+14 more)
 
 ### Community 27 - "SecuritySettings"
 Cohesion: 0.06
 Nodes (26): remoteCommand, remoteFileTransfer, remoteScreenState, File, Hash, Image, captureRemoteFrame(), encodeRemoteFrame() (+18 more)
 
 ### Community 28 - "loadDevices"
-Cohesion: 0.10
-Nodes (29): buildDeviceTable(), closeDeviceModal(), closeRustDeskManageModal(), connectWS(), deleteDevice(), filterDevices(), goPage(), handleSignal() (+21 more)
+Cohesion: 0.13
+Nodes (22): closeDeviceModal(), closeRustDeskManageModal(), connectWS(), deleteDevice(), deleteManualAsset(), filterDevices(), goPage(), handleSignal() (+14 more)
 
 ### Community 29 - "esc"
 Cohesion: 0.36
@@ -192,12 +196,12 @@ Cohesion: 0.33
 Nodes (11): CHART_COLORS, chartDefaults(), openProcessList(), processIcon(), renderApplicationRuntimeChart(), renderApplicationsChart(), renderCharts(), renderDiskChart() (+3 more)
 
 ### Community 32 - "loadBranchAssets"
-Cohesion: 0.13
-Nodes (19): buildBranchOptionsHTML(), esc(), exportAssets(), fmtBytes(), loadRoles(), onSearchBranchAssets(), openDeviceModal(), openDownloadAgentModal() (+11 more)
+Cohesion: 0.18
+Nodes (12): exportAssets(), fmtBytes(), onSearchBranchAssets(), openDeviceModal(), openEditAssetModal(), openVerifyModal(), remoteFileRequest(), renderAssets() (+4 more)
 
 ### Community 33 - "main"
-Cohesion: 0.27
-Nodes (11): addBusinessUnit(), closeBranchesModal(), createBranch(), deleteBranch(), editBranch(), loadBranches(), loadBranchesManagement(), loadBusinessUnits() (+3 more)
+Cohesion: 0.15
+Nodes (26): addBusinessUnit(), api(), buildBranchOptionsHTML(), closeBranchesModal(), closeManualAssetModal(), createBranch(), deleteBranch(), editBranch() (+18 more)
 
 ### Community 34 - "SecuritySettings"
 Cohesion: 0.29
@@ -228,16 +232,16 @@ Cohesion: 0.29
 Nodes (4): parseRustDeskID(), T, TestParseRustDeskID(), getRustDeskID()
 
 ### Community 43 - "SecuritySettings"
-Cohesion: 0.29
-Nodes (7): closeManualAssetModal(), closeVerificationModal(), deleteManualAsset(), loadBranchAssets(), onBranchChange(), saveManualAsset(), submitVerification()
+Cohesion: 0.24
+Nodes (10): buildDeviceTable(), isVersionNewer(), osIcon(), parseAgentVersion(), renderDevices(), renderRecentDevices(), timeAgo(), updateDeviceAgent() (+2 more)
 
 ### Community 46 - "Daftar API"
 Cohesion: 0.27
 Nodes (4): remotePrivacyWindow, Int64, remoteProtection, startRemotePrivacy()
 
 ### Community 47 - "Hitungan Memori: Kok Bisa 1000 Device di 1 GB?"
-Cohesion: 0.09
-Nodes (30): envOr(), main(), Request, ResponseWriter, Server, hashPassword(), authRequest(), HandlerFunc (+22 more)
+Cohesion: 0.29
+Nodes (5): applicationDeployment, deploymentExitStatus(), Agent, T, TestDeploymentExitStatus()
 
 ### Community 48 - "README.md"
 Cohesion: 0.29
@@ -260,40 +264,52 @@ Cohesion: 0.53
 Nodes (5): appAlert(), appConfirm(), appDialog(), appDialogQueue, appPrompt()
 
 ### Community 58 - "main"
-Cohesion: 0.40
-Nodes (5): 3. Halaman Devices, Cari Device, Filter, Hapus Device, Lihat Detail Device
+Cohesion: 0.27
+Nodes (8): browseRemoteFiles(), deploymentDevices, loadDeployments(), openDeployments(), openFileManager(), renderDeployTargets(), submitDeployment(), supportsDeployment()
 
 ### Community 61 - "README.md"
-Cohesion: 0.40
-Nodes (5): 5. Halaman Remote Desktop, Cara Cepat, Cara Remote ke Komputer, Putus Koneksi, Yang Perlu Diketahui
+Cohesion: 0.22
+Nodes (9): Activity Log Device, Daftar API, Detail Satu Device, Hapus Device, List Semua Device, List Semua Group, Login, Statistik Dashboard (+1 more)
 
 ### Community 62 - "startRemote"
-Cohesion: 0.50
-Nodes (4): Keamanan, Monitoring Efektif, Organisasi Device yang Rapi, Tips
+Cohesion: 0.32
+Nodes (4): RawMessage, Request, ResponseWriter, Server
+
+### Community 63 - "Hitungan Memori: Kok Bisa 1000 Device di 1 GB?"
+Cohesion: 0.40
+Nodes (4): Batas verifikasi, Deploy aplikasi, Deploy aplikasi dan transfer file — 0.2.56, Transfer file
 
 ### Community 64 - "TestRemoteInputProtectionCleanup"
 Cohesion: 0.67
 Nodes (3): T, TestRemoteInputProtectionCleanup(), TestRemoteProtectionDesktopTransitionReassertsBlockInput()
 
+### Community 65 - "AssetSwitchRequest"
+Cohesion: 0.22
+Nodes (11): closeChangeUsernameModal(), closeEditUserModal(), createUser(), deleteUser(), getSelectValues(), loadUsers(), openUsersModal(), resetUserMFA() (+3 more)
+
+### Community 68 - "startRemote"
+Cohesion: 0.47
+Nodes (6): remoteDisconnectReason(), renderRemoteProtection(), setRemoteControls(), setRemoteStatus(), startRemote(), stopRemote()
+
 ## Knowledge Gaps
-- **136 isolated node(s):** `github.com/user/remote-desktop`, `Agent`, `rustDeskExportConfig`, `RoleDefinition`, `credentialToken` (+131 more)
+- **141 isolated node(s):** `github.com/user/remote-desktop`, `Agent`, `Agent`, `rustDeskExportConfig`, `RoleDefinition` (+136 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **10 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **11 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `New()` connect `Hitungan Memori: Kok Bisa 1000 Device di 1 GB?` to `Community 0`, `Community 1`, `main`, `NewDB`, `SecuritySettings`?**
-  _High betweenness centrality (0.098) - this node is a cross-community bridge._
-- **Why does `NewDB()` connect `NewDB` to `Community 2`, `Community 7`, `esc`, `Hitungan Memori: Kok Bisa 1000 Device di 1 GB?`?**
-  _High betweenness centrality (0.079) - this node is a cross-community bridge._
-- **Why does `Server` connect `Community 1` to `Community 0`, `device.go`, `Community 3`, `Hitungan Memori: Kok Bisa 1000 Device di 1 GB?`?**
-  _High betweenness centrality (0.075) - this node is a cross-community bridge._
-- **Are the 9 inferred relationships involving `jsonError()` (e.g. with `.authorizeUserToken()` and `.handleActivities()`) actually correct?**
-  _`jsonError()` has 9 INFERRED edges - model-reasoned connections that need verification._
-- **What connects `github.com/user/remote-desktop`, `Agent`, `rustDeskExportConfig` to the rest of the system?**
-  _136 weakly-connected nodes found - possible documentation gaps or missing edges._
+- **Why does `New()` connect `NewDB` to `Community 0`, `Community 1`, `main`, `Hitungan Memori: Kok Bisa 1000 Device di 1 GB?`, `SecuritySettings`, `startRemote`?**
+  _High betweenness centrality (0.111) - this node is a cross-community bridge._
+- **Why does `Server` connect `Community 1` to `Community 0`, `device.go`, `Community 3`, `NewDB`?**
+  _High betweenness centrality (0.068) - this node is a cross-community bridge._
+- **Why does `remoteCommand` connect `SecuritySettings` to `Community 11`?**
+  _High betweenness centrality (0.061) - this node is a cross-community bridge._
+- **Are the 10 inferred relationships involving `jsonError()` (e.g. with `.authorizeUserToken()` and `.handleActivities()`) actually correct?**
+  _`jsonError()` has 10 INFERRED edges - model-reasoned connections that need verification._
+- **Are the 8 inferred relationships involving `getClaims()` (e.g. with `.handleActivities()` and `.handleAttachment()`) actually correct?**
+  _`getClaims()` has 8 INFERRED edges - model-reasoned connections that need verification._
+- **What connects `github.com/user/remote-desktop`, `Agent`, `Agent` to the rest of the system?**
+  _141 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `Community 0` be split into smaller, more focused modules?**
-  _Cohesion score 0.05888376856118792 - nodes in this community are weakly interconnected._
-- **Should `Community 1` be split into smaller, more focused modules?**
-  _Cohesion score 0.07387387387387387 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.052429667519181586 - nodes in this community are weakly interconnected._

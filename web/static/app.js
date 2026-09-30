@@ -164,6 +164,8 @@ function updateUserUI() {
   if (updateAllBtn) updateAllBtn.style.display = isTech ? 'inline-flex' : 'none';
   const rustDeskSettingsBtn = document.getElementById('rustDeskSettingsBtn');
   if (rustDeskSettingsBtn) rustDeskSettingsBtn.style.display = isTech ? 'inline-flex' : 'none';
+  const deployButton = document.getElementById('deployApplicationsBtn');
+  if (deployButton) deployButton.style.display = isTech ? 'inline-flex' : 'none';
   const rustDeskResetAllBtn = document.getElementById('rustDeskResetAllBtn');
   if (rustDeskResetAllBtn) rustDeskResetAllBtn.style.display = isTech ? 'inline-flex' : 'none';
   var navRoles = document.getElementById('navRoles');
@@ -1421,7 +1423,20 @@ function openSelectedRustDesk() {
   openRustDesk(device.rustdesk_id);
 }
 
-function startRemote() {
+function remoteDisconnectReason(event, online) {
+  if (online === false) return 'Browser operator offline. Periksa koneksi internet perangkat Anda.';
+  var reasons = {
+    agent_connect_timeout: 'Agent tidak tersambung ke relay dalam 30 detik.',
+    agent_connection_closed: 'Koneksi agent ke relay tertutup. Penyebab spesifik perlu diperiksa pada log agent/server.',
+    relay_write_failed: 'Relay gagal meneruskan data ke salah satu endpoint.',
+    relay_keepalive_failed: 'Keepalive relay gagal dikirim ke salah satu endpoint.'
+  };
+  return reasons[(event || {}).reason] || 'Koneksi browser ke relay terputus (kode ' + ((event || {}).code || 'tidak diketahui') + '). Belum dapat membedakan gangguan jaringan, proxy, atau server.';
+}
+
+function startRemote(reconnecting) {
+  if (reconnecting !== true) remoteTransitionHistory = [];
+  clearTimeout(window.remoteReconnectTimer);
   var deviceId = document.getElementById('remoteDeviceSelect').value;
   if (!deviceId) { showToast('Select a device first'); return; }
   if (remoteWS) remoteWS.close();
@@ -1505,12 +1520,14 @@ function startRemote() {
     } else {
       try {
         var relayMessage = JSON.parse(e.data);
+        if (relayMessage.type === 'error') sessionSocket.failureReason = relayMessage.message;
         if (relayMessage.type === 'ready') {
           var capabilities = relayMessage.capabilities || {};
           document.getElementById('btnRemoteBlock').disabled = !capabilities.protection;
           document.getElementById('btnRemotePrivacy').disabled = !capabilities.protection;
           document.getElementById('btnRemoteFile').disabled = !capabilities.file_transfer || remoteFileBusy;
           relayAgentVersion = relayMessage.agent_version || 'belum diketahui';
+          sessionSocket.agentVersion = relayAgentVersion;
           var monitorSelect = document.getElementById('remoteMonitorSelect');
           monitorSelect.innerHTML = '';
           (relayMessage.monitors || [{ index: 0, width: relayMessage.width, height: relayMessage.height }]).forEach(function(m) {
@@ -1529,8 +1546,8 @@ function startRemote() {
         if (relayMessage.type === 'clipboard_error' || relayMessage.type === 'input_error' || relayMessage.type === 'error' || relayMessage.type === 'relay_info') showToast(relayMessage.message || 'Remote session mengalami masalah');
 		if (relayMessage.type === 'desktop_transition') {
 		  var transitionNow = Date.now();
-		  remoteTransitionHistory = remoteTransitionHistory.filter(function(t){ return transitionNow - t < 10000; });
-		  if (remoteTransitionHistory.length < 2) {
+		  remoteTransitionHistory = remoteTransitionHistory.filter(function(t){ return transitionNow - t < 30000; });
+		  if (remoteTransitionHistory.length < 5) {
 		    remoteTransitionHistory.push(transitionNow);
 		    desktopTransition = true;
 		    showToast(relayMessage.message || 'Desktop Windows berubah; menyambungkan ulang…');
@@ -1547,16 +1564,22 @@ function startRemote() {
   var protectionHeartbeat = setInterval(function() {
     if (remoteWS === sessionSocket && sessionSocket.readyState === WebSocket.OPEN && (remoteProtectionState.blocked || remoteProtectionState.privacy)) sendRemote({type: 'protection_heartbeat'});
   }, 5000);
-  sessionSocket.onclose = function() {
+  sessionSocket.onclose = function(event) {
     clearInterval(protectionHeartbeat);
+    clearTimeout(connectTimer);
     if (remoteWS !== sessionSocket) return;
     remoteWS = null;
     clearTimeout(connectTimer);
     setRemoteStatus('disconnected');
     setRemoteControls(false);
-	if (desktopTransition) setTimeout(function() {
-	  if (!remoteWS && document.getElementById('remoteDeviceSelect').value === deviceId) startRemote();
+	if (desktopTransition) window.remoteReconnectTimer = setTimeout(function() {
+	  if (!remoteWS && document.getElementById('remoteDeviceSelect').value === deviceId) startRemote(true);
 	}, 700);
+    else {
+      var disconnectReason = sessionSocket.failureReason || remoteDisconnectReason(event, navigator.onLine);
+      document.getElementById('remoteStats').textContent = disconnectReason;
+      showToast(disconnectReason);
+    }
   };
 
   canvas.addEventListener('mousemove', function(e) {
@@ -1644,6 +1667,7 @@ function remoteFileRequest(socket, payload) {
 }
 
 async function sendRemoteFile(input) {
+  var destination = (document.getElementById('remoteDestination').value || '').trim();
   var file = input.files && input.files[0];
   input.value = '';
   var socket = remoteWS;
@@ -1655,13 +1679,13 @@ async function sendRemoteFile(input) {
   var progress = document.getElementById('remoteFileProgress');
   button.disabled = true;
   try {
-    if (!await appConfirm('Kirim ' + file.name + ' (' + fmtBytes(file.size) + ') ke komputer remote? Disimpan ke folder penerimaan sementara agent, tidak dijalankan. Lokasi lengkap ditampilkan setelah selesai.')) return;
+    if (!await appConfirm('Kirim ' + file.name + ' (' + fmtBytes(file.size) + ') ke ' + (destination || 'folder sementara') + '? File tidak dijalankan; file lama tidak ditimpa.')) return;
     if (remoteWS !== socket || socket.readyState !== WebSocket.OPEN) throw new Error('Sesi remote sudah berubah.');
     progress.textContent = 'Memeriksa file…';
     var bytes = new Uint8Array(await file.arrayBuffer());
     var checksum = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))).map(function(value) { return value.toString(16).padStart(2, '0'); }).join('');
-    var response = await remoteFileRequest(socket, {type:'file_start', name:file.name, size:file.size});
-    if (response.type !== 'file_ack' || response.offset !== 0) throw new Error('Respons awal transfer tidak valid');
+var response = await remoteFileRequest(socket, {type:'file_start', name:file.name, size:file.size, destination:destination});
+    if (response.type !== 'file_ack' || response.offset !== 0 || (destination && response.destination !== destination)) throw new Error('Agent belum mendukung lokasi tujuan atau respons transfer tidak valid');
     for (var offset = 0; offset < bytes.length; offset += 48 * 1024) {
       var chunk = bytes.subarray(offset, Math.min(offset + 48 * 1024, bytes.length));
       var data = btoa(String.fromCharCode.apply(null, chunk));
@@ -1672,7 +1696,7 @@ async function sendRemoteFile(input) {
     response = await remoteFileRequest(socket, {type:'file_end', digest:checksum});
     if (response.type !== 'file_complete' || !response.path) throw new Error('Transfer belum terkonfirmasi');
     progress.textContent = 'Terkirim: ' + response.path;
-    await appAlert('File diterima, checksum SHA-256 cocok. Simpan/pindahkan dari folder sementara bila ingin disimpan permanen. Lokasi di komputer remote: ' + response.path);
+    await appAlert('File diterima, checksum SHA-256 cocok. Lokasi: ' + response.path);
   } catch (error) {
     if (socket.readyState === WebSocket.OPEN) {
       try { await remoteFileRequest(socket, {type:'file_cancel'}); } catch (_) {}
@@ -1727,6 +1751,7 @@ function toggleRemoteFullscreen() {
 }
 
 function stopRemote() {
+  clearTimeout(window.remoteReconnectTimer);
   if (remoteWS) { remoteWS.close(); remoteWS = null; }
   setRemoteStatus('disconnected');
   setRemoteControls(false);

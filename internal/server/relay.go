@@ -87,16 +87,38 @@ func attachAgentRelay(sessionID, deviceID string, conn *websocket.Conn) error {
 }
 
 func pipeRelay(sessionID string, sess *relaySession, src, dst *websocket.Conn) {
+	done := make(chan struct{})
+	defer close(done)
+	go func() {
+		ticker := time.NewTicker(20 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-done:
+				return
+			case <-ticker.C:
+				if err := src.WriteControl(websocket.PingMessage, nil, time.Now().Add(5*time.Second)); err != nil {
+					closeRelaySession(sessionID, sess, "relay_keepalive_failed")
+					return
+				}
+			}
+		}
+	}()
 	for {
 		msgType, data, err := src.ReadMessage()
 		if err != nil {
 			log.Printf("[relay] %s read ended: %v", sessionID, err)
-			closeRelaySession(sessionID, sess)
+			reason := "agent_connection_closed"
+			if src == sess.viewer {
+				reason = "viewer_connection_closed"
+			}
+			closeRelaySession(sessionID, sess, reason)
 			return
 		}
+		_ = dst.SetWriteDeadline(time.Now().Add(10 * time.Second))
 		if err := dst.WriteMessage(msgType, data); err != nil {
 			log.Printf("[relay] %s write ended: %v", sessionID, err)
-			closeRelaySession(sessionID, sess)
+			closeRelaySession(sessionID, sess, "relay_write_failed")
 			return
 		}
 		if src == sess.viewer && msgType == websocket.TextMessage && sess.audit.onControl != nil {
@@ -116,7 +138,7 @@ func pipeRelay(sessionID string, sess *relaySession, src, dst *websocket.Conn) {
 	}
 }
 
-func closeRelaySession(sessionID string, sess *relaySession) {
+func closeRelaySession(sessionID string, sess *relaySession, reasons ...string) {
 	sess.once.Do(func() {
 		relayMu.Lock()
 		if relaySessions[sessionID] == sess {
@@ -127,6 +149,11 @@ func closeRelaySession(sessionID string, sess *relaySession) {
 		startedAt := sess.startedAt
 		onEnd := sess.audit.onEnd
 		if sess.viewer != nil {
+			reason := "agent_connect_timeout"
+			if len(reasons) > 0 {
+				reason = reasons[0]
+			}
+			_ = sess.viewer.WriteControl(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseGoingAway, reason), time.Now().Add(time.Second))
 			_ = sess.viewer.Close()
 		}
 		if sess.agent != nil {

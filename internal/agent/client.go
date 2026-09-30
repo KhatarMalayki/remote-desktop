@@ -430,6 +430,11 @@ func (a *Agent) handleMessage(raw []byte) {
 				log.Printf("[agent] failed to report RustDesk result: %v", err)
 			}
 		}()
+	case "deploy_application":
+		var deployment applicationDeployment
+		if json.Unmarshal(msg.Data, &deployment) == nil {
+			go a.deployApplication(deployment)
+		}
 	case "run_command":
 		var req struct {
 			RequestID string `json:"request_id"`
@@ -441,9 +446,9 @@ func (a *Agent) handleMessage(raw []byte) {
 				stdout, stderr, exitCode, execErr := executeShellCommand(req.Command, req.Shell)
 				result := map[string]interface{}{
 					"request_id": req.RequestID,
-					"stdout":    stdout,
-					"stderr":    stderr,
-					"exit_code": exitCode,
+					"stdout":     stdout,
+					"stderr":     stderr,
+					"exit_code":  exitCode,
 				}
 				if execErr != nil {
 					result["error"] = execErr.Error()

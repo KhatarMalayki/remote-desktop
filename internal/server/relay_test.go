@@ -4,11 +4,37 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/gorilla/websocket"
 	"github.com/user/remote-desktop/internal/models"
 )
+
+func TestRelayCloseReasonReachesViewer(t *testing.T) {
+	upgrader := websocket.Upgrader{}
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		conn, err := upgrader.Upgrade(writer, request, nil)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+		closeRelaySession("close-reason-test", &relaySession{viewer: conn}, "agent_connection_closed")
+	}))
+	defer server.Close()
+	viewer, _, err := websocket.DefaultDialer.Dial("ws"+strings.TrimPrefix(server.URL, "http"), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer viewer.Close()
+	_ = viewer.SetReadDeadline(time.Now().Add(3 * time.Second))
+	_, _, err = viewer.ReadMessage()
+	closed, ok := err.(*websocket.CloseError)
+	if !ok || closed.Code != websocket.CloseGoingAway || closed.Text != "agent_connection_closed" {
+		t.Fatalf("unexpected close: %v", err)
+	}
+}
 
 func TestValidRelayID(t *testing.T) {
 	for value, want := range map[string]bool{

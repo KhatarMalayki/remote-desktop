@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"hash"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -16,13 +17,14 @@ const remoteFileLimit = 100 * 1024 * 1024
 const remoteChunkLimit = 48 * 1024
 
 type remoteFileTransfer struct {
-	dir     string
-	file    *os.File
-	name    string
-	size    int64
-	written int64
-	digest  hash.Hash
-	updated time.Time
+	dir         string
+	destination string
+	file        *os.File
+	name        string
+	size        int64
+	written     int64
+	digest      hash.Hash
+	updated     time.Time
 }
 
 func validRemoteFilename(name string) bool {
@@ -63,6 +65,35 @@ func (transfer *remoteFileTransfer) abort() {
 
 func (transfer *remoteFileTransfer) handle(command remoteCommand) (map[string]interface{}, error) {
 	switch command.Type {
+	case "file_list":
+		directory := command.Destination
+		if directory == "" {
+			directory = os.TempDir()
+			if public := os.Getenv("PUBLIC"); public != "" {
+				directory = filepath.Join(public, "Documents")
+			}
+		}
+		if !filepath.IsAbs(directory) || strings.HasPrefix(directory, "\\\\") {
+			return nil, fmt.Errorf("gunakan folder lokal absolut")
+		}
+		folder, err := os.Open(directory)
+		if err != nil {
+			return nil, err
+		}
+		defer folder.Close()
+		entries, err := folder.ReadDir(501)
+		if err != nil && err != io.EOF {
+			return nil, err
+		}
+		truncated := len(entries) > 500
+		if truncated {
+			entries = entries[:500]
+		}
+		items := []map[string]interface{}{}
+		for _, entry := range entries {
+			items = append(items, map[string]interface{}{"name": entry.Name(), "directory": entry.IsDir()})
+		}
+		return map[string]interface{}{"type": "file_ack", "path": directory, "parent": filepath.Dir(directory), "entries": items, "truncated": truncated}, nil
 	case "file_start":
 		if transfer.file != nil {
 			return nil, fmt.Errorf("transfer masih berlangsung")
@@ -70,11 +101,20 @@ func (transfer *remoteFileTransfer) handle(command remoteCommand) (map[string]in
 		if !validRemoteFilename(command.Name) || command.Size < 0 || command.Size > remoteFileLimit {
 			return nil, fmt.Errorf("nama file tidak valid atau ukuran melebihi 100 MiB")
 		}
-		dir, err := os.MkdirTemp("", "RemoteDesk-received-")
+		if command.Destination != "" {
+			if !filepath.IsAbs(command.Destination) || strings.HasPrefix(command.Destination, "\\\\") {
+				return nil, fmt.Errorf("gunakan folder lokal absolut")
+			}
+			info, err := os.Stat(command.Destination)
+			if err != nil || !info.IsDir() {
+				return nil, fmt.Errorf("folder tujuan tidak ditemukan")
+			}
+		}
+		dir, err := os.MkdirTemp(command.Destination, "RemoteDesk-received-")
 		if err != nil {
 			return nil, err
 		}
-		transfer.dir, transfer.name = dir, command.Name
+		transfer.dir, transfer.name, transfer.destination = dir, command.Name, command.Destination
 		root, err := os.OpenRoot(dir)
 		if err != nil {
 			transfer.abort()
@@ -121,6 +161,15 @@ func (transfer *remoteFileTransfer) handle(command remoteCommand) (map[string]in
 			return nil, err
 		}
 		path := filepath.Join(transfer.dir, transfer.name)
+		if transfer.destination != "" {
+			target := filepath.Join(transfer.destination, transfer.name)
+			if err := os.Link(path, target); err != nil {
+				return nil, fmt.Errorf("tujuan sudah ada atau tidak mendukung publikasi aman: %w", err)
+			}
+			_ = os.Remove(path)
+			_ = os.Remove(transfer.dir)
+			path = target
+		}
 		*transfer = remoteFileTransfer{}
 		return map[string]interface{}{"type": "file_complete", "path": path}, nil
 	case "file_cancel":
@@ -129,5 +178,5 @@ func (transfer *remoteFileTransfer) handle(command remoteCommand) (map[string]in
 		return nil, fmt.Errorf("perintah transfer tidak dikenal")
 	}
 	transfer.updated = time.Now()
-	return map[string]interface{}{"type": "file_ack", "offset": transfer.written}, nil
+	return map[string]interface{}{"type": "file_ack", "offset": transfer.written, "destination": transfer.destination}, nil
 }

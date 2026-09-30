@@ -337,7 +337,12 @@ func New(cfg Config, webFS embed.FS) (*Server, error) {
 }
 
 func (s *Server) ListenAndServe() error {
+	if err := s.initDeployments(); err != nil {
+		return err
+	}
 	mux := http.NewServeMux()
+	mux.HandleFunc("/api/deployments", s.authMiddleware(s.handleDeployments))
+	mux.HandleFunc("/api/deployment-package", s.handleDeploymentPackage)
 
 	mux.HandleFunc("/api/auth/login", s.handleLogin)
 	mux.HandleFunc("/api/auth/login/mfa", s.handleLoginMFA)
@@ -2064,6 +2069,8 @@ func (s *Server) handleAgentMessage(c *Client, raw []byte) {
 		}
 		s.scanMu.Unlock()
 
+	case "deployment_result":
+		s.handleDeploymentResult(c.DeviceID, msg.Data)
 	case "exec_result":
 		var result struct {
 			RequestID string `json:"request_id"`

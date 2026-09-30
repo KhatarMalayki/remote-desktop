@@ -22,28 +22,29 @@ import (
 const remoteFrameTick = 25 * time.Millisecond
 
 type remoteCommand struct {
-	Enabled bool     `json:"enabled"`
-	Name    string   `json:"name"`
-	Size    int64    `json:"size"`
-	Offset  int64    `json:"offset"`
-	Data    string   `json:"data"`
-	Digest  string   `json:"digest"`
-	Type    string   `json:"type"`
-	X       float64  `json:"x"`
-	Y       float64  `json:"y"`
-	DeltaX  int      `json:"delta_x"`
-	DeltaY  int      `json:"delta_y"`
-	Button  int      `json:"button"`
-	Key     string   `json:"key"`
-	Code    string   `json:"code"`
-	Ctrl    bool     `json:"ctrl"`
-	Alt     bool     `json:"alt"`
-	Shift   bool     `json:"shift"`
-	Meta    bool     `json:"meta"`
-	Monitor int      `json:"monitor"`
-	Text    string   `json:"text"`
-	Profile string   `json:"profile"`
-	Keys    []string `json:"keys"`
+	Destination string   `json:"destination"`
+	Enabled     bool     `json:"enabled"`
+	Name        string   `json:"name"`
+	Size        int64    `json:"size"`
+	Offset      int64    `json:"offset"`
+	Data        string   `json:"data"`
+	Digest      string   `json:"digest"`
+	Type        string   `json:"type"`
+	X           float64  `json:"x"`
+	Y           float64  `json:"y"`
+	DeltaX      int      `json:"delta_x"`
+	DeltaY      int      `json:"delta_y"`
+	Button      int      `json:"button"`
+	Key         string   `json:"key"`
+	Code        string   `json:"code"`
+	Ctrl        bool     `json:"ctrl"`
+	Alt         bool     `json:"alt"`
+	Shift       bool     `json:"shift"`
+	Meta        bool     `json:"meta"`
+	Monitor     int      `json:"monitor"`
+	Text        string   `json:"text"`
+	Profile     string   `json:"profile"`
+	Keys        []string `json:"keys"`
 }
 
 type remoteScreenState struct {
@@ -195,7 +196,7 @@ func (a *Agent) startRemoteRelay(sessionID string) {
 				continue
 			}
 			switch command.Type {
-			case "file_start", "file_chunk", "file_end", "file_cancel":
+			case "file_list", "file_start", "file_chunk", "file_end", "file_cancel":
 				response, transferErr := transfer.handle(command)
 				if transferErr != nil {
 					transfer.abort()
@@ -249,6 +250,7 @@ func (a *Agent) startRemoteRelay(sessionID string) {
 	hasChecksum := false
 	lastSent := time.Time{}
 	lastCapture := time.Time{}
+	captureFailedAt := time.Time{}
 	protectionDeadline := time.Time{}
 	for {
 		select {
@@ -331,9 +333,18 @@ func (a *Agent) startRemoteRelay(sessionID string) {
 			lastCapture = time.Now()
 			img, captureErr := screenshot.CaptureRect(bounds)
 			if captureErr != nil {
-				log.Printf("[remote] screen capture failed: %v", captureErr)
-				return
+				if captureFailedAt.IsZero() {
+					captureFailedAt = time.Now()
+					log.Printf("[remote] screen capture interrupted: %v", captureErr)
+					_ = sendJSON(map[string]string{"type": "relay_info", "message": "Capture layar tertunda; menunggu desktop Windows tersedia kembali."})
+				}
+				if time.Since(captureFailedAt) >= 10*time.Second {
+					_ = sendJSON(map[string]string{"type": "error", "message": "Capture layar gagal selama 10 detik. Periksa sesi Windows dan log agent."})
+					return
+				}
+				continue
 			}
+			captureFailedAt = time.Time{}
 			checksum := crc32.ChecksumIEEE(img.Pix)
 			if hasChecksum && checksum == lastChecksum && time.Since(lastSent) < 2*time.Second {
 				continue

@@ -23,6 +23,14 @@ function harness() {
   return { context, elements };
 }
 
+test('disconnect reasons distinguish evidence from unknown network causes', () => {
+  const { context } = harness();
+  assert.match(context.remoteDisconnectReason({ code: 1006 }, false), /operator offline/);
+  assert.match(context.remoteDisconnectReason({ reason: 'agent_connection_closed' }, true), /agent ke relay/);
+  assert.match(context.remoteDisconnectReason({ reason: 'agent_connect_timeout' }, true), /30 detik/);
+  assert.match(context.remoteDisconnectReason({ code: 1006 }, true), /Belum dapat membedakan/);
+});
+
 class Socket {
   readyState = 1;
   events = new Map();
