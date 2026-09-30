@@ -351,7 +351,7 @@ function renderDevices() {
 }
 
 function buildDeviceTable(list) {
-  return '<table class="device-table"><thead><tr><th>Status</th><th>Hostname</th><th>OS</th><th>IP</th><th>CPU</th><th>RAM</th><th>Disk</th><th>Group</th><th>Agent</th><th>Last Seen</th><th>Actions</th></tr></thead><tbody>' +
+  return '<table class="device-table"><thead><tr><th>Status</th><th>Hostname</th><th>Aplikasi / Policy</th><th>OS</th><th>IP</th><th>CPU</th><th>RAM</th><th>Disk</th><th>Group</th><th>Agent</th><th>Last Seen</th><th>Actions</th></tr></thead><tbody>' +
     list.map(function(d) {
       var ramPct = d.memory_total ? Math.round(d.memory_used / d.memory_total * 100) : 0;
       var diskPct = d.disk_total ? Math.round(d.disk_used / d.disk_total * 100) : 0;
@@ -363,6 +363,7 @@ function buildDeviceTable(list) {
       var rustDeskID = /^\d{6,20}$/.test(String(d.rustdesk_id || '')) ? String(d.rustdesk_id) : '';
       return '<tr><td><span class="status-dot '+(d.online?'online':'offline')+'"></span>'+(d.online?'Online':'Offline')+'</td>' +
         '<td><strong>'+esc(d.hostname)+'</strong>'+(d.assigned_to ? '<br><small style="color:var(--accent);font-weight:600">&#128100; '+esc(d.assigned_to)+'</small>' : '')+'<br><small style="color:var(--fg2)">'+esc(d.id)+'</small></td>' +
+        '<td>'+endpointBadges(d)+'</td>' +
         '<td>'+osIcon(d.os)+' '+esc(d.os)+' '+esc(d.arch)+'</td>' +
         '<td><strong>'+esc(d.local_ip || d.ip || '-')+'</strong>'+(d.ip && d.local_ip && d.ip !== d.local_ip ? '<br><small style="color:var(--fg2)">Publik: '+esc(d.ip)+'</small>' : '')+(d.all_ips ? '<br><small style="color:var(--accent)" title="'+esc(d.all_ips)+'">VPN/Multi-IP</small>' : '')+'</td>' +
         '<td>'+d.cpu_cores+' cores</td>' +
@@ -1158,6 +1159,7 @@ async function openDeviceModal(id) {
   var dev = await api('/api/devices/' + id);
   if (!dev) return;
   currentDevice = dev;
+  document.getElementById('endpointDeviceSummary').innerHTML = endpointBadges(dev);
   var rustDeskID = /^\d{6,20}$/.test(String(dev.rustdesk_id || '')) ? String(dev.rustdesk_id) : '';
   document.getElementById('modalTitle').textContent = dev.hostname + ' - ' + dev.id;
   document.getElementById('modalDetails').innerHTML =

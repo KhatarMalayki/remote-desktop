@@ -335,6 +335,7 @@
   <div class="modal">
     <h3 id="modalTitle">Device Details</h3>
     <div class="detail-grid" id="modalDetails"></div>
+    <div id="endpointDeviceSummary" style="margin-top:12px"></div>
     <div class="form-group" style="margin-top:16px">
       <label>Tags (comma-separated)</label>
       <input type="text" id="modalTags">
@@ -993,6 +994,7 @@
 <script src="/static/ownership.js?v=20260924"></script>
 <script src="/static/app.js?v=20260924"></script>
 <script src="/static/deploy.js?v=20260930"></script>
+<script src="/static/endpoint.js?v=0.2.58"></script>
 <div id="fileManagerModal" class="modal-overlay" style="display:none">
  <div class="modal" style="max-width:1000px">
   <h3>Transfer file</h3>
@@ -1013,6 +1015,31 @@
   <div id="deployTargets" style="max-height:220px;overflow:auto"></div>
   <div class="modal-actions"><button id="deploySubmit" class="btn btn-primary" onclick="submitDeployment()">Konfirmasi deploy</button><button class="btn btn-ghost" onclick="loadDeployments()">Refresh status</button><button class="btn btn-ghost" onclick="closeDeployments()">Tutup</button></div>
   <div id="deployResults" aria-live="polite"></div>
+ </div>
+</div>
+<div id="endpointAppsModal" class="modal-overlay" style="display:none" role="dialog" aria-modal="true" aria-labelledby="endpointAppsTitle">
+ <div class="modal" style="max-width:850px">
+  <h3 id="endpointAppsTitle">Aplikasi terpantau — global</h3>
+  <p>Hanya mengubah daftar pemantauan, bukan install/uninstall. Pencocokan nama aplikasi/service, tidak peka huruf besar. Pisahkan alternatif dengan |. Instalasi per-user dan aplikasi portable tanpa service belum dicakup.</p>
+  <div id="endpointAppsRows"></div>
+  <div class="modal-actions"><button class="btn btn-ghost" onclick="addTrackedApplicationRow()">Tambah aplikasi</button><button id="endpointAppsSave" class="btn btn-primary" onclick="saveTrackedApplications()">Simpan daftar global</button><button class="btn btn-ghost" onclick="closeEndpointModal('endpointAppsModal')">Tutup</button></div>
+  <p id="endpointAppsMessage" role="status" aria-live="polite"></p>
+ </div>
+</div>
+<div id="endpointDeviceModal" class="modal-overlay" style="display:none" role="dialog" aria-modal="true" aria-labelledby="endpointDeviceTitle">
+ <div class="modal" style="max-width:850px">
+  <h3 id="endpointDeviceTitle">Aplikasi dan policy perangkat</h3>
+  <div id="endpointDeviceInfo" aria-live="polite"></div>
+  <section id="endpointPolicyControls" style="display:none">
+   <h4>Penguncian layar otomatis</h4>
+   <p>Default audit: tidak mengubah PC. Apply/restore hanya untuk Windows yang tidak terindikasi dikelola domain, MDM, atau ManageEngine. Policy yang sudah diatur pihak lain tidak ditimpa. SentinelOne tidak diubah. Pemeriksaan ini tidak menjamin semua konflik terdeteksi.</p>
+   <div class="form-group"><label for="endpointPolicyMode">Operasi</label><select id="endpointPolicyMode"><option value="audit">Audit saja</option><option value="apply">Terapkan</option><option value="restore">Pulihkan nilai sebelum RemoteDesk</option></select></div>
+   <div class="form-group"><label for="endpointPolicyMinutes">Batas tidak aktif (menit, 1–1440)</label><input id="endpointPolicyMinutes" type="number" min="1" max="1440" step="1" value="15"></div>
+   <p>Target hanya perangkat ini. Jika offline, job menunggu maksimal 24 jam. Apply/restore memerlukan hak administrator agent dan restart Windows; tidak ada restart otomatis. Status configured hanya membuktikan nilai registry, bukan penguncian sesi.</p>
+   <button id="endpointPolicySend" class="btn btn-primary" onclick="submitLockPolicy()">Konfirmasi operasi</button>
+  </section>
+  <div class="modal-actions"><button class="btn btn-ghost" onclick="refreshEndpointDevice()">Refresh status</button><button class="btn btn-ghost" onclick="closeEndpointModal('endpointDeviceModal')">Tutup</button></div>
+  <p id="endpointPolicyMessage" role="status" aria-live="polite"></p>
  </div>
 </div>
 </body>

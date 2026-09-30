@@ -28,7 +28,12 @@ func NewDB(path string) (*DB, error) {
 	if err := migrate(db); err != nil {
 		return nil, err
 	}
-	return &DB{db: db}, nil
+	store := &DB{db: db}
+	if err := store.initEndpoints(); err != nil {
+		db.Close()
+		return nil, err
+	}
+	return store, nil
 }
 
 func migrate(db *sql.DB) error {

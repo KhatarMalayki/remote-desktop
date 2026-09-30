@@ -341,6 +341,8 @@ func (s *Server) ListenAndServe() error {
 		return err
 	}
 	mux := http.NewServeMux()
+	mux.HandleFunc("/api/endpoint/applications", s.authMiddleware(s.handleTrackedApplications))
+	mux.HandleFunc("/api/endpoint/lock-policy", s.authMiddleware(s.handleLockPolicy))
 	mux.HandleFunc("/api/deployments", s.authMiddleware(s.handleDeployments))
 	mux.HandleFunc("/api/deployment-package", s.handleDeploymentPackage)
 
@@ -546,6 +548,7 @@ func (s *Server) handleDevices(w http.ResponseWriter, r *http.Request) {
 			onlineSet[id] = true
 		}
 		for _, d := range devices {
+			s.enrichEndpoint(d)
 			d.Online = onlineSet[d.ID]
 			d.Recommendation = deviceRecommendation(d)
 		}
@@ -716,6 +719,7 @@ func (s *Server) handleDevice(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
 		dev.Online = s.hub.IsOnline(id)
+		s.enrichEndpoint(dev)
 		dev.Recommendation = deviceRecommendation(dev)
 		jsonResp(w, dev, 200)
 
@@ -1987,6 +1991,7 @@ func (s *Server) handleAgentMessage(c *Client, raw []byte) {
 			}
 		}
 		s.queueRustDeskBootstrap(&dev)
+		s.dispatchLockPolicy(dev.ID)
 
 		// Updates are intentionally not pushed during registration. Administrators
 		// stage them from the dashboard after validating a pilot device.
@@ -1998,6 +2003,7 @@ func (s *Server) handleAgentMessage(c *Client, raw []byte) {
 		}
 		hb.ID = c.DeviceID
 		s.db.UpdateHeartbeat(&hb)
+		s.dispatchLockPolicy(c.DeviceID)
 		if hb.Applications != nil {
 			s.appsMu.Lock()
 			if s.deviceApps == nil {
@@ -2015,6 +2021,10 @@ func (s *Server) handleAgentMessage(c *Client, raw []byte) {
 			s.appsMu.Unlock()
 		}
 
+	case "endpoint_report":
+		s.receiveEndpointReport(c.DeviceID, msg.Data)
+	case "lock_policy_result":
+		s.receiveLockPolicyResult(c.DeviceID, msg.Data)
 	case "rustdesk_result":
 		var result models.RustDeskResult
 		if err := json.Unmarshal(msg.Data, &result); err != nil {

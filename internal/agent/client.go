@@ -115,6 +115,7 @@ func (a *Agent) Run() {
 		}
 
 		a.register()
+		go a.reportEndpoint()
 		go a.heartbeatLoop()
 		a.readLoop()
 
@@ -175,6 +176,7 @@ func (a *Agent) heartbeatLoop() {
 		select {
 		case <-ticker.C:
 			if heartbeatCount%10 == 0 {
+				go a.reportEndpoint()
 				if processes, err := listProcesses(); err == nil {
 					applications = activeApplications(processes)
 				}
@@ -327,6 +329,11 @@ func (a *Agent) handleMessage(raw []byte) {
 	}
 
 	switch msg.Action {
+	case "lock_policy":
+		var request models.LockPolicyRequest
+		if json.Unmarshal(msg.Data, &request) == nil && request.Valid() {
+			go a.handleLockPolicy(request)
+		}
 	case "upgrade":
 		var req struct {
 			Version string `json:"version"`
