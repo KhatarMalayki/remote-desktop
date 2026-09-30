@@ -1799,12 +1799,13 @@ async function runTerminalCommand() {
       method: 'POST',
       body: JSON.stringify({ command: cmd, shell: shell })
     });
-    if (!res || res.error) {
+    if (!res) {
       output.textContent += '[Error: ' + ((res && res.error) || 'Gagal mengeksekusi perintah') + ']\n';
     } else {
       if (res.stdout) output.textContent += res.stdout;
       if (res.stderr) output.textContent += '\n[STDERR]\n' + res.stderr;
-      output.textContent += '\n[Exit code: ' + res.exit_code + ']\n';
+      if (res.error) output.textContent += '\n[Error: ' + res.error + ']\n';
+      if (res.exit_code != null) output.textContent += '\n[Exit code: ' + res.exit_code + ']\n';
     }
   } catch (err) {
     output.textContent += '[Exception: ' + (err.message || err) + ']\n';

@@ -392,7 +392,7 @@
       <input type="text" id="terminalInput" placeholder="Ketik perintah (contoh: ipconfig, get-process, hostname, netstat)..." style="flex:1;background:#161b22;border:1px solid #30363d;color:#f0f6fc;font-family:Consolas,monospace;padding:8px 12px;border-radius:6px">
       <button type="submit" id="btnRunCommand" class="btn btn-primary">Jalankan</button>
     </form>
-    <div style="margin-top:8px;font-size:11px;color:var(--fg2)">Perintah dieksekusi di belakang layar di PC target oleh hak akses Agent (SYSTEM). Timeout 30 detik. Dicatat di audit log.</div>
+    <div style="margin-top:8px;font-size:11px;color:var(--fg2)">Perintah memakai akun Agent: SYSTEM jika melalui service LocalSystem. Cek dengan whoami. Shell baru setiap perintah, tanpa input interaktif. Batas eksekusi 28 detik. Dicatat di audit log; jangan masukkan password/token.</div>
   </div>
 </div>
 

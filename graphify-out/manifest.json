@@ -65,8 +65,8 @@
     "semantic_hash": "8c9cb5d1b967f64d6abc8c1ca0fe3e90"
   },
   "web/static/app.js": {
-    "mtime": 1790674944.4083152,
-    "ast_hash": "a7f8097dbfcd2c14298fc31b69afdb2f",
+    "mtime": 1790736282.1855557,
+    "ast_hash": "5f331e2441b018962000de33bec0d1ac",
     "semantic_hash": ""
   },
   ".codex/hooks.json": {
@@ -125,8 +125,8 @@
     "semantic_hash": ""
   },
   "web/index.html": {
-    "mtime": 1790655009.3280883,
-    "ast_hash": "997728e89e1d20b97090c8ea889e8baf",
+    "mtime": 1790736312.8657112,
+    "ast_hash": "a3d87d97801288d2de537554d26945bb",
     "semantic_hash": ""
   },
   "scripts/update-server.sh": {
@@ -422,6 +422,11 @@
   "docs/remote-session-controls.md": {
     "mtime": 1790666776.7244954,
     "ast_hash": "0b34b620ac9b9d8196b23a0ad09037da",
+    "semantic_hash": ""
+  },
+  "web/terminal.test.cjs": {
+    "mtime": 1790736312.866263,
+    "ast_hash": "61918bef27bbff684b6bcae990e2ce80",
     "semantic_hash": ""
   }
 }

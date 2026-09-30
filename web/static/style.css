@@ -274,7 +274,11 @@ select.filter-select {
 .form-group textarea { resize: vertical; min-height: 60px; }
 .form-group input:focus, .form-group textarea:focus { border-color: var(--accent); }
 
-.modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
+.modal-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; margin-top: 16px; }
+.modal-actions .btn { max-width: 100%; overflow-wrap: anywhere; }
+#deviceModal .modal { max-width: 850px; }
+#remoteTerminalModal input { min-width: 0; }
+#remoteTerminalModal .modal > div:first-child { flex-wrap: wrap; gap: 12px; }
 
 .detail-grid {
   display: grid;
