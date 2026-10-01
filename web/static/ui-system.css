@@ -1,0 +1,50 @@
+:root { color-scheme: dark; }
+body { line-height: 1.5; }
+.header { flex-wrap: wrap; gap: 16px; padding-bottom: 18px; border-bottom: 1px solid var(--border); }
+.header h2 { font-size: 24px; letter-spacing: -.5px; }
+.sidebar-section-title { color: var(--fg2); }
+.chart-card, .stat-card, .user-profile { border-radius: 12px; box-shadow: var(--shadow-sm); }
+.chart-card { padding: 20px; }
+.chart-title { color: var(--fg); margin-bottom: 18px; }
+.toolbar { gap: 12px; }
+.search-input { flex: 1 1 240px; min-width: 0; max-width: 100%; }
+.btn { min-height: 36px; line-height: 1.4; }
+.btn-sm { min-height: 30px; }
+.btn-primary { background: #2563eb; }
+.btn-warning { background: #92400e; }
+.btn-danger { background: #b91c1c; }
+.btn:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid #93c5fd; outline-offset: 3px; }
+.form-group { margin-bottom: 18px; }
+.form-group label { display: block; margin-bottom: 7px; font-size: 13px; font-weight: 600; }
+.form-group input:not([type=checkbox]):not([type=radio]), .form-group select, .form-group textarea { min-height: 40px; border: 1px solid #526078; border-radius: 8px; background: var(--bg); color: var(--fg); padding: 9px 12px; font-size: 14px; max-width: 100%; }
+.form-group select, .form-group textarea { width: 100%; }
+.modal { padding: 28px; scrollbar-gutter: stable; overscroll-behavior: contain; }
+.modal h3 { padding-bottom: 16px; border-bottom: 1px solid var(--border); }
+.modal p { line-height: 1.6; }
+.modal-actions { padding-top: 16px; border-top: 1px solid var(--border); gap: 10px; }
+.detail-item { padding: 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; min-width: 0; overflow-wrap: anywhere; }
+.table-wrap, #devicesTable, #assetsTable, #recentDevices { max-width: 100%; overflow-x: auto; }
+.modal table, .page table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.modal th, .page th { padding: 12px 14px; text-align: left; color: var(--fg2); background: var(--bg3); }
+.modal td, .page td { padding: 12px 14px; border-bottom: 1px solid var(--border); }
+.badge-status { white-space: nowrap; }
+.badge-status .status-dot { margin-right: 0; flex-shrink: 0; }
+.tab-nav { padding: 5px; background: var(--bg2); border: 1px solid var(--border); border-radius: 10px; }
+.pagination { flex-wrap: wrap; padding: 12px 0; }
+.empty-state { border: 1px dashed #526078; border-radius: 12px; margin: 16px 0; background: var(--bg2); }
+.login-container { padding: 24px; background: radial-gradient(ellipse at top, #172844, var(--bg) 65%); }
+.login-box { width: min(100%, 420px); padding: 32px; box-shadow: var(--shadow-lg); }
+.login-box h1 { color: var(--fg); letter-spacing: -.8px; }
+.remote-toolbar { padding: 16px; gap: 12px; }
+.toast { max-width: min(440px, calc(100vw - 32px)); overflow-wrap: anywhere; }
+@media (max-width: 768px) {
+  .sidebar { display: flex; position: static; width: 100%; height: auto; max-height: 240px; }
+  .app { flex-direction: column; }
+  .main { width: 100%; margin-left: 0; padding: 16px; }
+  .modal { width: 96%; padding: 18px; max-height: 90dvh; }
+  .endpoint-apps-grid { grid-template-columns: minmax(0, 1fr); }
+  .endpoint-app-card .app-header { flex-wrap: wrap; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+}
