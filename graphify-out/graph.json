@@ -318,8 +318,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "cmd_server_main",
-      "community": 71,
-      "community_name": "main",
+      "community": 47,
+      "community_name": "Hitungan Memori: Kok Bisa 1000 Device di 1 GB?",
       "norm_label": "main.go"
     },
     {
@@ -329,8 +329,8 @@
       "source_location": "L16",
       "_origin": "ast",
       "id": "cmd_server_main_main",
-      "community": 71,
-      "community_name": "main",
+      "community": 47,
+      "community_name": "Hitungan Memori: Kok Bisa 1000 Device di 1 GB?",
       "norm_label": "main()"
     },
     {
@@ -340,8 +340,8 @@
       "source_location": "L46",
       "_origin": "ast",
       "id": "cmd_server_main_envor",
-      "community": 71,
-      "community_name": "main",
+      "community": 47,
+      "community_name": "Hitungan Memori: Kok Bisa 1000 Device di 1 GB?",
       "norm_label": "envor()"
     },
     {
@@ -727,8 +727,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "internal_agent_deploy",
-      "community": 68,
-      "community_name": ".deployApplication",
+      "community": 47,
+      "community_name": "Hitungan Memori: Kok Bisa 1000 Device di 1 GB?",
       "norm_label": "deploy.go"
     },
     {
@@ -738,8 +738,8 @@
       "source_location": "L22",
       "_origin": "ast",
       "id": "agent_applicationdeployment",
-      "community": 68,
-      "community_name": ".deployApplication",
+      "community": 47,
+      "community_name": "Hitungan Memori: Kok Bisa 1000 Device di 1 GB?",
       "norm_label": "applicationdeployment"
     },
     {
@@ -749,8 +749,8 @@
       "source_location": "L29",
       "_origin": "ast",
       "id": "internal_agent_deploy_go_agent_agent",
-      "community": 68,
-      "community_name": ".deployApplication",
+      "community": 47,
+      "community_name": "Hitungan Memori: Kok Bisa 1000 Device di 1 GB?",
       "norm_label": "agent"
     },
     {
@@ -760,8 +760,8 @@
       "source_location": "L29",
       "_origin": "ast",
       "id": "agent_agent_deployapplication",
-      "community": 68,
-      "community_name": ".deployApplication",
+      "community": 47,
+      "community_name": "Hitungan Memori: Kok Bisa 1000 Device di 1 GB?",
       "norm_label": ".deployapplication()"
     },
     {
@@ -771,8 +771,8 @@
       "source_location": "L114",
       "_origin": "ast",
       "id": "internal_agent_deploy_deploymentexitstatus",
-      "community": 68,
-      "community_name": ".deployApplication",
+      "community": 47,
+      "community_name": "Hitungan Memori: Kok Bisa 1000 Device di 1 GB?",
       "norm_label": "deploymentexitstatus()"
     },
     {
@@ -782,8 +782,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "internal_agent_deploy_test",
-      "community": 68,
-      "community_name": ".deployApplication",
+      "community": 47,
+      "community_name": "Hitungan Memori: Kok Bisa 1000 Device di 1 GB?",
       "norm_label": "deploy_test.go"
     },
     {
@@ -793,8 +793,8 @@
       "source_location": "L5",
       "_origin": "ast",
       "id": "internal_agent_deploy_test_testdeploymentexitstatus",
-      "community": 68,
-      "community_name": ".deployApplication",
+      "community": 47,
+      "community_name": "Hitungan Memori: Kok Bisa 1000 Device di 1 GB?",
       "norm_label": "testdeploymentexitstatus()"
     },
     {
@@ -804,8 +804,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "internal_agent_deploy_test_go_t",
-      "community": 68,
-      "community_name": ".deployApplication",
+      "community": 47,
+      "community_name": "Hitungan Memori: Kok Bisa 1000 Device di 1 GB?",
       "norm_label": "t"
     },
     {
@@ -815,8 +815,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "internal_agent_endpoint",
-      "community": 30,
-      "community_name": "renderCharts",
+      "community": 71,
+      "community_name": "main",
       "norm_label": "endpoint.go"
     },
     {
@@ -826,8 +826,8 @@
       "source_location": "L13",
       "_origin": "ast",
       "id": "agent_lockvalue",
-      "community": 30,
-      "community_name": "renderCharts",
+      "community": 68,
+      "community_name": ".deployApplication",
       "norm_label": "lockvalue"
     },
     {
@@ -837,8 +837,8 @@
       "source_location": "L18",
       "_origin": "ast",
       "id": "agent_lockpolicystate",
-      "community": 30,
-      "community_name": "renderCharts",
+      "community": 68,
+      "community_name": ".deployApplication",
       "norm_label": "lockpolicystate"
     },
     {
@@ -848,8 +848,8 @@
       "source_location": "L25",
       "_origin": "ast",
       "id": "agent_lockpolicystore",
-      "community": 30,
-      "community_name": "renderCharts",
+      "community": 71,
+      "community_name": "main",
       "norm_label": "lockpolicystore"
     },
     {
@@ -859,8 +859,8 @@
       "source_location": "L32",
       "_origin": "ast",
       "id": "internal_agent_endpoint_executelockpolicy",
-      "community": 30,
-      "community_name": "renderCharts",
+      "community": 71,
+      "community_name": "main",
       "norm_label": "executelockpolicy()"
     },
     {
@@ -870,8 +870,8 @@
       "source_location": "L113",
       "_origin": "ast",
       "id": "internal_agent_endpoint_go_agent_agent",
-      "community": 30,
-      "community_name": "renderCharts",
+      "community": 77,
+      "community_name": ".handleLockPolicy",
       "norm_label": "agent"
     },
     {
@@ -881,8 +881,8 @@
       "source_location": "L113",
       "_origin": "ast",
       "id": "agent_agent_reportendpoint",
-      "community": 30,
-      "community_name": "renderCharts",
+      "community": 77,
+      "community_name": ".handleLockPolicy",
       "norm_label": ".reportendpoint()"
     },
     {
@@ -892,8 +892,8 @@
       "source_location": "L121",
       "_origin": "ast",
       "id": "agent_agent_handlelockpolicy",
-      "community": 30,
-      "community_name": "renderCharts",
+      "community": 77,
+      "community_name": ".handleLockPolicy",
       "norm_label": ".handlelockpolicy()"
     },
     {
@@ -936,8 +936,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "internal_agent_endpoint_test",
-      "community": 30,
-      "community_name": "renderCharts",
+      "community": 71,
+      "community_name": "main",
       "norm_label": "endpoint_test.go"
     },
     {
@@ -947,8 +947,8 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "agent_mocklockstore",
-      "community": 30,
-      "community_name": "renderCharts",
+      "community": 68,
+      "community_name": ".deployApplication",
       "norm_label": "mocklockstore"
     },
     {
@@ -958,8 +958,8 @@
       "source_location": "L21",
       "_origin": "ast",
       "id": "agent_mocklockstore_read",
-      "community": 30,
-      "community_name": "renderCharts",
+      "community": 68,
+      "community_name": ".deployApplication",
       "norm_label": ".read()"
     },
     {
@@ -969,8 +969,8 @@
       "source_location": "L24",
       "_origin": "ast",
       "id": "agent_mocklockstore_write",
-      "community": 30,
-      "community_name": "renderCharts",
+      "community": 68,
+      "community_name": ".deployApplication",
       "norm_label": ".write()"
     },
     {
@@ -980,8 +980,8 @@
       "source_location": "L29",
       "_origin": "ast",
       "id": "agent_mocklockstore_load",
-      "community": 30,
-      "community_name": "renderCharts",
+      "community": 68,
+      "community_name": ".deployApplication",
       "norm_label": ".load()"
     },
     {
@@ -991,8 +991,8 @@
       "source_location": "L32",
       "_origin": "ast",
       "id": "agent_mocklockstore_save",
-      "community": 30,
-      "community_name": "renderCharts",
+      "community": 68,
+      "community_name": ".deployApplication",
       "norm_label": ".save()"
     },
     {
@@ -1002,8 +1002,8 @@
       "source_location": "L37",
       "_origin": "ast",
       "id": "internal_agent_endpoint_test_testexecutelockpolicyauditdoesnotmutate",
-      "community": 30,
-      "community_name": "renderCharts",
+      "community": 71,
+      "community_name": "main",
       "norm_label": "testexecutelockpolicyauditdoesnotmutate()"
     },
     {
@@ -1013,8 +1013,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "internal_agent_endpoint_test_go_t",
-      "community": 30,
-      "community_name": "renderCharts",
+      "community": 71,
+      "community_name": "main",
       "norm_label": "t"
     },
     {
@@ -1024,8 +1024,8 @@
       "source_location": "L46",
       "_origin": "ast",
       "id": "internal_agent_endpoint_test_testexecutelockpolicyrefuseswhenexternalmanagerconflict",
-      "community": 30,
-      "community_name": "renderCharts",
+      "community": 71,
+      "community_name": "main",
       "norm_label": "testexecutelockpolicyrefuseswhenexternalmanagerconflict()"
     },
     {
@@ -1035,8 +1035,8 @@
       "source_location": "L55",
       "_origin": "ast",
       "id": "internal_agent_endpoint_test_testexecutelockpolicyapplyandrestorewithdrift",
-      "community": 30,
-      "community_name": "renderCharts",
+      "community": 71,
+      "community_name": "main",
       "norm_label": "testexecutelockpolicyapplyandrestorewithdrift()"
     },
     {
@@ -1046,8 +1046,8 @@
       "source_location": "L76",
       "_origin": "ast",
       "id": "internal_agent_endpoint_test_testexecutelockpolicyidempotentandsavefailure",
-      "community": 30,
-      "community_name": "renderCharts",
+      "community": 71,
+      "community_name": "main",
       "norm_label": "testexecutelockpolicyidempotentandsavefailure()"
     },
     {
@@ -1057,8 +1057,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "internal_agent_endpoint_windows",
-      "community": 30,
-      "community_name": "renderCharts",
+      "community": 73,
+      "community_name": ".Read",
       "norm_label": "endpoint_windows.go"
     },
     {
@@ -1068,8 +1068,8 @@
       "source_location": "L20",
       "_origin": "ast",
       "id": "agent_windowslockstore",
-      "community": 30,
-      "community_name": "renderCharts",
+      "community": 68,
+      "community_name": ".deployApplication",
       "norm_label": "windowslockstore"
     },
     {
@@ -1079,8 +1079,8 @@
       "source_location": "L22",
       "_origin": "ast",
       "id": "internal_agent_endpoint_windows_installedmachineapplications",
-      "community": 30,
-      "community_name": "renderCharts",
+      "community": 73,
+      "community_name": ".Read",
       "norm_label": "installedmachineapplications()"
     },
     {
@@ -1090,8 +1090,8 @@
       "source_location": "L101",
       "_origin": "ast",
       "id": "internal_agent_endpoint_windows_boundedendpointtext",
-      "community": 30,
-      "community_name": "renderCharts",
+      "community": 73,
+      "community_name": ".Read",
       "norm_label": "boundedendpointtext()"
     },
     {
@@ -1101,8 +1101,8 @@
       "source_location": "L111",
       "_origin": "ast",
       "id": "internal_agent_endpoint_windows_readlockvalue",
-      "community": 30,
-      "community_name": "renderCharts",
+      "community": 73,
+      "community_name": ".Read",
       "norm_label": "readlockvalue()"
     },
     {
@@ -1112,8 +1112,8 @@
       "source_location": "L133",
       "_origin": "ast",
       "id": "internal_agent_endpoint_windows_managementblocker",
-      "community": 30,
-      "community_name": "renderCharts",
+      "community": 73,
+      "community_name": ".Read",
       "norm_label": "managementblocker()"
     },
     {
@@ -1123,8 +1123,8 @@
       "source_location": "L172",
       "_origin": "ast",
       "id": "agent_windowslockstore_read",
-      "community": 30,
-      "community_name": "renderCharts",
+      "community": 73,
+      "community_name": ".Read",
       "norm_label": ".read()"
     },
     {
@@ -1134,8 +1134,8 @@
       "source_location": "L182",
       "_origin": "ast",
       "id": "agent_windowslockstore_write",
-      "community": 30,
-      "community_name": "renderCharts",
+      "community": 68,
+      "community_name": ".deployApplication",
       "norm_label": ".write()"
     },
     {
@@ -1145,8 +1145,8 @@
       "source_location": "L198",
       "_origin": "ast",
       "id": "agent_windowslockstore_load",
-      "community": 30,
-      "community_name": "renderCharts",
+      "community": 68,
+      "community_name": ".deployApplication",
       "norm_label": ".load()"
     },
     {
@@ -1156,8 +1156,8 @@
       "source_location": "L219",
       "_origin": "ast",
       "id": "agent_windowslockstore_save",
-      "community": 30,
-      "community_name": "renderCharts",
+      "community": 68,
+      "community_name": ".deployApplication",
       "norm_label": ".save()"
     },
     {
@@ -1167,8 +1167,8 @@
       "source_location": "L235",
       "_origin": "ast",
       "id": "internal_agent_endpoint_windows_openmachinescm",
-      "community": 30,
-      "community_name": "renderCharts",
+      "community": 73,
+      "community_name": ".Read",
       "norm_label": "openmachinescm()"
     },
     {
@@ -1178,8 +1178,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "mgr",
-      "community": 30,
-      "community_name": "renderCharts",
+      "community": 73,
+      "community_name": ".Read",
       "norm_label": "mgr"
     },
     {
@@ -1189,8 +1189,8 @@
       "source_location": "L243",
       "_origin": "ast",
       "id": "internal_agent_endpoint_windows_collectendpointreport",
-      "community": 30,
-      "community_name": "renderCharts",
+      "community": 73,
+      "community_name": ".Read",
       "norm_label": "collectendpointreport()"
     },
     {
@@ -3136,8 +3136,8 @@
       "source_location": "L91",
       "_origin": "ast",
       "id": "models_user",
-      "community": 17,
-      "community_name": "device.go",
+      "community": 70,
+      "community_name": "AssetSwitchRequest",
       "norm_label": "user"
     },
     {
@@ -3147,7 +3147,7 @@
       "source_location": "L100",
       "_origin": "ast",
       "id": "models_assetswitchrequest",
-      "community": 70,
+      "community": 76,
       "community_name": "AssetSwitchRequest",
       "norm_label": "assetswitchrequest"
     },
@@ -3334,8 +3334,8 @@
       "source_location": "L3",
       "_origin": "ast",
       "id": "models_trackedapplication",
-      "community": 30,
-      "community_name": "renderCharts",
+      "community": 75,
+      "community_name": "detectApplications",
       "norm_label": "trackedapplication"
     },
     {
@@ -3488,8 +3488,8 @@
       "source_location": "L59",
       "_origin": "ast",
       "id": "server_db_listholderoptions",
-      "community": 1,
-      "community_name": "Community 1",
+      "community": 70,
+      "community_name": "AssetSwitchRequest",
       "norm_label": ".listholderoptions()"
     },
     {
@@ -3631,8 +3631,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "internal_server_auth_security",
-      "community": 47,
-      "community_name": "Hitungan Memori: Kok Bisa 1000 Device di 1 GB?",
+      "community": 1,
+      "community_name": "Community 1",
       "norm_label": "auth_security.go"
     },
     {
@@ -3675,8 +3675,8 @@
       "source_location": "L74",
       "_origin": "ast",
       "id": "server_credentialtoken",
-      "community": 47,
-      "community_name": "Hitungan Memori: Kok Bisa 1000 Device di 1 GB?",
+      "community": 1,
+      "community_name": "Community 1",
       "norm_label": "credentialtoken"
     },
     {
@@ -4170,8 +4170,8 @@
       "source_location": "L626",
       "_origin": "ast",
       "id": "server_db_listusers",
-      "community": 17,
-      "community_name": "device.go",
+      "community": 70,
+      "community_name": "AssetSwitchRequest",
       "norm_label": ".listusers()"
     },
     {
@@ -4192,8 +4192,8 @@
       "source_location": "L652",
       "_origin": "ast",
       "id": "server_db_getuserbyid",
-      "community": 17,
-      "community_name": "device.go",
+      "community": 70,
+      "community_name": "AssetSwitchRequest",
       "norm_label": ".getuserbyid()"
     },
     {
@@ -4511,7 +4511,7 @@
       "source_location": "L1173",
       "_origin": "ast",
       "id": "server_db_createswitchrequest",
-      "community": 70,
+      "community": 76,
       "community_name": "AssetSwitchRequest",
       "norm_label": ".createswitchrequest()"
     },
@@ -4522,7 +4522,7 @@
       "source_location": "L1196",
       "_origin": "ast",
       "id": "server_db_listswitchrequests",
-      "community": 70,
+      "community": 76,
       "community_name": "AssetSwitchRequest",
       "norm_label": ".listswitchrequests()"
     },
@@ -4533,7 +4533,7 @@
       "source_location": "L1250",
       "_origin": "ast",
       "id": "server_db_getswitchrequest",
-      "community": 70,
+      "community": 76,
       "community_name": "AssetSwitchRequest",
       "norm_label": ".getswitchrequest()"
     },
@@ -4544,7 +4544,7 @@
       "source_location": "L1267",
       "_origin": "ast",
       "id": "server_db_reviewswitchrequest",
-      "community": 70,
+      "community": 76,
       "community_name": "AssetSwitchRequest",
       "norm_label": ".reviewswitchrequest()"
     },
@@ -5127,8 +5127,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "internal_server_endpoint",
-      "community": 30,
-      "community_name": "renderCharts",
+      "community": 75,
+      "community_name": "detectApplications",
       "norm_label": "endpoint.go"
     },
     {
@@ -5138,8 +5138,8 @@
       "source_location": "L23",
       "_origin": "ast",
       "id": "internal_server_endpoint_go_server_db",
-      "community": 30,
-      "community_name": "renderCharts",
+      "community": 75,
+      "community_name": "detectApplications",
       "norm_label": "db"
     },
     {
@@ -5149,8 +5149,8 @@
       "source_location": "L23",
       "_origin": "ast",
       "id": "server_db_initendpoints",
-      "community": 30,
-      "community_name": "renderCharts",
+      "community": 75,
+      "community_name": "detectApplications",
       "norm_label": ".initendpoints()"
     },
     {
@@ -5160,8 +5160,8 @@
       "source_location": "L29",
       "_origin": "ast",
       "id": "server_db_trackedapplications",
-      "community": 30,
-      "community_name": "renderCharts",
+      "community": 75,
+      "community_name": "detectApplications",
       "norm_label": ".trackedapplications()"
     },
     {
@@ -5171,8 +5171,8 @@
       "source_location": "L43",
       "_origin": "ast",
       "id": "internal_server_endpoint_validtrackedapplications",
-      "community": 30,
-      "community_name": "renderCharts",
+      "community": 75,
+      "community_name": "detectApplications",
       "norm_label": "validtrackedapplications()"
     },
     {
@@ -5182,8 +5182,8 @@
       "source_location": "L67",
       "_origin": "ast",
       "id": "internal_server_endpoint_go_server_server",
-      "community": 30,
-      "community_name": "renderCharts",
+      "community": 43,
+      "community_name": "SecuritySettings",
       "norm_label": "server"
     },
     {
@@ -5193,8 +5193,8 @@
       "source_location": "L67",
       "_origin": "ast",
       "id": "server_server_handletrackedapplications",
-      "community": 1,
-      "community_name": "Community 1",
+      "community": 43,
+      "community_name": "SecuritySettings",
       "norm_label": ".handletrackedapplications()"
     },
     {
@@ -5204,8 +5204,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "internal_server_endpoint_go_responsewriter",
-      "community": 1,
-      "community_name": "Community 1",
+      "community": 43,
+      "community_name": "SecuritySettings",
       "norm_label": "responsewriter"
     },
     {
@@ -5215,8 +5215,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "internal_server_endpoint_go_request",
-      "community": 1,
-      "community_name": "Community 1",
+      "community": 43,
+      "community_name": "SecuritySettings",
       "norm_label": "request"
     },
     {
@@ -5226,8 +5226,8 @@
       "source_location": "L105",
       "_origin": "ast",
       "id": "internal_server_endpoint_detectapplications",
-      "community": 30,
-      "community_name": "renderCharts",
+      "community": 75,
+      "community_name": "detectApplications",
       "norm_label": "detectapplications()"
     },
     {
@@ -5237,8 +5237,8 @@
       "source_location": "L130",
       "_origin": "ast",
       "id": "server_server_enrichendpoint",
-      "community": 30,
-      "community_name": "renderCharts",
+      "community": 75,
+      "community_name": "detectApplications",
       "norm_label": ".enrichendpoint()"
     },
     {
@@ -5248,8 +5248,8 @@
       "source_location": "L148",
       "_origin": "ast",
       "id": "server_server_handlelockpolicy",
-      "community": 1,
-      "community_name": "Community 1",
+      "community": 43,
+      "community_name": "SecuritySettings",
       "norm_label": ".handlelockpolicy()"
     },
     {
@@ -5259,8 +5259,8 @@
       "source_location": "L204",
       "_origin": "ast",
       "id": "server_server_dispatchlockpolicy",
-      "community": 30,
-      "community_name": "renderCharts",
+      "community": 43,
+      "community_name": "SecuritySettings",
       "norm_label": ".dispatchlockpolicy()"
     },
     {
@@ -5270,8 +5270,8 @@
       "source_location": "L227",
       "_origin": "ast",
       "id": "server_server_receiveendpointreport",
-      "community": 30,
-      "community_name": "renderCharts",
+      "community": 43,
+      "community_name": "SecuritySettings",
       "norm_label": ".receiveendpointreport()"
     },
     {
@@ -5281,8 +5281,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "internal_server_endpoint_go_rawmessage",
-      "community": 30,
-      "community_name": "renderCharts",
+      "community": 43,
+      "community_name": "SecuritySettings",
       "norm_label": "rawmessage"
     },
     {
@@ -5292,8 +5292,8 @@
       "source_location": "L246",
       "_origin": "ast",
       "id": "server_server_receivelockpolicyresult",
-      "community": 30,
-      "community_name": "renderCharts",
+      "community": 43,
+      "community_name": "SecuritySettings",
       "norm_label": ".receivelockpolicyresult()"
     },
     {
@@ -6425,8 +6425,8 @@
       "source_location": "L251",
       "_origin": "ast",
       "id": "internal_server_server_recordloginfail",
-      "community": 19,
-      "community_name": "NewDB",
+      "community": 1,
+      "community_name": "Community 1",
       "norm_label": "recordloginfail()"
     },
     {
@@ -6502,8 +6502,8 @@
       "source_location": "L286",
       "_origin": "ast",
       "id": "internal_server_server_new",
-      "community": 1,
-      "community_name": "Community 1",
+      "community": 47,
+      "community_name": "Hitungan Memori: Kok Bisa 1000 Device di 1 GB?",
       "norm_label": "new()"
     },
     {
@@ -7316,8 +7316,8 @@
       "source_location": "L42",
       "_origin": "ast",
       "id": "internal_server_totp_validatetotpcode",
-      "community": 47,
-      "community_name": "Hitungan Memori: Kok Bisa 1000 Device di 1 GB?",
+      "community": 1,
+      "community_name": "Community 1",
       "norm_label": "validatetotpcode()"
     },
     {
@@ -7349,8 +7349,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "internal_versioncmp_version",
-      "community": 0,
-      "community_name": "Community 0",
+      "community": 43,
+      "community_name": "SecuritySettings",
       "norm_label": "version.go"
     },
     {
@@ -7360,8 +7360,8 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "internal_versioncmp_version_isnewer",
-      "community": 0,
-      "community_name": "Community 0",
+      "community": 43,
+      "community_name": "SecuritySettings",
       "norm_label": "isnewer()"
     },
     {
@@ -7371,8 +7371,8 @@
       "source_location": "L37",
       "_origin": "ast",
       "id": "internal_versioncmp_version_parse",
-      "community": 0,
-      "community_name": "Community 0",
+      "community": 43,
+      "community_name": "SecuritySettings",
       "norm_label": "parse()"
     },
     {
@@ -7382,8 +7382,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "internal_versioncmp_version_test",
-      "community": 0,
-      "community_name": "Community 0",
+      "community": 43,
+      "community_name": "SecuritySettings",
       "norm_label": "version_test.go"
     },
     {
@@ -7393,8 +7393,8 @@
       "source_location": "L5",
       "_origin": "ast",
       "id": "internal_versioncmp_version_test_testisnewer",
-      "community": 0,
-      "community_name": "Community 0",
+      "community": 43,
+      "community_name": "SecuritySettings",
       "norm_label": "testisnewer()"
     },
     {
@@ -7404,8 +7404,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "internal_versioncmp_version_test_go_t",
-      "community": 0,
-      "community_name": "Community 0",
+      "community": 43,
+      "community_name": "SecuritySettings",
       "norm_label": "t"
     },
     {
@@ -7937,8 +7937,8 @@
       "source_location": "L231",
       "_origin": "ast",
       "id": "web_static_app_updateonlinestatus",
-      "community": 43,
-      "community_name": "SecuritySettings",
+      "community": 28,
+      "community_name": "loadDevices",
       "norm_label": "updateonlinestatus()"
     },
     {
@@ -7970,8 +7970,8 @@
       "source_location": "L269",
       "_origin": "ast",
       "id": "web_static_app_renderrecentdevices",
-      "community": 43,
-      "community_name": "SecuritySettings",
+      "community": 28,
+      "community_name": "loadDevices",
       "norm_label": "renderrecentdevices()"
     },
     {
@@ -8080,8 +8080,8 @@
       "source_location": "L342",
       "_origin": "ast",
       "id": "web_static_app_renderdevices",
-      "community": 43,
-      "community_name": "SecuritySettings",
+      "community": 28,
+      "community_name": "loadDevices",
       "norm_label": "renderdevices()"
     },
     {
@@ -8091,8 +8091,8 @@
       "source_location": "L357",
       "_origin": "ast",
       "id": "web_static_app_builddevicetable",
-      "community": 43,
-      "community_name": "SecuritySettings",
+      "community": 28,
+      "community_name": "loadDevices",
       "norm_label": "builddevicetable()"
     },
     {
@@ -8102,8 +8102,8 @@
       "source_location": "L420",
       "_origin": "ast",
       "id": "web_static_app_parseagentversion",
-      "community": 43,
-      "community_name": "SecuritySettings",
+      "community": 28,
+      "community_name": "loadDevices",
       "norm_label": "parseagentversion()"
     },
     {
@@ -8124,8 +8124,8 @@
       "source_location": "L433",
       "_origin": "ast",
       "id": "web_static_app_isversionnewer",
-      "community": 43,
-      "community_name": "SecuritySettings",
+      "community": 28,
+      "community_name": "loadDevices",
       "norm_label": "isversionnewer()"
     },
     {
@@ -8135,8 +8135,8 @@
       "source_location": "L446",
       "_origin": "ast",
       "id": "web_static_app_updatedeviceagent",
-      "community": 43,
-      "community_name": "SecuritySettings",
+      "community": 28,
+      "community_name": "loadDevices",
       "norm_label": "updatedeviceagent()"
     },
     {
@@ -8256,8 +8256,8 @@
       "source_location": "L621",
       "_origin": "ast",
       "id": "web_static_app_onbranchchange",
-      "community": 28,
-      "community_name": "loadDevices",
+      "community": 20,
+      "community_name": "qrcode.min.js",
       "norm_label": "onbranchchange()"
     },
     {
@@ -8278,8 +8278,8 @@
       "source_location": "L632",
       "_origin": "ast",
       "id": "web_static_app_loadbranchassets",
-      "community": 28,
-      "community_name": "loadDevices",
+      "community": 20,
+      "community_name": "qrcode.min.js",
       "norm_label": "loadbranchassets()"
     },
     {
@@ -8333,8 +8333,8 @@
       "source_location": "L899",
       "_origin": "ast",
       "id": "web_static_app_closemanualassetmodal",
-      "community": 28,
-      "community_name": "loadDevices",
+      "community": 20,
+      "community_name": "qrcode.min.js",
       "norm_label": "closemanualassetmodal()"
     },
     {
@@ -8344,8 +8344,8 @@
       "source_location": "L903",
       "_origin": "ast",
       "id": "web_static_app_savemanualasset",
-      "community": 28,
-      "community_name": "loadDevices",
+      "community": 20,
+      "community_name": "qrcode.min.js",
       "norm_label": "savemanualasset()"
     },
     {
@@ -8355,8 +8355,8 @@
       "source_location": "L937",
       "_origin": "ast",
       "id": "web_static_app_deletemanualasset",
-      "community": 28,
-      "community_name": "loadDevices",
+      "community": 20,
+      "community_name": "qrcode.min.js",
       "norm_label": "deletemanualasset()"
     },
     {
@@ -8377,8 +8377,8 @@
       "source_location": "L962",
       "_origin": "ast",
       "id": "web_static_app_closeverificationmodal",
-      "community": 28,
-      "community_name": "loadDevices",
+      "community": 20,
+      "community_name": "qrcode.min.js",
       "norm_label": "closeverificationmodal()"
     },
     {
@@ -8388,8 +8388,8 @@
       "source_location": "L966",
       "_origin": "ast",
       "id": "web_static_app_submitverification",
-      "community": 28,
-      "community_name": "loadDevices",
+      "community": 20,
+      "community_name": "qrcode.min.js",
       "norm_label": "submitverification()"
     },
     {
@@ -8608,8 +8608,8 @@
       "source_location": "L1273",
       "_origin": "ast",
       "id": "web_static_app_configurerustdesk",
-      "community": 9,
-      "community_name": "Community 9",
+      "community": 33,
+      "community_name": "main",
       "norm_label": "configurerustdesk()"
     },
     {
@@ -9037,8 +9037,8 @@
       "source_location": "L1902",
       "_origin": "ast",
       "id": "web_static_app_timeago",
-      "community": 43,
-      "community_name": "SecuritySettings",
+      "community": 28,
+      "community_name": "loadDevices",
       "norm_label": "timeago()"
     },
     {
@@ -9048,8 +9048,8 @@
       "source_location": "L1911",
       "_origin": "ast",
       "id": "web_static_app_osicon",
-      "community": 43,
-      "community_name": "SecuritySettings",
+      "community": 28,
+      "community_name": "loadDevices",
       "norm_label": "osicon()"
     },
     {
@@ -10192,8 +10192,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "web_static_qrcode_min_g",
-      "community": 61,
-      "community_name": "README.md",
+      "community": 28,
+      "community_name": "loadDevices",
       "norm_label": "g()"
     },
     {
@@ -10294,6 +10294,105 @@
       "community": 48,
       "community_name": "README.md",
       "norm_label": "focus()"
+    },
+    {
+      "label": "ui-smoke.cjs",
+      "file_type": "code",
+      "source_file": "web/ui-smoke.cjs",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "web_ui_smoke",
+      "community": 74,
+      "community_name": "ui-smoke.cjs",
+      "norm_label": "ui-smoke.cjs"
+    },
+    {
+      "label": "assert",
+      "file_type": "code",
+      "source_file": "web/ui-smoke.cjs",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "web_ui_smoke_assert",
+      "community": 74,
+      "community_name": "ui-smoke.cjs",
+      "norm_label": "assert"
+    },
+    {
+      "label": "fs",
+      "file_type": "code",
+      "source_file": "web/ui-smoke.cjs",
+      "source_location": "L2",
+      "_origin": "ast",
+      "id": "web_ui_smoke_fs",
+      "community": 74,
+      "community_name": "ui-smoke.cjs",
+      "norm_label": "fs"
+    },
+    {
+      "label": "path",
+      "file_type": "code",
+      "source_file": "web/ui-smoke.cjs",
+      "source_location": "L3",
+      "_origin": "ast",
+      "id": "web_ui_smoke_path",
+      "community": 74,
+      "community_name": "ui-smoke.cjs",
+      "norm_label": "path"
+    },
+    {
+      "label": "http",
+      "file_type": "code",
+      "source_file": "web/ui-smoke.cjs",
+      "source_location": "L4",
+      "_origin": "ast",
+      "id": "web_ui_smoke_http",
+      "community": 74,
+      "community_name": "ui-smoke.cjs",
+      "norm_label": "http"
+    },
+    {
+      "label": "{ createRequire }",
+      "file_type": "code",
+      "source_file": "web/ui-smoke.cjs",
+      "source_location": "L5",
+      "_origin": "ast",
+      "id": "web_ui_smoke_createrequire",
+      "community": 74,
+      "community_name": "ui-smoke.cjs",
+      "norm_label": "{ createrequire }"
+    },
+    {
+      "label": "root",
+      "file_type": "code",
+      "source_file": "web/ui-smoke.cjs",
+      "source_location": "L7",
+      "_origin": "ast",
+      "id": "web_ui_smoke_root",
+      "community": 74,
+      "community_name": "ui-smoke.cjs",
+      "norm_label": "root"
+    },
+    {
+      "label": "fixture",
+      "file_type": "code",
+      "source_file": "web/ui-smoke.cjs",
+      "source_location": "L9",
+      "_origin": "ast",
+      "id": "web_ui_smoke_fixture",
+      "community": 74,
+      "community_name": "ui-smoke.cjs",
+      "norm_label": "fixture"
+    },
+    {
+      "label": "responses",
+      "file_type": "code",
+      "source_file": "web/ui-smoke.cjs",
+      "source_location": "L10",
+      "_origin": "ast",
+      "id": "web_ui_smoke_responses",
+      "community": 74,
+      "community_name": "ui-smoke.cjs",
+      "norm_label": "responses"
     },
     {
       "label": "AGENTS.md",
@@ -36406,6 +36505,94 @@
     {
       "relation": "contains",
       "confidence": "EXTRACTED",
+      "source_file": "web/ui-smoke.cjs",
+      "source_location": "L1",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "web_ui_smoke",
+      "target": "web_ui_smoke_assert",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "web/ui-smoke.cjs",
+      "source_location": "L5",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "web_ui_smoke",
+      "target": "web_ui_smoke_createrequire",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "web/ui-smoke.cjs",
+      "source_location": "L9",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "web_ui_smoke",
+      "target": "web_ui_smoke_fixture",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "web/ui-smoke.cjs",
+      "source_location": "L2",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "web_ui_smoke",
+      "target": "web_ui_smoke_fs",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "web/ui-smoke.cjs",
+      "source_location": "L4",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "web_ui_smoke",
+      "target": "web_ui_smoke_http",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "web/ui-smoke.cjs",
+      "source_location": "L3",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "web_ui_smoke",
+      "target": "web_ui_smoke_path",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "web/ui-smoke.cjs",
+      "source_location": "L10",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "web_ui_smoke",
+      "target": "web_ui_smoke_responses",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "web/ui-smoke.cjs",
+      "source_location": "L7",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "web_ui_smoke",
+      "target": "web_ui_smoke_root",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
       "source_file": "AGENTS.md",
       "source_location": "L1",
       "weight": 1.0,
@@ -38088,5 +38275,5 @@
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "105c2a3cb70bcb8f74201b87b263a3fd86eca4c1"
+  "built_at_commit": "808dd1379d7aeff354377775f45428ad8a8191c1"
 }

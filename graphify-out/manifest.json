@@ -125,8 +125,8 @@
     "semantic_hash": ""
   },
   "web/index.html": {
-    "mtime": 1790789300.301823,
-    "ast_hash": "7d06980e7a85be516a7bf48342d7b1cc",
+    "mtime": 1790859248.3014858,
+    "ast_hash": "b8e44ce3bf64f76523c8e6ac758084dd",
     "semantic_hash": ""
   },
   "scripts/update-server.sh": {
@@ -537,6 +537,61 @@
   "web/static/endpoint.js": {
     "mtime": 1790789411.8319523,
     "ast_hash": "9ac05dfe6e81a1134194fb5aeb3bb05a",
+    "semantic_hash": ""
+  },
+  "web/ui-smoke.cjs": {
+    "mtime": 1790859526.5406244,
+    "ast_hash": "a80bac02539e6cc6a64358572916fd52",
+    "semantic_hash": ""
+  },
+  "output/playwright/assets-desktop.png": {
+    "mtime": 1790859598.0634582,
+    "ast_hash": "80238540d071602805701be6b2635fb0",
+    "semantic_hash": ""
+  },
+  "output/playwright/branch-assets-1440.png": {
+    "mtime": 1790859655.2507534,
+    "ast_hash": "bdf48e0b941c67ff7ad2bb5f5f8c54c0",
+    "semantic_hash": ""
+  },
+  "output/playwright/branch-assets-desktop.png": {
+    "mtime": 1790859597.7483287,
+    "ast_hash": "bdf48e0b941c67ff7ad2bb5f5f8c54c0",
+    "semantic_hash": ""
+  },
+  "output/playwright/dashboard-1440.png": {
+    "mtime": 1790859655.0684505,
+    "ast_hash": "33f756cf860f368757d54a84f08b9a09",
+    "semantic_hash": ""
+  },
+  "output/playwright/dashboard-desktop.png": {
+    "mtime": 1790859597.5680404,
+    "ast_hash": "e5396f2e0cde3cbef60ff20e50976e5a",
+    "semantic_hash": ""
+  },
+  "output/playwright/devices-1440.png": {
+    "mtime": 1790859655.439259,
+    "ast_hash": "293f87b55e779c0f40c3eef5d7682538",
+    "semantic_hash": ""
+  },
+  "output/playwright/devices-desktop.png": {
+    "mtime": 1790859597.9195807,
+    "ast_hash": "20463877de22401009d72f4f658b5b56",
+    "semantic_hash": ""
+  },
+  "output/playwright/login-1440.png": {
+    "mtime": 1790859654.6774528,
+    "ast_hash": "dcbf458de7ae78e6c8af5e7e45b0ef89",
+    "semantic_hash": ""
+  },
+  "output/playwright/redesign-login.png": {
+    "mtime": 1790859417.5254369,
+    "ast_hash": "dcbf458de7ae78e6c8af5e7e45b0ef89",
+    "semantic_hash": ""
+  },
+  "output/playwright/remote-desktop.png": {
+    "mtime": 1790859598.1954515,
+    "ast_hash": "89f18e8d77c43cd40dfa24b03314b986",
     "semantic_hash": ""
   }
 }

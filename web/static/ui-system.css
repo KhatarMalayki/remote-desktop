@@ -48,3 +48,77 @@ body { line-height: 1.5; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
 }
+
+.eyebrow { display:block; color:#8da5c9; font-size:10px; font-weight:700; letter-spacing:1.8px; margin-bottom:10px; }
+.page-heading { border:0; padding:6px 0 4px; margin-bottom:28px; }
+.page-heading h2 { font-size:30px; font-weight:650; letter-spacing:-1px; }
+.page-heading p { color:var(--fg2); font-size:14px; margin-top:8px; max-width:660px; }
+.main { padding:32px; }
+.nav-item { background:transparent; border-top:0; border-right:0; border-bottom:0; text-align:left; font-family:inherit; flex-shrink:0; width:calc(100% - 20px); }
+.nav-item:focus-visible { outline:2px solid #93c5fd; outline-offset:-2px; }
+.sidebar { background:#0e1522; }
+.sidebar-logo h1 { color:#dbeafe; letter-spacing:-.4px; }
+.sidebar-logo small { display:block; margin-top:8px; }
+.user-profile { background:rgba(148,163,184,.05); }
+.login-container { gap:clamp(32px,8vw,130px); }
+.login-intro { max-width:510px; }
+.login-intro h2 { font-size:clamp(32px,4vw,52px); line-height:1.1; letter-spacing:-2px; font-weight:650; }
+.login-intro p { color:var(--fg2); max-width:420px; margin-top:24px; }
+.login-capabilities { display:grid; gap:14px; margin-top:40px; color:#b4c6df; font-size:13px; }
+.login-capabilities span { border-top:1px solid var(--border); padding-top:14px; }
+.login-box { flex-shrink:0; border-top:3px solid #60a5fa; }
+.login-box h1, .login-box p { text-align:left; }
+.login-box h1 { font-size:25px; }
+.login-box .eyebrow { margin-bottom:16px; }
+.stats-grid { gap:16px; }
+.stat-card { padding:22px; position:relative; overflow:hidden; }
+.stat-card:before { content:''; display:block; width:28px; height:3px; border-radius:2px; background:#60a5fa; margin-bottom:18px; }
+.stat-card .value { margin-top:10px; font-size:34px; }
+.charts-grid { gap:20px; }
+.chart-title { text-transform:none; font-size:14px; letter-spacing:0; }
+.chart-card { border-radius:14px; }
+.section-heading { display:flex; justify-content:space-between; gap:16px; align-items:end; margin:30px 0 16px; }
+.section-heading h3 { font-size:18px; }
+.section-hint { color:var(--fg2); font-size:12px; }
+.page > .toolbar { padding:16px; background:var(--bg2); border:1px solid var(--border); border-radius:12px; }
+.branch-header-banner { background:var(--bg2); border-left:3px solid #60a5fa; padding:24px; }
+.branch-header-banner h3 { font-size:25px; letter-spacing:-.5px; }
+.branch-header-actions { max-width:560px; }
+.asset-record { border:1px solid var(--border); box-shadow:none; }
+.asset-record-head, .asset-record-footer { padding:18px; }
+#assetsTable, #recentDevices, #devicesTable { border:1px solid var(--border); border-radius:12px; background:var(--bg2); }
+.device-table { border:0; }
+.device-table td { line-height:1.5; }
+.device-table th { white-space:nowrap; font-size:10px; padding-top:16px; padding-bottom:16px; }
+#page-remote .remote-toolbar { border-radius:12px; border-top:3px solid #60a5fa; }
+.remote-container { border:1px solid var(--border); min-height:440px; }
+.remote-container .empty-state { border:0; background:transparent; max-width:420px; }
+.modal-overlay { padding:16px; }
+.modal { border-radius:16px; max-height:calc(100dvh - 32px); }
+.modal > h3 { font-size:21px; letter-spacing:-.6px; margin-bottom:24px; }
+.modal > h3:before { content:''; display:block; width:26px; height:3px; background:#60a5fa; border-radius:2px; margin-bottom:14px; }
+.modal .form-group label { color:#c4cfdf; }
+.modal-actions { margin-top:24px; }
+.modal > .toolbar, .modal > .detail-grid { margin-bottom:20px; }
+.modal :is(.table-wrap, [id$='Table']) { max-width:100%; overflow-x:auto; }
+.modal .empty-state { padding:28px 16px; }
+#usersModal .modal, #branchesModal .modal, #rolesModal .modal, #securityLogsModal .modal { border-top:3px solid #60a5fa; }
+#mfaModal .modal, #changePasswordModal .modal, #changeUsernameModal .modal { border-top:3px solid #34d399; }
+#verificationModal .modal, #manualAssetModal .modal, #handoverModal .modal, #relocateModal .modal, #serviceModal .modal { border-top:3px solid #a78bfa; }
+@media (max-width:1000px) { .login-intro { max-width:360px; } .main { padding:24px; } }
+@media (max-width:768px) {
+  .login-container { flex-direction:column; align-items:stretch; gap:24px; }
+  .login-intro { max-width:420px; margin:0 auto; }
+  .login-intro h2 { font-size:32px; }
+  .login-intro p, .login-capabilities { display:none; }
+  .login-box { width:100%; max-width:420px; margin:0 auto; }
+  .sidebar { max-height:210px; }
+  .main { padding:16px; }
+  .page-heading h2 { font-size:25px; }
+  .section-heading { align-items:start; flex-direction:column; gap:4px; }
+  .stat-card { padding:16px; }
+  .stat-card .value { font-size:28px; }
+  .modal-overlay { padding:8px; }
+  .modal { width:100%; max-height:calc(100dvh - 16px); }
+  .remote-toolbar > select { max-width:100%; min-width:0 !important; }
+}

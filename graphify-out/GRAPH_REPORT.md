@@ -1,16 +1,16 @@
 # Graph Report - remote-desktop  (2026-10-01)
 
 ## Corpus Check
-- 102 files · ~145,902 words
+- 103 files · ~186,822 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 1093 nodes · 2246 edges · 73 communities (63 shown, 10 thin omitted)
+- 1102 nodes · 2254 edges · 78 communities (67 shown, 11 thin omitted)
 - Extraction: 88% EXTRACTED · 12% INFERRED · 0% AMBIGUOUS · INFERRED: 264 edges (avg confidence: 0.79)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `105c2a3c`
+- Built from commit: `808dd137`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -76,6 +76,11 @@
 - AssetSwitchRequest
 - main
 - Remote disconnect investigation — 2026-09-30
+- .Read
+- ui-smoke.cjs
+- detectApplications
+- AssetSwitchRequest
+- .handleLockPolicy
 
 ## God Nodes (most connected - your core abstractions)
 1. `Server` - 73 edges
@@ -90,25 +95,25 @@
 10. `NewHub()` - 21 edges
 
 ## Surprising Connections (you probably didn't know these)
-- `main()` --calls--> `New()`  [INFERRED]
-  cmd/server/main.go → internal/server/server.go
 - `main()` --calls--> `LoadConfig()`  [INFERRED]
   cmd/agent/main.go → internal/agent/client.go
 - `main()` --calls--> `NewAgent()`  [INFERRED]
   cmd/agent/main.go → internal/agent/client.go
+- `main()` --calls--> `New()`  [INFERRED]
+  cmd/server/main.go → internal/server/server.go
+- `runLockPolicy()` --calls--> `executeLockPolicy()`  [INFERRED]
+  internal/agent/endpoint_windows.go → internal/agent/endpoint.go
 - `TestExecuteLockPolicyIdempotentAndSaveFailure()` --calls--> `New()`  [INFERRED]
   internal/agent/endpoint_test.go → internal/server/server.go
-- `listProcesses()` --calls--> `New()`  [INFERRED]
-  internal/agent/process_other.go → internal/server/server.go
 
 ## Import Cycles
 - None detected.
 
-## Communities (73 total, 10 thin omitted)
+## Communities (78 total, 11 thin omitted)
 
 ### Community 0 - "Community 0"
-Cohesion: 0.05
-Nodes (41): AgentConfig, SystemInfo, envOr(), main(), CleanupOldExecutable(), executeShellCommand(), generateDeviceID(), Agent (+33 more)
+Cohesion: 0.06
+Nodes (37): AgentConfig, SystemInfo, envOr(), main(), CleanupOldExecutable(), executeShellCommand(), generateDeviceID(), Agent (+29 more)
 
 ### Community 1 - "Community 1"
 Cohesion: 0.07
@@ -143,8 +148,8 @@ Cohesion: 0.09
 Nodes (21): ❌ Agent connect tapi device tidak muncul di dashboard, ❌ Agent sering putus dan reconnect, ❌ Agent tidak mau connect, "connection failed", ❌ API return "unauthorized" (401), ❌ Buka browser tapi halaman tidak muncul, ❌ Container tidak start, ❌ Data hilang setelah restart container, ❌ Error "gcc not found" waktu build server (+13 more)
 
 ### Community 9 - "Community 9"
-Cohesion: 0.12
-Nodes (21): checkAuth(), closeChangePasswordModal(), closeMFAModal(), configureRustDesk(), copyDownloadAgentLink(), copyMFASecret(), doLogin(), doLoginMFA() (+13 more)
+Cohesion: 0.13
+Nodes (20): checkAuth(), closeChangePasswordModal(), closeMFAModal(), copyDownloadAgentLink(), copyMFASecret(), doLogin(), doLoginMFA(), exportBranchAssetsCSV() (+12 more)
 
 ### Community 10 - "Community 10"
 Cohesion: 0.20
@@ -155,16 +160,16 @@ Cohesion: 0.09
 Nodes (35): remoteDeskService, ChangeRequest, enableTokenPrivilege(), exeToUTF16(), runSystemService(), startConsoleSystemWorker(), startSecureDesktopRelay(), startUserDesktopRelay() (+27 more)
 
 ### Community 17 - "device.go"
-Cohesion: 0.11
-Nodes (14): ManageRustDesk(), RawMessage, Time, AssetActivity, AuthLog, BlockedIPInfo, Branch, DeviceHeartbeat (+6 more)
+Cohesion: 0.12
+Nodes (13): ManageRustDesk(), RawMessage, Time, AssetActivity, AuthLog, BlockedIPInfo, Branch, DeviceHeartbeat (+5 more)
 
 ### Community 19 - "NewDB"
 Cohesion: 0.09
-Nodes (50): hashPassword(), NewDB(), T, TestADHBranchIsolation(), TestAgentPackageDownload(), TestAgentRegistrationDoesNotAutoUpdate(), TestAgentVersionEndpoint(), TestAuditLogFilters() (+42 more)
+Nodes (49): hashPassword(), NewDB(), T, TestADHBranchIsolation(), TestAgentPackageDownload(), TestAgentRegistrationDoesNotAutoUpdate(), TestAgentVersionEndpoint(), TestAuditLogFilters() (+41 more)
 
 ### Community 20 - "qrcode.min.js"
-Cohesion: 0.18
-Nodes (12): exportAssets(), fmtBytes(), onSearchBranchAssets(), openDeviceModal(), openEditAssetModal(), openVerifyModal(), remoteFileRequest(), renderAssets() (+4 more)
+Cohesion: 0.12
+Nodes (19): closeManualAssetModal(), closeVerificationModal(), deleteManualAsset(), exportAssets(), fmtBytes(), loadBranchAssets(), onBranchChange(), onSearchBranchAssets() (+11 more)
 
 ### Community 22 - "db.go"
 Cohesion: 0.16
@@ -187,16 +192,16 @@ Cohesion: 0.06
 Nodes (26): remoteCommand, remoteFileTransfer, remoteScreenState, File, Hash, Image, captureRemoteFrame(), encodeRemoteFrame() (+18 more)
 
 ### Community 28 - "loadDevices"
-Cohesion: 0.10
-Nodes (27): closeDeviceModal(), closeManualAssetModal(), closeRustDeskManageModal(), closeVerificationModal(), connectWS(), deleteDevice(), deleteManualAsset(), filterDevices() (+19 more)
+Cohesion: 0.09
+Nodes (30): buildDeviceTable(), closeDeviceModal(), closeRustDeskManageModal(), connectWS(), deleteDevice(), filterDevices(), goPage(), handleSignal() (+22 more)
 
 ### Community 29 - "esc"
 Cohesion: 0.36
 Nodes (6): migrate(), scanDevice(), scanDeviceRows(), Device, Rows, scanner
 
 ### Community 30 - "renderCharts"
-Cohesion: 0.07
-Nodes (34): lockPolicyState, lockPolicyStore, lockValue, mockLockStore, windowsLockStore, executeLockPolicy(), Agent, collectEndpointReport() (+26 more)
+Cohesion: 0.29
+Nodes (9): collectEndpointReport(), runLockPolicy(), runLockPolicy(), ApplicationDetection, EndpointReport, EndpointState, InstalledApplication, LockPolicyRequest (+1 more)
 
 ### Community 31 - "init"
 Cohesion: 0.33
@@ -207,8 +212,8 @@ Cohesion: 0.26
 Nodes (9): addTrackedApplicationRow(), onEndpointDevicePickerChange(), openEndpointDevice(), openPolicyManagerModal(), openTrackedApplications(), refreshEndpointDevice(), showEndpointModal(), submitLockPolicy() (+1 more)
 
 ### Community 33 - "main"
-Cohesion: 0.16
-Nodes (24): addBusinessUnit(), api(), buildBranchOptionsHTML(), closeBranchesModal(), createBranch(), deleteBranch(), editBranch(), esc() (+16 more)
+Cohesion: 0.15
+Nodes (25): addBusinessUnit(), api(), buildBranchOptionsHTML(), closeBranchesModal(), configureRustDesk(), createBranch(), deleteBranch(), editBranch() (+17 more)
 
 ### Community 34 - "SecuritySettings"
 Cohesion: 0.29
@@ -239,16 +244,16 @@ Cohesion: 0.29
 Nodes (4): parseRustDeskID(), T, TestParseRustDeskID(), getRustDeskID()
 
 ### Community 43 - "SecuritySettings"
-Cohesion: 0.28
-Nodes (9): buildDeviceTable(), isVersionNewer(), osIcon(), parseAgentVersion(), renderDevices(), renderRecentDevices(), timeAgo(), updateDeviceAgent() (+1 more)
+Cohesion: 0.20
+Nodes (8): RawMessage, Request, ResponseWriter, Server, IsNewer(), parse(), T, TestIsNewer()
 
 ### Community 46 - "Daftar API"
 Cohesion: 0.27
 Nodes (4): remotePrivacyWindow, Int64, remoteProtection, startRemotePrivacy()
 
 ### Community 47 - "Hitungan Memori: Kok Bisa 1000 Device di 1 GB?"
-Cohesion: 0.10
-Nodes (27): Request, ResponseWriter, Server, authRequest(), HandlerFunc, T, securityServer(), TestCredentialTokenIntegrityAndAccountChanges() (+19 more)
+Cohesion: 0.08
+Nodes (33): applicationDeployment, envOr(), main(), deploymentExitStatus(), Agent, T, TestDeploymentExitStatus(), Request (+25 more)
 
 ### Community 48 - "README.md"
 Cohesion: 0.29
@@ -275,8 +280,8 @@ Cohesion: 0.27
 Nodes (8): browseRemoteFiles(), deploymentDevices, loadDeployments(), openDeployments(), openFileManager(), renderDeployTargets(), submitDeployment(), supportsDeployment()
 
 ### Community 61 - "README.md"
-Cohesion: 0.23
-Nodes (6): a(), b(), d(), g(), r(), s()
+Cohesion: 0.24
+Nodes (5): a(), b(), d(), r(), s()
 
 ### Community 62 - "startRemote"
 Cohesion: 0.40
@@ -295,35 +300,51 @@ Cohesion: 0.22
 Nodes (11): closeChangeUsernameModal(), closeEditUserModal(), createUser(), deleteUser(), getSelectValues(), loadUsers(), openUsersModal(), resetUserMFA() (+3 more)
 
 ### Community 68 - ".deployApplication"
-Cohesion: 0.29
-Nodes (5): applicationDeployment, deploymentExitStatus(), Agent, T, TestDeploymentExitStatus()
+Cohesion: 0.31
+Nodes (4): lockPolicyState, lockValue, mockLockStore, windowsLockStore
 
 ### Community 69 - ".handleDeployments"
 Cohesion: 0.32
 Nodes (4): RawMessage, Request, ResponseWriter, Server
 
 ### Community 70 - "AssetSwitchRequest"
-Cohesion: 0.22
-Nodes (3): DB, AssetAttachment, AssetSwitchRequest
+Cohesion: 0.24
+Nodes (3): DB, AssetAttachment, User
+
+### Community 71 - "main"
+Cohesion: 0.42
+Nodes (7): lockPolicyStore, executeLockPolicy(), T, TestExecuteLockPolicyApplyAndRestoreWithDrift(), TestExecuteLockPolicyAuditDoesNotMutate(), TestExecuteLockPolicyIdempotentAndSaveFailure(), TestExecuteLockPolicyRefusesWhenExternalManagerConflict()
 
 ### Community 72 - "Remote disconnect investigation — 2026-09-30"
 Cohesion: 0.50
 Nodes (3): Remote disconnect investigation — 2026-09-30, Verification and limits, Verified in source
 
+### Community 73 - ".Read"
+Cohesion: 0.42
+Nodes (7): boundedEndpointText(), collectEndpointReport(), installedMachineApplications(), managementBlocker(), openMachineSCM(), readLockValue(), Mgr
+
+### Community 74 - "ui-smoke.cjs"
+Cohesion: 0.22
+Nodes (8): assert, { createRequire }, fixture, fs, http, path, responses, root
+
+### Community 75 - "detectApplications"
+Cohesion: 0.32
+Nodes (4): detectApplications(), DB, validTrackedApplications(), TrackedApplication
+
 ## Knowledge Gaps
-- **143 isolated node(s):** `github.com/user/remote-desktop`, `Agent`, `Agent`, `rustDeskExportConfig`, `RoleDefinition` (+138 more)
+- **151 isolated node(s):** `github.com/user/remote-desktop`, `Agent`, `Agent`, `rustDeskExportConfig`, `RoleDefinition` (+146 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **10 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **11 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `New()` connect `Community 1` to `Community 0`, `main`, `.deployApplication`, `.handleDeployments`, `main`, `Hitungan Memori: Kok Bisa 1000 Device di 1 GB?`, `NewDB`, `SecuritySettings`, `renderCharts`?**
-  _High betweenness centrality (0.118) - this node is a cross-community bridge._
-- **Why does `NewDB()` connect `NewDB` to `Community 1`, `Community 2`, `Community 7`, `Hitungan Memori: Kok Bisa 1000 Device di 1 GB?`, `.Close`, `esc`?**
-  _High betweenness centrality (0.065) - this node is a cross-community bridge._
-- **Why does `Server` connect `Community 1` to `Community 0`, `device.go`, `Community 3`, `NewDB`?**
+- **Why does `New()` connect `Hitungan Memori: Kok Bisa 1000 Device di 1 GB?` to `Community 0`, `Community 1`, `main`, `.handleDeployments`, `main`, `.Read`, `NewDB`, `SecuritySettings`?**
+  _High betweenness centrality (0.116) - this node is a cross-community bridge._
+- **Why does `NewDB()` connect `NewDB` to `Community 2`, `Community 7`, `Hitungan Memori: Kok Bisa 1000 Device di 1 GB?`, `.Close`, `esc`?**
   _High betweenness centrality (0.064) - this node is a cross-community bridge._
+- **Why does `Server` connect `Community 1` to `Community 0`, `Community 3`, `Hitungan Memori: Kok Bisa 1000 Device di 1 GB?`, `device.go`, `NewDB`?**
+  _High betweenness centrality (0.061) - this node is a cross-community bridge._
 - **Are the 12 inferred relationships involving `jsonError()` (e.g. with `.authorizeUserToken()` and `.handleActivities()`) actually correct?**
   _`jsonError()` has 12 INFERRED edges - model-reasoned connections that need verification._
 - **Are the 10 inferred relationships involving `getClaims()` (e.g. with `.handleActivities()` and `.handleAttachment()`) actually correct?**
@@ -331,4 +352,4 @@ _Questions this graph is uniquely positioned to answer:_
 - **Are the 9 inferred relationships involving `jsonResp()` (e.g. with `.handleActivities()` and `.handleDeployments()`) actually correct?**
   _`jsonResp()` has 9 INFERRED edges - model-reasoned connections that need verification._
 - **What connects `github.com/user/remote-desktop`, `Agent`, `Agent` to the rest of the system?**
-  _143 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _151 weakly-connected nodes found - possible documentation gaps or missing edges._
