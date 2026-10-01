@@ -32,9 +32,6 @@ body { line-height: 1.5; }
 .tab-nav { padding: 5px; background: var(--bg2); border: 1px solid var(--border); border-radius: 10px; }
 .pagination { flex-wrap: wrap; padding: 12px 0; }
 .empty-state { border: 1px dashed #526078; border-radius: 12px; margin: 16px 0; background: var(--bg2); }
-.login-container { padding: 24px; background: radial-gradient(ellipse at top, #172844, var(--bg) 65%); }
-.login-box { width: min(100%, 420px); padding: 32px; box-shadow: var(--shadow-lg); }
-.login-box h1 { color: var(--fg); letter-spacing: -.8px; }
 .remote-toolbar { padding: 16px; gap: 12px; }
 .toast { max-width: min(440px, calc(100vw - 32px)); overflow-wrap: anywhere; }
 @media (max-width: 768px) {
@@ -60,16 +57,6 @@ body { line-height: 1.5; }
 .sidebar-logo h1 { color:#dbeafe; letter-spacing:-.4px; }
 .sidebar-logo small { display:block; margin-top:8px; }
 .user-profile { background:rgba(148,163,184,.05); }
-.login-container { gap:clamp(32px,8vw,130px); }
-.login-intro { max-width:510px; }
-.login-intro h2 { font-size:clamp(32px,4vw,52px); line-height:1.1; letter-spacing:-2px; font-weight:650; }
-.login-intro p { color:var(--fg2); max-width:420px; margin-top:24px; }
-.login-capabilities { display:grid; gap:14px; margin-top:40px; color:#b4c6df; font-size:13px; }
-.login-capabilities span { border-top:1px solid var(--border); padding-top:14px; }
-.login-box { flex-shrink:0; border-top:3px solid #60a5fa; }
-.login-box h1, .login-box p { text-align:left; }
-.login-box h1 { font-size:25px; }
-.login-box .eyebrow { margin-bottom:16px; }
 .stats-grid { gap:16px; }
 .stat-card { padding:22px; position:relative; overflow:hidden; }
 .stat-card:before { content:''; display:block; width:28px; height:3px; border-radius:2px; background:#60a5fa; margin-bottom:18px; }
@@ -105,13 +92,10 @@ body { line-height: 1.5; }
 #usersModal .modal, #branchesModal .modal, #rolesModal .modal, #securityLogsModal .modal { border-top:3px solid #60a5fa; }
 #mfaModal .modal, #changePasswordModal .modal, #changeUsernameModal .modal { border-top:3px solid #34d399; }
 #verificationModal .modal, #manualAssetModal .modal, #handoverModal .modal, #relocateModal .modal, #serviceModal .modal { border-top:3px solid #a78bfa; }
-@media (max-width:1000px) { .login-intro { max-width:360px; } .main { padding:24px; } }
+@media (max-width:1000px) { .main { padding:24px; } }
 @media (max-width:768px) {
-  .login-container { flex-direction:column; align-items:stretch; gap:24px; }
-  .login-intro { max-width:420px; margin:0 auto; }
-  .login-intro h2 { font-size:32px; }
-  .login-intro p, .login-capabilities { display:none; }
-  .login-box { width:100%; max-width:420px; margin:0 auto; }
+  .login-container { padding:16px; }
+  .login-box { max-width:100%; }
   .sidebar { max-height:210px; }
   .main { padding:16px; }
   .page-heading h2 { font-size:25px; }
