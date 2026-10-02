@@ -3,12 +3,14 @@
 package agent
 
 import (
+	"context"
 	"fmt"
 	"image"
 	"os/exec"
 	"strings"
 	"sync/atomic"
 	"syscall"
+	"time"
 	"unsafe"
 
 	"github.com/lxn/win"
@@ -278,10 +280,13 @@ func windowsVirtualKey(code, key string) (uintptr, bool) {
 }
 
 func setRemoteClipboard(text string) error {
-	command := exec.Command("powershell.exe", "-NoProfile", "-NonInteractive", "-STA", "-Command", "$input | Set-Clipboard")
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	command := exec.CommandContext(ctx, "powershell.exe", "-NoProfile", "-NonInteractive", "-STA", "-Command", "[Console]::InputEncoding=[System.Text.Encoding]::UTF8; Set-Clipboard -Value ([Console]::In.ReadToEnd()) -ErrorAction Stop")
+	command.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
 	command.Stdin = strings.NewReader(text)
-	if output, err := command.CombinedOutput(); err != nil {
-		return fmt.Errorf("gagal menulis clipboard: %v (%s)", err, strings.TrimSpace(string(output)))
+	if err := command.Run(); err != nil {
+		return fmt.Errorf("gagal menulis clipboard: %v", err)
 	}
 	return nil
 }

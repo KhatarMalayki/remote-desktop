@@ -287,6 +287,7 @@ func TestChangePasswordAndRateLimit(t *testing.T) {
 	}
 
 	// 1. Test change password with wrong old password
+	s.breachCheck = cleanPasswordFixture
 	bodyWrong := strings.NewReader(`{"old_password":"wrong","new_password":"unique new password 492","confirm_password":"unique new password 492"}`)
 	reqWrong := httptest.NewRequest("POST", "/api/auth/change-password", bodyWrong)
 	ctx := context.WithValue(reqWrong.Context(), userClaimsKey, &UserClaims{Username: "admin", Role: "admin"})

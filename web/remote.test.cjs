@@ -8,7 +8,7 @@ const { webcrypto } = require('node:crypto');
 function harness() {
   const elements = new Map();
   const context = vm.createContext({
-    setTimeout, clearTimeout, crypto: webcrypto, Uint8Array,
+    setTimeout, clearTimeout, crypto: webcrypto, Uint8Array, TextEncoder,
     window: { crypto: webcrypto }, WebSocket: { OPEN: 1 },
     btoa: value => Buffer.from(value, 'binary').toString('base64'),
     remoteWS: null, remoteProtectionState: { blocked: false, privacy: false }, remoteFileBusy: false,
@@ -19,6 +19,7 @@ function harness() {
     } }
   });
   const source = fs.readFileSync(path.join(__dirname, 'static/app.js'), 'utf8');
+  vm.runInContext(source.slice(source.indexOf('function bindRemoteKeyboard('), source.indexOf('function setRemoteControls(')), context);
   vm.runInContext(source.slice(source.indexOf('function updateRemoteDeviceList()'), source.indexOf('// ==================== UTILS')), context);
   return { context, elements };
 }
@@ -105,4 +106,40 @@ test('protection toggle waits for confirmation and never claims success locally'
   await context.toggleRemoteProtection('block_input');
   assert.deepEqual(socket.sent, [{ type: 'block_input', enabled: true }]);
   assert.equal(context.remoteProtectionState.blocked, false);
+});
+test('remote keyboard intercepts supported paste and sends text directly', () => {
+  const sent = [];
+  let defaultPrevented = 0;
+  const listeners = {};
+  const canvas = {
+    addEventListener(event, callback) { listeners[event] = callback; }
+  };
+  const { context } = harness();
+  context.bindRemoteKeyboard(canvas, payload => sent.push(payload), () => true);
+  listeners.keydown({ code: 'KeyV', ctrlKey: true, altKey: false, shiftKey: false, metaKey: false, preventDefault() { defaultPrevented++; } });
+  assert.equal(sent.length, 0);
+  assert.equal(defaultPrevented, 0);
+  listeners.paste({
+    clipboardData: { types: ['text/plain'], getData: () => 'halo remote' },
+    preventDefault() { defaultPrevented++; }
+  });
+  assert.equal(defaultPrevented, 1);
+  assert.equal(JSON.stringify(sent), JSON.stringify([{ type: 'clipboard_paste', text: 'halo remote' }]));
+});
+
+test('remote keyboard rejects paste unsupported by older agents', () => {
+  const sent = [];
+  const toasts = [];
+  const listeners = {};
+  const canvas = { addEventListener(event, callback) { listeners[event] = callback; } };
+  const { context } = harness();
+  context.showToast = msg => toasts.push(msg);
+  context.bindRemoteKeyboard(canvas, payload => sent.push(payload), () => false);
+  listeners.keydown({ code: 'KeyV', ctrlKey: true, altKey: false, shiftKey: false, metaKey: false, preventDefault() {} });
+  assert.equal(JSON.stringify(sent), JSON.stringify([{ type: 'key_down', code: 'KeyV' }]));
+  listeners.paste({
+    clipboardData: { types: ['text/plain'], getData: () => 'halo remote' },
+    preventDefault() {}
+  });
+  assert.match(toasts.pop() || '', /Kirim Clipboard/);
 });

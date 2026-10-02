@@ -1517,7 +1517,6 @@ function startRemote(reconnecting) {
   var frameCount = 0;
   var relayAgentVersion = 'belum diketahui';
   var fpsStarted = performance.now();
-  var pressedKeys = {};
   var pendingMove = null;
   var moveScheduled = false;
 	var desktopTransition = false;
@@ -1582,6 +1581,7 @@ function startRemote(reconnecting) {
         if (relayMessage.type === 'error') sessionSocket.failureReason = relayMessage.message;
         if (relayMessage.type === 'ready') {
           var capabilities = relayMessage.capabilities || {};
+          sessionSocket.clipboardPaste = !!capabilities.clipboard_paste;
           document.getElementById('btnRemoteBlock').disabled = !capabilities.protection;
           document.getElementById('btnRemotePrivacy').disabled = !capabilities.protection;
           document.getElementById('btnRemoteFile').disabled = !capabilities.file_transfer || remoteFileBusy;
@@ -1597,6 +1597,7 @@ function startRemote(reconnecting) {
         if (relayMessage.type === 'clipboard') {
           navigator.clipboard.writeText(relayMessage.text || '').then(function(){ showToast('Clipboard komputer remote sudah disalin ke perangkat ini'); }).catch(function(){ showToast('Browser menolak akses clipboard'); });
         }
+        if (relayMessage.type === 'clipboard_pasted') showToast('Clipboard dikirim; perintah paste dijalankan di target');
         if (relayMessage.type === 'protection_state') {
           remoteProtectionState = { blocked: !!relayMessage.blocked, privacy: !!relayMessage.privacy };
           renderRemoteProtection();
@@ -1658,18 +1659,52 @@ function startRemote(reconnecting) {
   canvas.addEventListener('wheel', function(e) { var p = position(e); sendRemote({ type: 'mouse_wheel', x: p.x, y: p.y, delta_x: Math.round(e.deltaX), delta_y: Math.round(e.deltaY) }); e.preventDefault(); }, { passive: false });
   canvas.addEventListener('contextmenu', function(e) { e.preventDefault(); });
 
-  canvas.addEventListener('keydown', function(e) {
-    if (!pressedKeys[e.code] || e.repeat) { pressedKeys[e.code] = true; sendRemote({ type: 'key_down', key: e.key, code: e.code }); }
-    e.preventDefault();
-  });
-  canvas.addEventListener('keyup', function(e) { delete pressedKeys[e.code]; sendRemote({ type: 'key_up', key: e.key, code: e.code }); e.preventDefault(); });
-  canvas.addEventListener('blur', function() { Object.keys(pressedKeys).forEach(function(code){ sendRemote({ type: 'key_up', key: '', code: code }); }); pressedKeys = {}; });
+  bindRemoteKeyboard(canvas, sendRemote, function(){ return !!sessionSocket.clipboardPaste; });
 
   canvas.tabIndex = 1; canvas.focus();
   setRemoteControls(true);
 }
 
+function bindRemoteKeyboard(canvas, sendRemote, supportsPaste) {
+  var pressedKeys = {};
+  function releaseKeys() {
+    Object.keys(pressedKeys).forEach(function(code){ sendRemote({ type: 'key_up', key: '', code: code }); });
+    pressedKeys = {};
+  }
+  canvas.addEventListener('keydown', function(event) {
+    var paste = ((event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey && event.code === 'KeyV') || (event.shiftKey && !event.ctrlKey && !event.altKey && event.code === 'Insert');
+    if (paste && supportsPaste()) return;
+    if (!pressedKeys[event.code] || event.repeat) {
+      pressedKeys[event.code] = true;
+      sendRemote({ type: 'key_down', key: event.key, code: event.code });
+    }
+    event.preventDefault();
+  });
+  canvas.addEventListener('keyup', function(event) {
+    if (pressedKeys[event.code]) {
+      delete pressedKeys[event.code];
+      sendRemote({ type: 'key_up', key: event.key, code: event.code });
+    }
+    event.preventDefault();
+  });
+  canvas.addEventListener('paste', function(event) {
+    event.preventDefault();
+    if (!supportsPaste()) { showToast('Update agent untuk paste otomatis; gunakan Kirim Clipboard pada agent lama'); return; }
+    if (!event.clipboardData || !Array.from(event.clipboardData.types).includes('text/plain')) {
+      showToast('Paste otomatis hanya untuk teks; gunakan Kirim File untuk berkas'); return;
+    }
+    var text = event.clipboardData.getData('text/plain');
+    if (text.includes('\u0000') || new TextEncoder().encode(text).length > 16384) {
+      showToast('Teks clipboard maksimal 16 KiB, tanpa karakter NUL'); return;
+    }
+    releaseKeys();
+    sendRemote({ type: 'clipboard_paste', text: text });
+  });
+  canvas.addEventListener('blur', releaseKeys);
+}
+
 function setRemoteControls(active) {
+  if (!active && typeof navigator !== 'undefined' && navigator.keyboard && navigator.keyboard.unlock) navigator.keyboard.unlock();
   document.getElementById('btnConnect').style.display = active ? 'none' : '';
   document.getElementById('btnDisconnect').style.display = active ? '' : 'none';
   ['remoteMonitorSelect','remoteQualitySelect','remoteShortcutSelect','btnClipboardSend','btnClipboardGet','btnRemoteFullscreen'].forEach(function(id){ document.getElementById(id).style.display = active ? '' : 'none'; });
@@ -1804,9 +1839,16 @@ function getRemoteClipboardText() {
   if (remoteWS && remoteWS.readyState === WebSocket.OPEN) remoteWS.send(JSON.stringify({ type: 'clipboard_get' }));
 }
 
-function toggleRemoteFullscreen() {
+async function toggleRemoteFullscreen() {
   var container = document.getElementById('remoteContainer');
-  if (document.fullscreenElement) document.exitFullscreen(); else container.requestFullscreen().catch(function(){ showToast('Fullscreen tidak diizinkan browser'); });
+  if (document.fullscreenElement) { await document.exitFullscreen(); return; }
+  try { await container.requestFullscreen(); } catch (_) { showToast('Fullscreen tidak diizinkan browser'); return; }
+  try {
+    if (!navigator.keyboard || !navigator.keyboard.lock) throw new Error('unsupported');
+    await navigator.keyboard.lock();
+  } catch (_) { showToast('Keyboard Lock tidak tersedia/diizinkan. Gunakan Kirim Shortcut untuk tombol yang ditahan browser/OS'); }
+  var canvas = document.getElementById('remoteCanvas');
+  if (canvas) canvas.focus();
 }
 
 function stopRemote() {
@@ -1944,6 +1986,9 @@ function showToast(msg) {
 }
 
 // ==================== BOOT ====================
+document.addEventListener('fullscreenchange', function() {
+  if (!document.fullscreenElement && navigator.keyboard && navigator.keyboard.unlock) navigator.keyboard.unlock();
+});
 window.addEventListener('storage', function(event) {
   if (event.key === 'rd_token' && token !== (event.newValue || '')) location.reload();
 });
@@ -1988,7 +2033,7 @@ function openChangePasswordModal() {
 }
 
 function closeChangePasswordModal() {
-  if (window.isPasswordChangeForced) { showToast('Ganti password awal untuk melanjutkan'); return; }
+  if (window.isPasswordChangeForced) { showToast('Password wajib diganti sebelum melanjutkan'); return; }
   var modal = document.getElementById('changePasswordModal');
   if (modal) modal.style.display = 'none';
 }
@@ -2638,10 +2683,11 @@ function copyDownloadAgentLink() {
     branch = currentUser.branch;
   }
   var os = (document.getElementById('dlAgentOS') || {}).value || 'windows';
+  var arch = document.getElementById('dlAgentOS').selectedOptions[0].dataset.arch || 'amd64';
   if (!branch) { appAlert('Pilih lokasi terlebih dahulu.'); return; }
   
   // Create absolute URL
-  var link = window.location.origin + '/api/agent/package?branch=' + encodeURIComponent(branch) + '&os=' + encodeURIComponent(os) + '&token=' + encodeURIComponent(token);
+  var link = window.location.origin + '/api/agent/package?branch=' + encodeURIComponent(branch) + '&os=' + encodeURIComponent(os) + '&arch=' + encodeURIComponent(arch) + '&token=' + encodeURIComponent(token);
   
   if (navigator.clipboard) {
     navigator.clipboard.writeText(link).then(function() {
@@ -2661,9 +2707,10 @@ function submitDownloadAgentPackage() {
     branch = currentUser.branch;
   }
   var os = (document.getElementById('dlAgentOS') || {}).value || 'windows';
+  var arch = document.getElementById('dlAgentOS').selectedOptions[0].dataset.arch || 'amd64';
   if (!branch) { appAlert('Pilih lokasi terlebih dahulu.'); return; }
 
-  var downloadURL = '/api/agent/package?branch=' + encodeURIComponent(branch) + '&os=' + encodeURIComponent(os) + '&token=' + encodeURIComponent(token);
+  var downloadURL = '/api/agent/package?branch=' + encodeURIComponent(branch) + '&os=' + encodeURIComponent(os) + '&arch=' + encodeURIComponent(arch) + '&token=' + encodeURIComponent(token);
   
   showToast('Menyiapkan paket installer untuk cabang ' + branch + '...');
   

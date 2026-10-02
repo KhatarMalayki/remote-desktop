@@ -528,6 +528,7 @@ func TestMasterRoleAndITSupportPermissions(t *testing.T) {
 		t.Fatal("it_support role not found in master roles")
 	}
 
+	s.breachCheck = cleanPasswordFixture
 	rCreate := httptest.NewRequest("POST", "/api/users", strings.NewReader(`{"username":"andi_it","password":"unique initial phrase 492","role":"it_support","branch":""}`))
 	wCreate := httptest.NewRecorder()
 	s.handleUsers(wCreate, rCreate.WithContext(context.WithValue(rCreate.Context(), userClaimsKey, adminClaims)))

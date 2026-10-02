@@ -153,7 +153,7 @@ func (a *Agent) startRemoteRelay(sessionID string) {
 			item := screenshot.GetDisplayBounds(i)
 			monitors = append(monitors, map[string]int{"index": i, "width": item.Dx(), "height": item.Dy()})
 		}
-		return sendJSON(map[string]interface{}{"type": "ready", "agent_version": a.version, "width": bounds.Dx(), "height": bounds.Dy(), "monitor": monitor, "monitors": monitors, "capabilities": map[string]bool{"file_transfer": true, "protection": runtime.GOOS == "windows"}})
+		return sendJSON(map[string]interface{}{"type": "ready", "agent_version": a.version, "width": bounds.Dx(), "height": bounds.Dy(), "monitor": monitor, "monitors": monitors, "capabilities": map[string]bool{"file_transfer": true, "protection": runtime.GOOS == "windows", "clipboard_paste": runtime.GOOS == "windows"}})
 	}
 	if err := sendScreenInfo(); err != nil {
 		return
@@ -288,6 +288,14 @@ func (a *Agent) startRemoteRelay(sessionID string) {
 			if command.Type == "hotkey" {
 				if inputErr := sendRemoteHotkey(command.Keys); inputErr != nil {
 					_ = sendJSON(map[string]string{"type": "input_error", "message": inputErr.Error()})
+				}
+				continue
+			}
+			if command.Type == "clipboard_paste" {
+				if err := pasteRemoteText(command.Text, setRemoteClipboard, sendRemoteHotkey); err != nil {
+					_ = sendJSON(map[string]string{"type": "clipboard_error", "message": err.Error()})
+				} else {
+					_ = sendJSON(map[string]string{"type": "clipboard_pasted"})
 				}
 				continue
 			}

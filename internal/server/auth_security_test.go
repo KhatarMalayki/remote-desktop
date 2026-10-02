@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -17,8 +18,10 @@ func securityServer(t *testing.T) *Server {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { db.Close() })
-	return &Server{db: db, cfg: Config{JWTSecret: "security-test-secret", APIKey: "agent-test-key"}}
+	return &Server{db: db, cfg: Config{JWTSecret: "security-test-secret", APIKey: "agent-test-key"}, breachCheck: cleanPasswordFixture}
 }
+
+func cleanPasswordFixture(context.Context, string) (bool, error) { return false, nil }
 
 func authRequest(t *testing.T, s *Server, path, token string, body interface{}, handler http.HandlerFunc, status int) map[string]interface{} {
 	t.Helper()

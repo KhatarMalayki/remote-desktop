@@ -192,6 +192,29 @@ ExecStart=/usr/local/bin/rd-agent -config /etc/remotedesk/agent.json
 
 ## Pasang di macOS
 
+### Installer dari dashboard
+
+Pilih Download Agent, lokasi, lalu **macOS Apple Silicon** atau **macOS Intel**.
+Ekstrak seluruh ZIP, kemudian buka `pasang-otomatis.command`. Installer berjalan
+melalui Terminal, tanpa sudo, untuk akun yang sedang login. Binary dan konfigurasi
+disimpan di `~/Library/Application Support/RemoteDesk`; LaunchAgent dipasang di
+`~/Library/LaunchAgents/com.remotedesk.agent.plist`. Auto-start berlaku setelah
+pengguna login, bukan saat boot sebelum login. Periksa status online di dashboard
+dan `agent.log`; registrasi launchd sendiri belum membuktikan koneksi berhasil.
+
+Pemasangan ulang mempertahankan konfigurasi lama termasuk server, lokasi, dan
+device ID. Jika instalasi sistem LaunchDaemon lama terdeteksi, installer berhenti
+agar tidak menjalankan agent ganda; migrasinya perlu ditangani admin.
+`hapus-otomatis.command` menghapus auto-start saja, tanpa menghapus data atau binary.
+
+Installer ZIP ini belum signed/notarized Apple. Jika Gatekeeper atau kebijakan
+perusahaan memblokirnya, minta persetujuan admin; jangan menonaktifkan proteksi.
+Jaga `agent.json` karena berisi kredensial koneksi. Installer belum menambahkan
+dukungan keyboard/mouse/clipboard target macOS; remote input masih Windows-only.
+
+Bagian manual berikut adalah alternatif, bukan untuk dijalankan bersamaan
+dengan installer per-user di atas.
+
 ### Langsung Jalankan
 
 ```bash

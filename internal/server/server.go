@@ -266,6 +266,7 @@ func recordLoginSuccess(ip string) {
 }
 
 type Server struct {
+	breachCheck    func(context.Context, string) (bool, error)
 	cfg            Config
 	db             *DB
 	hub            *Hub
@@ -314,6 +315,9 @@ func New(cfg Config, webFS embed.FS) (*Server, error) {
 	}
 
 	s := &Server{
+		breachCheck: func(ctx context.Context, password string) (bool, error) {
+			return checkPwnedPassword(ctx, &http.Client{Timeout: 4 * time.Second}, password)
+		},
 		cfg:            cfg,
 		db:             db,
 		hub:            NewHub(db),
@@ -452,7 +456,17 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	if validatePassword(req.Password) != nil {
+	mustChange := validatePassword(req.Password) != nil
+	if !mustChange {
+		breached, screenErr := s.screenPassword(r.Context(), req.Password)
+		if screenErr != nil {
+			_ = s.db.RecordAuthLog(req.Username, ip, "password_screen_unavailable", "Skrining kebocoran belum berhasil; hasil tidak dianggap bersih", r.UserAgent())
+		} else if breached {
+			mustChange = true
+			_ = s.db.RecordAuthLog(req.Username, ip, "password_compromised", "Password cocok dengan database kebocoran; wajib diganti", r.UserAgent())
+		}
+	}
+	if mustChange {
 		if _, err := s.db.db.Exec(`UPDATE users SET must_change_password=1 WHERE username=?`, req.Username); err != nil {
 			jsonError(w, "Gagal memeriksa akun", 500)
 			return
@@ -1702,8 +1716,7 @@ func (s *Server) handleUsers(w http.ResponseWriter, r *http.Request) {
 			jsonError(w, "username and password are required", 400)
 			return
 		}
-		if err := validatePassword(req.Password); err != nil {
-			jsonError(w, err.Error(), 400)
+		if !s.acceptNewPassword(w, r, req.Password) {
 			return
 		}
 		if req.Role == "" {
@@ -2266,23 +2279,11 @@ func (s *Server) handleAgentDownload(w http.ResponseWriter, r *http.Request) {
 		targetArch = "amd64"
 	}
 
-	candidates := []string{}
-	if s.cfg.AgentsDir != "" {
-		candidates = append(candidates,
-			filepath.Join(s.cfg.AgentsDir, fmt.Sprintf("rd-agent-%s-%s.exe", targetOS, targetArch)),
-			filepath.Join(s.cfg.AgentsDir, fmt.Sprintf("rd-agent-%s-%s", targetOS, targetArch)),
-			filepath.Join(s.cfg.AgentsDir, "rd-agent.exe"),
-			filepath.Join(s.cfg.AgentsDir, "rd-agent"),
-		)
+	candidates, candidateErr := agentBinaryCandidates(s.cfg.AgentsDir, targetOS, targetArch)
+	if candidateErr != nil {
+		jsonError(w, candidateErr.Error(), http.StatusBadRequest)
+		return
 	}
-	candidates = append(candidates,
-		filepath.Join("bin", "agents", fmt.Sprintf("rd-agent-%s-%s.exe", targetOS, targetArch)),
-		filepath.Join("bin", "agents", fmt.Sprintf("rd-agent-%s-%s", targetOS, targetArch)),
-		filepath.Join("bin", "rd-agent.exe"),
-		filepath.Join("bin", "rd-agent"),
-		"rd-agent.exe",
-		"rd-agent",
-	)
 
 	var foundPath string
 	for _, p := range candidates {
@@ -2673,6 +2674,9 @@ func (s *Server) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "Password lama salah", 400)
 		return
 	}
+	if !s.acceptNewPassword(w, r, req.NewPassword) {
+		return
+	}
 
 	newHash := hashPassword(req.NewPassword)
 	if err := s.db.UpdatePassword(claims.Username, newHash); err != nil {
@@ -2744,6 +2748,9 @@ func (s *Server) handleUserUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if req.Password != "" && !s.acceptNewPassword(w, r, req.Password) {
+		return
+	}
 	if err := s.db.UpdateUser(id, req.Username, req.Password, req.Role, req.Branch); err != nil {
 		jsonError(w, err.Error(), 400)
 		return
@@ -2778,11 +2785,9 @@ func (s *Server) handleResetUserPassword(w http.ResponseWriter, r *http.Request)
 		jsonError(w, "invalid request body", 400)
 		return
 	}
-	if err := validatePassword(req.NewPassword); err != nil {
-		jsonError(w, err.Error(), 400)
+	if !s.acceptNewPassword(w, r, req.NewPassword) {
 		return
 	}
-
 	if err := s.db.ResetUserPassword(id, hashPassword(req.NewPassword)); err != nil {
 		jsonError(w, err.Error(), 500)
 		return
@@ -3149,23 +3154,11 @@ func (s *Server) handleAgentPackageDownload(w http.ResponseWriter, r *http.Reque
 		targetArch = "amd64"
 	}
 
-	candidates := []string{}
-	if s.cfg.AgentsDir != "" {
-		candidates = append(candidates,
-			filepath.Join(s.cfg.AgentsDir, fmt.Sprintf("rd-agent-%s-%s.exe", targetOS, targetArch)),
-			filepath.Join(s.cfg.AgentsDir, fmt.Sprintf("rd-agent-%s-%s", targetOS, targetArch)),
-			filepath.Join(s.cfg.AgentsDir, "rd-agent.exe"),
-			filepath.Join(s.cfg.AgentsDir, "rd-agent"),
-		)
+	candidates, candidateErr := agentBinaryCandidates(s.cfg.AgentsDir, targetOS, targetArch)
+	if candidateErr != nil {
+		jsonError(w, candidateErr.Error(), http.StatusBadRequest)
+		return
 	}
-	candidates = append(candidates,
-		filepath.Join("bin", "agents", fmt.Sprintf("rd-agent-%s-%s.exe", targetOS, targetArch)),
-		filepath.Join("bin", "agents", fmt.Sprintf("rd-agent-%s-%s", targetOS, targetArch)),
-		filepath.Join("bin", "rd-agent.exe"),
-		filepath.Join("bin", "rd-agent"),
-		"rd-agent.exe",
-		"rd-agent",
-	)
 
 	var foundPath string
 	for _, p := range candidates {
@@ -3216,12 +3209,16 @@ func (s *Server) handleAgentPackageDownload(w http.ResponseWriter, r *http.Reque
 	if targetOS != "windows" {
 		binName = "rd-agent"
 	}
-	fBin, err := zw.Create(binName)
+	binHeader := &zip.FileHeader{Name: binName, Method: zip.Deflate}
+	binHeader.SetMode(0700)
+	fBin, err := zw.CreateHeader(binHeader)
 	if err == nil {
 		_, _ = fBin.Write(agentBytes)
 	}
 
-	fCfg, err := zw.Create("agent.json")
+	configHeader := &zip.FileHeader{Name: "agent.json", Method: zip.Deflate}
+	configHeader.SetMode(0600)
+	fCfg, err := zw.CreateHeader(configHeader)
 	if err == nil {
 		_, _ = fCfg.Write(cfgBytes)
 	}
@@ -3493,11 +3490,41 @@ KETERANGAN FILE:
 - run-agent.bat       : Menjalankan agent di jendela hitam untuk tes melihat log.
 - hapus-otomatis.bat  : Menghapus service dan auto-start agent.
 `, branch, serverURL)
+	if targetOS == "darwin" {
+		if err := addMacInstallers(zw, targetArch); err != nil {
+			jsonError(w, "Gagal membuat installer macOS", 500)
+			return
+		}
+		readmeContent = fmt.Sprintf(`REMOTEDESK AGENT UNTUK macOS (%s)
+Lokasi: %s
+Server: %s
+
+1. Pilih paket Intel (amd64) atau Apple Silicon (arm64) sesuai Mac.
+2. Ekstrak SELURUH isi ZIP. Klik dua kali pasang-otomatis.command.
+3. Installer berjalan melalui Terminal dari akun yang sedang login, tanpa sudo.
+4. Periksa status online di dashboard. Jika belum online, baca agent.log.
+
+Lokasi pemasangan: ~/Library/Application Support/RemoteDesk
+Auto-start: ~/Library/LaunchAgents/com.remotedesk.agent.plist
+Agent aktif setelah akun tersebut login, bukan sebelum login.
+Pemasangan ulang mempertahankan konfigurasi, server, lokasi, dan device ID lama.
+hapus-otomatis.command menonaktifkan auto-start; data dan binary tetap disimpan.
+
+Paket ini belum ditandatangani/notarized Apple. macOS atau kebijakan perusahaan
+dapat memblokir pembukaannya. Minta persetujuan admin; jangan mematikan Gatekeeper.
+Jangan membagikan agent.json: berisi kredensial koneksi server.
+Installer tidak menambahkan kontrol keyboard/mouse/clipboard target macOS;
+implementasi remote input saat ini hanya mendukung Windows.
+`, targetArch, branch, serverURL)
+	}
 	if fReadme, err := zw.Create("PETUNJUK_CARA_PAKAI.txt"); err == nil {
 		_, _ = fReadme.Write([]byte(readmeContent))
 	}
 
-	_ = zw.Close()
+	if err := zw.Close(); err != nil {
+		jsonError(w, "Gagal menyelesaikan paket agent", 500)
+		return
+	}
 
 	cleanBranch := strings.ReplaceAll(branch, " ", "-")
 	versionSuffix := strings.TrimSpace(s.cfg.Version)
@@ -3507,6 +3534,9 @@ KETERANGAN FILE:
 	// The package URL is stable; preventing HTTP caching ensures the binary in
 	// a freshly downloaded ZIP is from this server release.
 	zipName := fmt.Sprintf("RemoteDesk-Agent-%s-v%s.zip", cleanBranch, versionSuffix)
+	if targetOS == "darwin" {
+		zipName = fmt.Sprintf("RemoteDesk-Agent-%s-macOS-%s-v%s.zip", cleanBranch, targetArch, versionSuffix)
+	}
 	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", zipName))
 	w.Header().Set("Content-Type", "application/zip")
 	w.Header().Set("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
