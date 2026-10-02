@@ -1,4 +1,33 @@
 :root { color-scheme: dark; }
+.device-filters { display:flex; flex-wrap:wrap; gap:12px; margin-bottom:12px; }
+#page-devices .device-filters .search-input { flex:1 1 260px; min-width:0; }
+#page-devices .device-filters .filter-select { flex:0 1 180px; min-width:140px; }
+.device-list-hint { margin:0 0 12px; font-size:12px; color:var(--fg2); }
+#devicesTable { max-height:70vh; }
+#devicesTable:focus-visible { outline:2px solid var(--accent); outline-offset:3px; }
+.device-identity { display:flex; align-items:flex-start; flex-direction:column; gap:8px; margin-bottom:8px; }
+.device-hostname { font-size:14px; line-height:1.4; overflow-wrap:anywhere; }
+.device-identity .badge-status { display:inline-flex; align-items:center; gap:6px; font-size:11px; padding:2px 8px; border-radius:999px; }
+.device-owner { font-size:12px; font-weight:600; color:#bfdbfe; overflow-wrap:anywhere; margin-bottom:4px; }
+.device-meta, .device-id { color:var(--fg2); font-size:11px; line-height:1.6; overflow-wrap:anywhere; }
+.device-id { font-family:monospace; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:4px; }
+.device-ip { font-size:12px; font-weight:600; overflow-wrap:anywhere; margin-bottom:8px; }
+.device-ip-secondary { font-variant-numeric:tabular-nums; }
+.device-network-hint { display:inline-block; font-size:11px; color:#93c5fd; margin-top:8px; }
+.device-resource { display:grid; grid-template-columns:1fr auto; align-items:center; gap:4px; margin-top:10px; font-size:11px; font-variant-numeric:tabular-nums; }
+.device-resource meter { grid-column:1 / -1; width:100%; height:8px; }
+.device-resource meter::-webkit-meter-bar { background:var(--bg3); border:0; border-radius:4px; }
+.device-resource meter::-webkit-meter-optimum-value { background:var(--green); }
+.device-resource meter::-webkit-meter-suboptimum-value { background:#fbbf24; }
+.device-resource meter::-webkit-meter-even-less-good-value { background:var(--red); }
+.device-version { font-size:12px; }
+.device-update { font-size:11px; font-weight:600; margin:4px 0 12px; }
+.device-os { display:flex; align-items:center; gap:4px; font-size:11px; margin-bottom:6px; }
+.device-actions { display:flex; flex-direction:column; gap:6px; }
+.device-actions .btn { justify-content:center; text-decoration:none; white-space:nowrap; font-size:11px; padding:6px 8px; }
+.device-actions svg { width:13px; height:13px; flex-shrink:0; }
+.remote-workspace .sidebar { display:none; }
+.remote-workspace .main { margin-left:0; width:100%; padding:24px; }
 body { line-height: 1.5; }
 .header { flex-wrap: wrap; gap: 16px; padding-bottom: 18px; border-bottom: 1px solid var(--border); }
 .header h2 { font-size: 24px; letter-spacing: -.5px; }
@@ -74,9 +103,18 @@ body { line-height: 1.5; }
 .asset-record { border:1px solid var(--border); box-shadow:none; }
 .asset-record-head, .asset-record-footer { padding:18px; }
 #assetsTable, #recentDevices, #devicesTable { border:1px solid var(--border); border-radius:12px; background:var(--bg2); }
-.device-table { border:0; }
-.device-table td { line-height:1.5; }
-.device-table th { white-space:nowrap; font-size:10px; padding-top:16px; padding-bottom:16px; }
+.device-table { border:0; table-layout:fixed; min-width:960px; overflow:visible; }
+.device-table td { line-height:1.5; vertical-align:top; padding:16px 12px; }
+.device-table th { white-space:nowrap; font-size:10px; padding:14px 12px; position:sticky; top:0; z-index:1; }
+.device-table th:nth-child(1) { width:22%; }
+.device-table th:nth-child(2) { width:16%; }
+.device-table th:nth-child(3) { width:15%; }
+.device-table th:nth-child(4) { width:17%; }
+.device-table th:nth-child(5) { width:15%; }
+.device-table th:nth-child(6) { width:15%; }
+.device-table .device-actions-cell { position:sticky; right:0; background:var(--bg2); box-shadow:-1px 0 var(--border); }
+.device-table th.device-actions-cell { background:var(--bg3); z-index:2; }
+.device-table tr:hover td.device-actions-cell { background:var(--bg2); }
 #page-remote .remote-toolbar { border-radius:12px; border-top:3px solid #60a5fa; }
 .remote-container { border:1px solid var(--border); min-height:440px; }
 .remote-container .empty-state { border:0; background:transparent; max-width:420px; }

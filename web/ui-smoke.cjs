@@ -13,7 +13,7 @@ const responses = {
   '/api/auth/me': {id:1,username:'test-admin',role:'admin',mfa_enabled:true},
   '/api/auth/mfa/status': {mfa_enabled:true},
   '/api/stats': {total_devices:1,online_devices:1,offline_devices:0,os_distribution:{windows:1}},
-  '/api/devices': [fixture],
+  '/api/devices': {devices:[fixture],total:1,offset:0,limit:50,server_version:'0.2.58'},
   '/api/groups': ['Cabang Pengujian'],
   '/api/devices/test-workstation': fixture
 };
@@ -45,6 +45,13 @@ const responses = {
       for (const section of ['dashboard','branch-assets','devices','assets','remote']) {
         await page.locator('.nav-item[data-page="'+section+'"]').click();
         await page.locator('#page-'+section).waitFor({state:'visible'});
+        if (section === 'devices') {
+          assert.equal(await page.locator('#devicesTable tbody tr').count(), 1, 'Device fixture must render');
+          assert.equal(await page.locator('#devicesTable thead th').count(), 6);
+          const remoteLink = page.locator('#devicesTable a[target="_blank"]');
+          assert.equal(await remoteLink.getAttribute('rel'), 'noopener noreferrer');
+          assert.equal(await remoteLink.getAttribute('href'), '#remote=test-workstation');
+        }
         const overflow = await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1);
         results.push({width,section,overflow});
         await page.screenshot({path:path.join(output,section+'-'+width+'.png')});

@@ -10,6 +10,7 @@ let manualAssets = [];
 let currentDevice = null;
 let ws = null;
 let remoteWS = null;
+let remoteTabDevice = null;
 let remoteProtectionState = { blocked: false, privacy: false };
 let remoteFileBusy = false;
 let remoteTransitionHistory = [];
@@ -189,7 +190,7 @@ function updateUserUI() {
 function init() {
   ownershipUI();
   loadStats();
-  loadDevices();
+  loadDevices().then(openRemoteFromLocation);
   loadGroups();
   loadBranches();
   loadBranchAssets();
@@ -231,6 +232,7 @@ function connectWS() {
 function updateOnlineStatus(id, online) {
   var dev = devices.find(function(d) { return d.id === id; });
   if (dev) dev.online = online;
+  if (remoteTabDevice && remoteTabDevice.id === id) remoteTabDevice.online = online;
   if (currentPage === 'devices') renderDevices();
   if (currentPage === 'dashboard') { renderRecentDevices(); renderCharts(); }
   if (currentPage === 'branch-assets') renderBranchAssets();
@@ -356,22 +358,14 @@ function renderDevices() {
 
 function buildDeviceTable(list) {
   return '<table class="device-table"><thead><tr>' +
-    '<th style="width:105px">Status</th>' +
-    '<th>Hostname / PIC</th>' +
-    '<th style="min-width:130px">Aplikasi / Policy</th>' +
-    '<th>OS</th>' +
-    '<th>Alamat IP</th>' +
-    '<th>CPU</th>' +
-    '<th style="min-width:90px">RAM</th>' +
-    '<th style="min-width:90px">Disk</th>' +
-    '<th>Group</th>' +
-    '<th>Agent</th>' +
-    '<th>Last Seen</th>' +
-    '<th style="min-width:160px;text-align:right">Aksi</th>' +
+    '<th scope="col">Perangkat / Pemakai</th>' +
+    '<th scope="col">Jaringan</th>' +
+    '<th scope="col">Aplikasi / Policy</th>' +
+    '<th scope="col">Kapasitas</th>' +
+    '<th scope="col">Agent / Aktivitas</th>' +
+    '<th scope="col" class="device-actions-cell">Aksi</th>' +
     '</tr></thead><tbody>' +
     list.map(function(d) {
-      var ramPct = d.memory_total ? Math.round(d.memory_used / d.memory_total * 100) : 0;
-      var diskPct = d.disk_total ? Math.round(d.disk_used / d.disk_total * 100) : 0;
       var outdated = isVersionNewer(serverAgentVersion, d.version || '');
       var pending = !!pendingAgentUpdates[d.id];
       var versionLabel = d.version ? 'v' + esc(d.version) : 'Tidak diketahui';
@@ -379,42 +373,45 @@ function buildDeviceTable(list) {
       var updateColor = pending ? '#fbbf24' : (outdated ? '#ef4444' : '#10b981');
       var rustDeskID = /^\d{6,20}$/.test(String(d.rustdesk_id || '')) ? String(d.rustdesk_id) : '';
       
-      var statusHtml = '<span class="badge-status ' + (d.online ? 'online' : 'offline') + '" style="white-space:nowrap;display:inline-flex;align-items:center;gap:6px">' +
+      var statusHtml = '<span class="badge-status ' + (d.online ? 'online' : 'offline') + '">' +
         '<span class="status-dot ' + (d.online ? 'online' : 'offline') + '"></span>' + (d.online ? 'Online' : 'Offline') + '</span>';
       
-      var hostHtml = '<div style="font-weight:650;font-size:13px;color:var(--fg);line-height:1.3">' + esc(d.hostname) + '</div>' +
-        (d.assigned_to ? '<div style="margin:3px 0"><span style="display:inline-flex;align-items:center;gap:4px;background:rgba(59,130,246,0.12);color:#93c5fd;border:1px solid rgba(59,130,246,0.25);border-radius:4px;padding:1px 6px;font-size:11px;font-weight:550">&#128100; ' + esc(d.assigned_to) + '</span></div>' : '') +
-        '<div style="font-family:monospace;font-size:10.5px;color:var(--fg2)">' + esc(d.id) + '</div>';
+      var hostHtml = '<div class="device-identity"><strong class="device-hostname">' + esc(d.hostname || d.id) + '</strong>' + statusHtml + '</div>' +
+        '<div class="device-owner">' + (d.assigned_to ? esc(d.assigned_to) : 'Pemakai belum diisi') + '</div>' +
+        '<div class="device-meta">' + esc(d.branch || d.group || 'default') + '</div>' +
+        '<div class="device-id" title="' + esc(d.id) + '">' + esc(d.id) + '</div>';
       
-      var osHtml = '<div style="display:inline-flex;align-items:center;gap:6px;font-size:12px;white-space:nowrap">' +
+      var osHtml = '<div class="device-os">' +
         osIcon(d.os) + ' <span>' + esc(d.os) + ' ' + esc(d.arch) + '</span></div>';
       
-      var ipHtml = '<div style="font-weight:600;font-size:13px;color:var(--fg)">' + esc(d.local_ip || d.ip || '-') + '</div>' +
-        (d.ip && d.local_ip && d.ip !== d.local_ip ? '<div style="font-size:11px;color:var(--fg2)">Publik: ' + esc(d.ip) + '</div>' : '') +
-        (d.all_ips ? '<div style="font-size:11px;color:var(--accent);font-weight:500" title="' + esc(d.all_ips) + '">VPN/Multi-IP</div>' : '');
+      var ipHtml = '<div class="device-ip">' + esc(d.local_ip || d.ip || 'Belum tersedia') + '</div>' +
+        (d.ip && d.local_ip && d.ip !== d.local_ip ? '<div class="device-meta">Publik<br><span class="device-ip-secondary">' + esc(d.ip) + '</span></div>' : '') +
+        (d.all_ips ? '<span class="device-network-hint" title="' + esc(d.all_ips) + '">VPN / Multi-IP</span>' : '');
       
-      var actionsHtml = '<div style="display:flex;align-items:center;justify-content:flex-end;gap:5px;flex-wrap:nowrap">' +
-        '<button class="btn btn-ghost btn-sm" onclick="openDeviceModal(\'' + d.id + '\')">Details</button>' +
-        (d.online ? '<button class="btn btn-primary btn-sm" onclick="quickRemote(\'' + d.id + '\')">Remote Web</button>' : '') +
+      var actionsHtml = '<div class="device-actions">' +
+        (d.online ? '<a class="btn btn-primary btn-sm" href="#remote=' + encodeURIComponent(d.id) + '" target="_blank" rel="noopener noreferrer" aria-label="Remote ' + esc(d.hostname || d.id) + ' di tab baru">Remote Web <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h6v6M10 14 21 3"/><path d="M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5"/></svg></a>' : '') +
+        '<button class="btn btn-ghost btn-sm" data-device="' + esc(d.id) + '" onclick="openDeviceModal(this.dataset.device)">Detail</button>' +
         (rustDeskID ? '<button class="btn btn-warning btn-sm" onclick="openRustDesk(\'' + rustDeskID + '\')">RustDesk</button>' : '') +
-        (currentUser && (currentUser.role === 'admin' || currentUser.role === 'it_support') && outdated ? '<button class="btn btn-warning btn-sm" ' + (!d.online || pending ? 'disabled' : '') + ' onclick="updateDeviceAgent(\'' + d.id + '\')">Update</button>' : '') +
+        (currentUser && (currentUser.role === 'admin' || currentUser.role === 'it_support') && outdated ? '<button class="btn btn-warning btn-sm" ' + (!d.online || pending ? 'disabled' : '') + ' data-device="' + esc(d.id) + '" onclick="updateDeviceAgent(this.dataset.device)">Update</button>' : '') +
         '</div>';
 
       return '<tr>' +
-        '<td>' + statusHtml + '</td>' +
         '<td>' + hostHtml + '</td>' +
-        '<td>' + endpointBadges(d) + '</td>' +
-        '<td>' + osHtml + '</td>' +
         '<td>' + ipHtml + '</td>' +
-        '<td style="white-space:nowrap">' + d.cpu_cores + ' cores</td>' +
-        '<td><div class="progress-bar"><div class="fill ' + (ramPct > 80 ? 'danger' : '') + '" style="width:' + ramPct + '%"></div></div><div style="font-size:11px;color:var(--fg2);margin-top:2px">' + ramPct + '%</div></td>' +
-        '<td><div class="progress-bar"><div class="fill ' + (diskPct > 80 ? 'danger' : '') + '" style="width:' + diskPct + '%"></div></div><div style="font-size:11px;color:var(--fg2);margin-top:2px">' + diskPct + '%</div></td>' +
-        '<td><span class="tag" style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + esc(d.branch || d.group || 'default') + '">' + esc(d.branch || d.group || 'default') + '</span></td>' +
-        '<td><strong style="font-size:12px">' + versionLabel + '</strong><br><small style="color:' + updateColor + ';font-weight:600">' + updateLabel + '</small></td>' +
-        '<td style="font-size:12px;color:var(--fg2);white-space:nowrap">' + timeAgo(d.last_seen) + '</td>' +
-        '<td>' + actionsHtml + '</td>' +
+        '<td>' + endpointBadges(d) + '</td>' +
+        '<td><div class="device-meta">CPU <strong>' + esc(String(d.cpu_cores || 0)) + ' cores</strong></div>' + deviceResourceUsage('RAM', d.memory_used, d.memory_total) + deviceResourceUsage('Disk', d.disk_used, d.disk_total) + '</td>' +
+        '<td><strong class="device-version">' + versionLabel + '</strong><div class="device-update" style="color:' + updateColor + '">' + updateLabel + '</div>' + osHtml + '<div class="device-meta">Terlihat ' + timeAgo(d.last_seen) + '</div></td>' +
+        '<td class="device-actions-cell">' + actionsHtml + '</td>' +
         '</tr>';
     }).join('') + '</tbody></table>';
+}
+
+function deviceResourceUsage(label, used, total) {
+  if (!Number.isFinite(total) || total <= 0 || !Number.isFinite(used) || used < 0) {
+    return '<div class="device-resource"><span>' + label + '</span><span class="device-meta">Belum tersedia</span></div>';
+  }
+  var percent = Math.min(100, Math.round(used / total * 100));
+  return '<div class="device-resource"><span>' + label + '</span><strong>' + percent + '%</strong><meter min="0" max="100" low="60" high="80" optimum="0" value="' + percent + '" aria-label="Pemakaian ' + label + '">' + percent + '%</meter></div>';
 }
 
 function parseAgentVersion(value) {
@@ -1450,15 +1447,31 @@ function updateRemoteDeviceList() {
   if (!sel) return;
   var cur = sel.value;
   sel.innerHTML = '<option value="">Select Device...</option>';
-  devices.filter(function(d){return d.online || d.rustdesk_id}).forEach(function(d){ sel.innerHTML += '<option value="'+d.id+'">'+esc(d.hostname)+' ('+d.id+')'+(d.online?'':' — offline web')+'</option>'; });
+  var available = devices.slice();
+  if (remoteTabDevice && !available.some(function(d){return d.id === remoteTabDevice.id})) available.push(remoteTabDevice);
+  available.filter(function(d){return d.online || d.rustdesk_id}).forEach(function(d){ sel.innerHTML += '<option value="'+esc(d.id)+'">'+esc(d.hostname)+' ('+esc(d.id)+')'+(d.online?'':' — offline web')+'</option>'; });
   if (cur) sel.value = cur;
 }
 
-function quickRemote(id) { showPage('remote'); document.getElementById('remoteDeviceSelect').value = id; startRemote(); }
+async function openRemoteFromLocation() {
+  var id = new URLSearchParams(location.hash.slice(1)).get('remote');
+  if (!id) return;
+  showPage('remote');
+  if (id.length > 256 || /[\x00-\x1f\x7f]/.test(id)) { showToast('ID perangkat tidak valid'); return; }
+  var device = await api('/api/devices/' + encodeURIComponent(id));
+  if (!device || device.id !== id) { showToast('Perangkat tidak tersedia atau akses ditolak'); return; }
+  remoteTabDevice = device;
+  document.title = (device.hostname || id) + ' — RemoteDesk';
+  document.body.classList.add('remote-workspace');
+  updateRemoteDeviceList();
+  if (!device.online) { showToast('Perangkat sedang offline'); return; }
+  document.getElementById('remoteDeviceSelect').value = id;
+  startRemote();
+}
 
 function openSelectedRustDesk() {
   var deviceId = document.getElementById('remoteDeviceSelect').value;
-  var device = devices.find(function(item){ return item.id === deviceId; });
+  var device = devices.find(function(item){ return item.id === deviceId; }) || (remoteTabDevice && remoteTabDevice.id === deviceId ? remoteTabDevice : null);
   if (!device) { showToast('Pilih perangkat terlebih dahulu'); return; }
   if (!device.rustdesk_id) { showToast('RustDesk belum terdeteksi. Update agent lalu restart servicenya.'); return; }
   openRustDesk(device.rustdesk_id);
@@ -1480,6 +1493,11 @@ function startRemote(reconnecting) {
   clearTimeout(window.remoteReconnectTimer);
   var deviceId = document.getElementById('remoteDeviceSelect').value;
   if (!deviceId) { showToast('Select a device first'); return; }
+  if (remoteTabDevice) {
+    var selectedDevice = devices.find(function(item){ return item.id === deviceId; }) || (remoteTabDevice.id === deviceId ? remoteTabDevice : null);
+    document.title = (selectedDevice && selectedDevice.hostname || deviceId) + ' — RemoteDesk';
+    history.replaceState(null, '', '#remote=' + encodeURIComponent(deviceId));
+  }
   if (remoteWS) remoteWS.close();
   setRemoteStatus('connecting');
 
@@ -1889,7 +1907,7 @@ function esc(str) {
   if (!str) return '';
   var div = document.createElement('div');
   div.textContent = str;
-  return div.innerHTML;
+  return div.innerHTML.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
 function fmtBytes(bytes) {
@@ -1926,6 +1944,9 @@ function showToast(msg) {
 }
 
 // ==================== BOOT ====================
+window.addEventListener('storage', function(event) {
+  if (event.key === 'rd_token' && token !== (event.newValue || '')) location.reload();
+});
 loadServerVersion();
 checkAuth();
 

@@ -6,7 +6,7 @@
   <title>RemoteDesk - Device & Branch Asset Management</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%234f8cff'><rect x='2' y='3' width='20' height='14' rx='2' fill='%234f8cff'/><rect x='4' y='5' width='16' height='10' fill='%230f1117'/><rect x='8' y='19' width='8' height='2' rx='1' fill='%234f8cff'/><rect x='11' y='17' width='2' height='2' fill='%234f8cff'/></svg>">
   <link rel="stylesheet" href="/static/style.css?v=20261001-redesign">
-  <link rel="stylesheet" href="/static/ui-system.css?v=20261001-login-classic">
+  <link rel="stylesheet" href="/static/ui-system.css?v=20261002-devices">
   <script src="/static/qrcode.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 </head>
@@ -262,7 +262,7 @@
     <div id="page-devices" class="page">
       <header class="header page-heading"><div><span class="eyebrow">ENDPOINTS</span><h2>Perangkat</h2><p>Temukan workstation, periksa aplikasi, dan kelola kebijakan agent.</p></div></header>
       <!-- TOOLBAR 1: SEARCH & FILTERS -->
-      <div class="toolbar" style="margin-bottom:10px">
+      <div class="toolbar device-filters">
         <input class="search-input" aria-label="Cari perangkat" id="deviceSearch" placeholder="Cari hostname, IP, ID, pemakai..." oninput="searchDevices()">
         <select class="filter-select" aria-label="Filter grup" id="groupFilter" onchange="filterDevices()">
           <option value="">Semua Grup</option>
@@ -289,7 +289,8 @@
           <button class="btn btn-ghost btn-sm" id="rustDeskResetAllBtn" style="display:none" onclick="resetAllRustDeskPasswords()">🔑 Reset All Password</button>
         </div>
       </div>
-      <div id="devicesTable"></div>
+      <p class="device-list-hint">Remote Web membuka tab baru. Daftar perangkat tetap terbuka untuk sesi lainnya.</p>
+      <div id="devicesTable" role="region" aria-label="Daftar perangkat, gulir untuk melihat semua kolom" tabindex="0"></div>
       <div class="pagination" id="pagination"></div>
     </div>
 
@@ -1004,7 +1005,7 @@
 </div>
 <script src="/static/dialogs.js?v=20260924"></script>
 <script src="/static/ownership.js?v=20260924"></script>
-<script src="/static/app.js?v=20260924"></script>
+<script src="/static/app.js?v=20261002-remote-tabs"></script>
 <script src="/static/deploy.js?v=20260930"></script>
 <script src="/static/endpoint.js?v=0.2.58"></script>
 <div id="fileManagerModal" class="modal-overlay" style="display:none">

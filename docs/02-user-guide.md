@@ -183,8 +183,10 @@ Klik tombol **Disconnect** (merah).
 
 ### Cara Cepat
 
-Di halaman Devices, klik tombol **Remote** di baris device yang online.
-Otomatis pindah ke halaman Remote Desktop dan langsung connect.
+Di halaman Devices, klik **Remote Web** pada perangkat online.
+Sesi dibuka di tab baru, sedangkan daftar Devices tetap terbuka.
+Ulangi pada perangkat lain untuk multitask; judul tab menampilkan hostname tujuan.
+Setiap tab tetap memerlukan autentikasi dan hak akses. Logout berlaku lintas tab.
 
 ### Yang Perlu Diketahui
 
