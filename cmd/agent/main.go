@@ -10,9 +10,11 @@ import (
 	"github.com/user/remote-desktop/internal/agent"
 )
 
-var version = "0.2.59"
+var version = "0.2.61"
 
 func main() {
+	vpnTray := flag.Bool("vpn-tray", false, "show RemoteDesk VPN safety tray")
+	vpnWatchdog := flag.Bool("vpn-watchdog", false, "run independent VPN safety watchdog")
 	serverURL := flag.String("server", envOr("RD_SERVER_URL", ""), "server URL")
 	apiKey := flag.String("key", envOr("RD_API_KEY", ""), "API key")
 	deviceID := flag.String("id", envOr("RD_DEVICE_ID", ""), "device ID (auto-generated if empty)")
@@ -25,6 +27,8 @@ func main() {
 	secureRelay := flag.String("secure-relay", "", "run one remote relay directly on the Windows Winlogon desktop")
 	userRelay := flag.String("user-relay", "", "run one remote relay in the interactive Windows user session")
 	flag.Parse()
+	if *vpnTray { if err := agent.RunVPNTray(); err != nil { log.Print(err) }; return }
+	if *vpnWatchdog { if err := agent.RunVPNWatchdog(); err != nil { log.Print(err) }; return }
 	if *logFile != "" {
 		if file, err := os.OpenFile(*logFile, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600); err == nil {
 			log.SetOutput(file)

@@ -266,6 +266,7 @@ func recordLoginSuccess(ip string) {
 }
 
 type Server struct {
+	vpnPilot       *vpnServer
 	breachCheck    func(context.Context, string) (bool, error)
 	cfg            Config
 	db             *DB
@@ -337,6 +338,7 @@ func New(cfg Config, webFS embed.FS) (*Server, error) {
 	if err := os.MkdirAll(s.attachmentsDir, 0700); err != nil {
 		return nil, fmt.Errorf("attachment storage: %w", err)
 	}
+	s.initVPN()
 	return s, nil
 }
 
@@ -345,6 +347,7 @@ func (s *Server) ListenAndServe() error {
 		return err
 	}
 	mux := http.NewServeMux()
+	mux.HandleFunc("/api/vpn/pilot", s.authMiddleware(s.handleVPN))
 	mux.HandleFunc("/api/endpoint/applications", s.authMiddleware(s.handleTrackedApplications))
 	mux.HandleFunc("/api/endpoint/lock-policy", s.authMiddleware(s.handleLockPolicy))
 	mux.HandleFunc("/api/deployments", s.authMiddleware(s.handleDeployments))
@@ -2036,6 +2039,8 @@ func (s *Server) handleAgentMessage(c *Client, raw []byte) {
 
 	case "endpoint_report":
 		s.receiveEndpointReport(c.DeviceID, msg.Data)
+	case "vpn_pilot_status":
+		s.receiveVPN(c.DeviceID, msg.Data)
 	case "lock_policy_result":
 		s.receiveLockPolicyResult(c.DeviceID, msg.Data)
 	case "rustdesk_result":
@@ -3513,8 +3518,14 @@ hapus-otomatis.command menonaktifkan auto-start; data dan binary tetap disimpan.
 Paket ini belum ditandatangani/notarized Apple. macOS atau kebijakan perusahaan
 dapat memblokir pembukaannya. Minta persetujuan admin; jangan mematikan Gatekeeper.
 Jangan membagikan agent.json: berisi kredensial koneksi server.
-Installer tidak menambahkan kontrol keyboard/mouse/clipboard target macOS;
-implementasi remote input saat ini hanya mendukung Windows.
+Minimal macOS 13. Build native mendukung layar, keyboard, mouse, dan clipboard teks.
+Berikan izin Screen Recording dan Accessibility untuk:
+~/Library/Application Support/RemoteDesk/rd-agent
+di System Settings > Privacy & Security. Gunakan tombol + lalu Command+Shift+G.
+Restart sesudah memberi izin: launchctl kickstart -k gui/$(id -u)/com.remotedesk.agent
+Setelah update, macOS mungkin meminta izin ulang. Command memakai tombol Meta/Windows;
+paste memakai Command+V. Hanya sesi pengguna yang sudah login, bukan FileVault/login screen.
+Secure Input tidak dapat dilewati. Privacy screen dan blokir input lokal belum tersedia.
 `, targetArch, branch, serverURL)
 	}
 	if fReadme, err := zw.Create("PETUNJUK_CARA_PAKAI.txt"); err == nil {

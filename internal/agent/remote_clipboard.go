@@ -2,6 +2,7 @@ package agent
 
 import (
 	"fmt"
+	"runtime"
 	"strings"
 	"unicode/utf8"
 )
@@ -13,5 +14,12 @@ func pasteRemoteText(text string, setClipboard func(string) error, hotkey func([
 	if err := setClipboard(text); err != nil {
 		return fmt.Errorf("clipboard target gagal diperbarui; paste dibatalkan")
 	}
-	return hotkey([]string{"ControlLeft", "KeyV"})
+	return hotkey(remotePasteKeys(runtime.GOOS))
+}
+
+func remotePasteKeys(platform string) []string {
+	if platform == "darwin" {
+		return []string{"MetaLeft", "KeyV"}
+	}
+	return []string{"ControlLeft", "KeyV"}
 }

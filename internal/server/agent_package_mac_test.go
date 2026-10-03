@@ -67,7 +67,7 @@ func TestMacAgentPackage(t *testing.T) {
 				t.Fatalf("invalid config: %v", err)
 			}
 			script := contents["pasang-otomatis.command"]
-			for _, required := range []string{"launchctl bootstrap", "launchctl kickstart", "trap finish EXIT", "old-agent", "Konfigurasi lama", "plutil -insert Program -string"} {
+			for _, required := range []string{"launchctl bootstrap", "launchctl kickstart", "trap finish EXIT", "old-agent", "Konfigurasi lama", "plutil -insert Program -string", "sw_vers -productVersion", "Screen Recording", "Accessibility", "Secure Input"} {
 				if !strings.Contains(script, required) {
 					t.Fatalf("installer missing %s", required)
 				}

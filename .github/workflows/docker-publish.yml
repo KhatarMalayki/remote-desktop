@@ -11,6 +11,11 @@ env:
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
+  build-macos-agent:
+    uses: ./.github/workflows/build-macos-agent.yml
+    permissions:
+      contents: read
+
   sign-windows-agent:
     runs-on: windows-latest
     permissions:
@@ -68,7 +73,7 @@ jobs:
           if-no-files-found: error
 
   build-and-push:
-    needs: sign-windows-agent
+    needs: [sign-windows-agent, build-macos-agent]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -86,6 +91,12 @@ jobs:
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
+
+      - name: Download native macOS agents
+        uses: actions/download-artifact@v4
+        with:
+          name: native-macos-agents
+          path: prebuilt-agent
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3

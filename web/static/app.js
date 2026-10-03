@@ -392,6 +392,7 @@ function buildDeviceTable(list) {
         (d.online ? '<a class="btn btn-primary btn-sm" href="#remote=' + encodeURIComponent(d.id) + '" target="_blank" rel="noopener noreferrer" aria-label="Remote ' + esc(d.hostname || d.id) + ' di tab baru">Remote Web <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h6v6M10 14 21 3"/><path d="M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5"/></svg></a>' : '') +
         '<button class="btn btn-ghost btn-sm" data-device="' + esc(d.id) + '" onclick="openDeviceModal(this.dataset.device)">Detail</button>' +
         (rustDeskID ? '<button class="btn btn-warning btn-sm" onclick="openRustDesk(\'' + rustDeskID + '\')">RustDesk</button>' : '') +
+        (currentUser && currentUser.role === 'admin' ? '<button class="btn btn-ghost btn-sm" data-device="' + esc(d.id) + '" onclick="openVPNModal(this.dataset.device)">VPN</button>' : '') +
         (currentUser && (currentUser.role === 'admin' || currentUser.role === 'it_support') && outdated ? '<button class="btn btn-warning btn-sm" ' + (!d.online || pending ? 'disabled' : '') + ' data-device="' + esc(d.id) + '" onclick="updateDeviceAgent(this.dataset.device)">Update</button>' : '') +
         '</div>';
 
@@ -1582,6 +1583,10 @@ function startRemote(reconnecting) {
         if (relayMessage.type === 'ready') {
           var capabilities = relayMessage.capabilities || {};
           sessionSocket.clipboardPaste = !!capabilities.clipboard_paste;
+          sessionSocket.platform = relayMessage.platform || 'windows';
+          document.getElementById('remoteShortcutSelect').innerHTML = sessionSocket.platform === 'darwin'
+            ? '<option value="">Kirim Shortcut...</option><option value="alt-tab">Command + Tab</option><option value="task-manager">Force Quit</option><option value="win-d">Mission Control</option>'
+            : '<option value="">Kirim Shortcut...</option><option value="alt-tab">Alt + Tab</option><option value="task-manager">Task Manager</option><option value="win-d">Tampilkan Desktop</option>';
           document.getElementById('btnRemoteBlock').disabled = !capabilities.protection;
           document.getElementById('btnRemotePrivacy').disabled = !capabilities.protection;
           document.getElementById('btnRemoteFile').disabled = !capabilities.file_transfer || remoteFileBusy;
@@ -1813,15 +1818,24 @@ function changeRemoteQuality() {
   if (remoteWS && remoteWS.readyState === WebSocket.OPEN) remoteWS.send(JSON.stringify({ type: 'set_quality', profile: profile }));
 }
 
-function sendRemoteShortcut() {
-  var select = document.getElementById('remoteShortcutSelect');
-  var shortcuts = {
+function remoteShortcutKeys(platform, shortcut) {
+  var shortcuts = platform === 'darwin' ? {
+    'alt-tab': ['MetaLeft', 'Tab'],
+    'task-manager': ['MetaLeft', 'AltLeft', 'Escape'],
+    'win-d': ['ControlLeft', 'ArrowUp']
+  } : {
     'alt-tab': ['AltLeft', 'Tab'],
     'task-manager': ['ControlLeft', 'ShiftLeft', 'Escape'],
     'win-d': ['MetaLeft', 'KeyD']
   };
-  if (shortcuts[select.value] && remoteWS && remoteWS.readyState === WebSocket.OPEN) {
-    remoteWS.send(JSON.stringify({ type: 'hotkey', keys: shortcuts[select.value] }));
+  return shortcuts[shortcut];
+}
+
+function sendRemoteShortcut() {
+  var select = document.getElementById('remoteShortcutSelect');
+  var keys = remoteShortcutKeys(remoteWS && remoteWS.platform, select.value);
+  if (keys && remoteWS && remoteWS.readyState === WebSocket.OPEN) {
+    remoteWS.send(JSON.stringify({ type: 'hotkey', keys: keys }));
     document.getElementById('remoteCanvas').focus();
   }
   select.value = '';

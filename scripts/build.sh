@@ -19,11 +19,14 @@ CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o bin/rd-agent-
 echo "=> Building agent (windows/amd64)..."
 CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o bin/rd-agent-windows-amd64.exe ./cmd/agent
 
-echo "=> Building agent (darwin/amd64)..."
-CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o bin/rd-agent-darwin-amd64 ./cmd/agent
-
-echo "=> Building agent (darwin/arm64)..."
-CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" -o bin/rd-agent-darwin-arm64 ./cmd/agent
+if [ "$(uname -s)" = Darwin ]; then
+  for arch in amd64 arm64; do
+    echo "=> Building native agent (darwin/$arch)..."
+    CGO_ENABLED=1 MACOSX_DEPLOYMENT_TARGET=13.0 CGO_CFLAGS='-mmacosx-version-min=13.0' CGO_LDFLAGS='-mmacosx-version-min=13.0' GOOS=darwin GOARCH="$arch" go build -ldflags="-s -w" -o "bin/rd-agent-darwin-$arch" ./cmd/agent
+  done
+else
+  echo 'macOS agents skipped: native capture/input require the macOS CI builder (CGO enabled).'
+fi
 
 echo ""
 echo "Build complete! Binaries in ./bin/"

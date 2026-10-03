@@ -20,6 +20,7 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/user/remote-desktop/internal/models"
 	"github.com/user/remote-desktop/internal/versioncmp"
+	"github.com/user/remote-desktop/internal/vpn"
 )
 
 type AgentConfig struct {
@@ -32,6 +33,7 @@ type AgentConfig struct {
 }
 
 type Agent struct {
+	vpnPilot    *vpnClient
 	cfg         AgentConfig
 	cfgPath     string
 	version     string
@@ -103,6 +105,7 @@ func NewAgent(cfg AgentConfig, version, cfgPath string) *Agent {
 
 func (a *Agent) Run() {
 	CleanupOldExecutable()
+	a.initVPNPilot()
 
 	// Run update check in background independent of server connection status
 	go a.periodicUpdateCheck()
@@ -329,6 +332,9 @@ func (a *Agent) handleMessage(raw []byte) {
 	}
 
 	switch msg.Action {
+	case "vpn_pilot":
+		var command vpn.Command
+		if json.Unmarshal(msg.Data, &command) == nil { go a.handleVPNPilot(command) }
 	case "lock_policy":
 		var request models.LockPolicyRequest
 		if json.Unmarshal(msg.Data, &request) == nil && request.Valid() {
@@ -528,6 +534,7 @@ func (a *Agent) saveConfig() {
 }
 
 func (a *Agent) PerformUpdate(rawURL string) {
+	if err := a.stopVPNForUpdate(); err != nil { log.Printf("[agent] update aborted: VPN cleanup failed: %v", err); return }
 	a.updatingMu.Lock()
 	if a.isUpdating {
 		a.updatingMu.Unlock()

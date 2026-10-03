@@ -209,8 +209,24 @@ agar tidak menjalankan agent ganda; migrasinya perlu ditangani admin.
 
 Installer ZIP ini belum signed/notarized Apple. Jika Gatekeeper atau kebijakan
 perusahaan memblokirnya, minta persetujuan admin; jangan menonaktifkan proteksi.
-Jaga `agent.json` karena berisi kredensial koneksi. Installer belum menambahkan
-dukungan keyboard/mouse/clipboard target macOS; remote input masih Windows-only.
+Jaga `agent.json` karena berisi kredensial koneksi.
+
+Mulai agent 0.2.60, build native macOS menyediakan capture layar, keyboard,
+mouse (klik/drag/scroll), hotkey, dan clipboard teks maksimal 16 KiB.
+Berikan izin **Screen Recording** dan **Accessibility** untuk
+`~/Library/Application Support/RemoteDesk/rd-agent` melalui System Settings >
+Privacy & Security. Gunakan tombol + dan Command+Shift+G untuk memilih binary.
+Kemudian restart: `launchctl kickstart -k gui/$(id -u)/com.remotedesk.agent`.
+Izin tidak diberikan otomatis dan mungkin perlu diberikan ulang setelah update.
+Paste memakai Command+V; tombol Meta/Windows diteruskan sebagai Command,
+Control tetap Control. Pemetaan keyboard mengikuti posisi tombol dan layout target.
+
+Batas: hanya sesi pengguna yang sudah login; bukan FileVault/pre-login,
+bukan bypass Secure Input. Privacy screen dan blokir input lokal belum tersedia.
+Shortcut yang ditahan browser/OS pengendali tidak dijamin dapat diteruskan.
+Target deployment minimum macOS 13; kompatibilitas semua rilis Mac tetap perlu
+pengujian perangkat nyata. Build CI memakai runner macOS dengan CGO aktif;
+cross-build Darwin tanpa CGO tidak menyediakan capture/input native.
 
 Bagian manual berikut adalah alternatif, bukan untuk dijalankan bersamaan
 dengan installer per-user di atas.

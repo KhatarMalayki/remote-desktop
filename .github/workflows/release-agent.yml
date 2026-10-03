@@ -6,7 +6,15 @@ on:
       - 'v*'
 
 jobs:
+  build-macos-agent:
+    uses: ./.github/workflows/build-macos-agent.yml
+    permissions:
+      contents: read
+    with:
+      version: ${{ github.ref_name }}
+
   release:
+    needs: build-macos-agent
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -27,8 +35,12 @@ jobs:
           echo "Building version: $VERSION"
           CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags="-s -w -X main.version=$VERSION" -o dist/rd-agent-windows-amd64.exe ./cmd/agent
           CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w -X main.version=$VERSION" -o dist/rd-agent-linux-amd64 ./cmd/agent
-          CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w -X main.version=$VERSION" -o dist/rd-agent-darwin-amd64 ./cmd/agent
-          CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w -X main.version=$VERSION" -o dist/rd-agent-darwin-arm64 ./cmd/agent
+
+      - name: Download native macOS agents
+        uses: actions/download-artifact@v4
+        with:
+          name: native-macos-agents
+          path: dist
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2

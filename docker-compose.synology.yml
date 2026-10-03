@@ -10,12 +10,20 @@ services:
     restart: unless-stopped
     ports:
       - "8080:8080"
+      - "51820:51820/udp"
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
     volumes:
       - ./data:/data
     environment:
       - RD_ADMIN_USER=admin
       - RD_ADMIN_PASS=admin123
       - RD_API_KEY=kunci-rahasia-anda
+      - RD_VPN_PILOT=true
+      - RD_VPN_CIDR=10.77.0.0/24
+      - RD_VPN_ENDPOINT=jatiasih.synology.me:51820
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
 

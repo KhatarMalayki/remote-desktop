@@ -17,13 +17,14 @@ RUN CGO_ENABLED=1 GOOS=linux go build -ldflags="-s -w" -o /bin/rd-server ./cmd/s
 RUN mkdir -p /agents && \
     if [ -f /prebuilt-agent/rd-agent-windows-amd64.exe ] && [ -f /prebuilt-agent/rd-agent-uiaccess.exe ]; then cp /prebuilt-agent/rd-agent-windows-amd64.exe /agents/rd-agent-windows-amd64.exe && cp /prebuilt-agent/rd-agent-uiaccess.exe /agents/rd-agent-uiaccess.exe; else echo "ERROR: signed Windows agent artifacts missing" >&2; exit 1; fi && \
     CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o /agents/rd-agent-linux-amd64 ./cmd/agent && \
-    CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o /agents/rd-agent-darwin-amd64 ./cmd/agent && \
-    CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" -o /agents/rd-agent-darwin-arm64 ./cmd/agent
+    test -s /prebuilt-agent/rd-agent-darwin-amd64 && test -s /prebuilt-agent/rd-agent-darwin-arm64 && \
+    cp /prebuilt-agent/rd-agent-darwin-amd64 /prebuilt-agent/rd-agent-darwin-arm64 /agents/ && \
+    chmod 755 /agents/rd-agent-darwin-*
 
 # Runtime stage - minimal & secure
 FROM alpine:3.19
 
-RUN apk add --no-cache ca-certificates sqlite-libs tzdata
+RUN apk add --no-cache ca-certificates sqlite-libs tzdata iproute2 iptables wireguard-tools
 
 COPY --from=builder /bin/rd-server /usr/local/bin/rd-server
 COPY --from=builder /agents /app/agents

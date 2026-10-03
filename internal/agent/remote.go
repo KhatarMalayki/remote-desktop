@@ -153,7 +153,13 @@ func (a *Agent) startRemoteRelay(sessionID string) {
 			item := screenshot.GetDisplayBounds(i)
 			monitors = append(monitors, map[string]int{"index": i, "width": item.Dx(), "height": item.Dy()})
 		}
-		return sendJSON(map[string]interface{}{"type": "ready", "agent_version": a.version, "width": bounds.Dx(), "height": bounds.Dy(), "monitor": monitor, "monitors": monitors, "capabilities": map[string]bool{"file_transfer": true, "protection": runtime.GOOS == "windows", "clipboard_paste": runtime.GOOS == "windows"}})
+		return sendJSON(map[string]interface{}{"type": "ready", "platform": runtime.GOOS, "agent_version": a.version, "width": bounds.Dx(), "height": bounds.Dy(), "monitor": monitor, "monitors": monitors, "capabilities": map[string]bool{"file_transfer": true, "protection": runtime.GOOS == "windows", "clipboard_paste": runtime.GOOS == "windows" || runtime.GOOS == "darwin"}})
+	}
+	if runtime.GOOS == "darwin" {
+		if err := desktop.prepare(); err != nil {
+			_ = sendJSON(map[string]string{"type": "error", "message": err.Error()})
+			return
+		}
 	}
 	if err := sendScreenInfo(); err != nil {
 		return
@@ -166,6 +172,9 @@ func (a *Agent) startRemoteRelay(sessionID string) {
 		desktopName = "tidak terdeteksi"
 	}
 	relayInfo := "Agent v" + a.version + ": desktop input Windows " + desktopName + " (" + mode + ")"
+	if runtime.GOOS == "darwin" {
+		relayInfo = "Agent v" + a.version + ": macOS. Kontrol memerlukan Accessibility; Command memakai tombol Meta/Windows. Secure Input tidak dapat dilewati."
+	}
 	log.Printf("[remote] %s", relayInfo)
 	_ = sendJSON(map[string]string{"type": "relay_info", "message": relayInfo})
 
@@ -324,6 +333,10 @@ func (a *Agent) startRemoteRelay(sessionID string) {
 			// follow Default <-> Winlogon transitions without dropping the relay.
 			if desktopErr := desktop.prepare(); desktopErr != nil {
 				secureDesktop := isSecureInputDesktop()
+				if runtime.GOOS == "darwin" {
+					_ = sendJSON(map[string]string{"type": "error", "message": desktopErr.Error()})
+					return
+				}
 				if !a.secureDesktopOnly && a.secureRelayStarter != nil && secureDesktop {
 					log.Printf("[remote] Winlogon desktop requires secure worker delegate: %v", desktopErr)
 					_ = sendJSON(map[string]string{"type": "desktop_transition", "message": "Windows terkunci; menyambungkan kontrol lock screen…"})
@@ -344,10 +357,10 @@ func (a *Agent) startRemoteRelay(sessionID string) {
 				if captureFailedAt.IsZero() {
 					captureFailedAt = time.Now()
 					log.Printf("[remote] screen capture interrupted: %v", captureErr)
-					_ = sendJSON(map[string]string{"type": "relay_info", "message": "Capture layar tertunda; menunggu desktop Windows tersedia kembali."})
+					_ = sendJSON(map[string]string{"type": "relay_info", "message": "Capture layar tertunda; periksa sesi desktop dan izin Screen Recording pada macOS."})
 				}
 				if time.Since(captureFailedAt) >= 10*time.Second {
-					_ = sendJSON(map[string]string{"type": "error", "message": "Capture layar gagal selama 10 detik. Periksa sesi Windows dan log agent."})
+					_ = sendJSON(map[string]string{"type": "error", "message": "Capture layar gagal selama 10 detik. Periksa sesi desktop, izin capture, dan log agent."})
 					return
 				}
 				continue

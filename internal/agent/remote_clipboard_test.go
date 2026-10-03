@@ -2,6 +2,7 @@ package agent
 
 import (
 	"errors"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -33,7 +34,15 @@ func TestPasteRemoteTextValidationAndSequence(t *testing.T) {
 		hotkeyKeys = append(hotkeyKeys, keys...)
 		return nil
 	})
-	if err != nil || written != "teks paste sukses" || strings.Join(hotkeyKeys, ",") != "ControlLeft,KeyV" {
+	if err != nil || written != "teks paste sukses" || strings.Join(hotkeyKeys, ",") != strings.Join(remotePasteKeys(runtime.GOOS), ",") {
 		t.Fatalf("unexpected success sequence: written=%q keys=%v err=%v", written, hotkeyKeys, err)
+	}
+}
+
+func TestRemotePasteKeys(t *testing.T) {
+	for platform, expected := range map[string]string{"windows": "ControlLeft,KeyV", "darwin": "MetaLeft,KeyV"} {
+		if actual := strings.Join(remotePasteKeys(platform), ","); actual != expected {
+			t.Fatalf("%s: %s != %s", platform, actual, expected)
+		}
 	}
 }

@@ -56,6 +56,7 @@ set -euo pipefail
 umask 077
 fail() { printf '%s\n' "$1" >&2; exit 1; }
 [[ "$(uname -s)" == Darwin ]] || fail 'Installer ini hanya untuk macOS.'
+[[ "$(sw_vers -productVersion | cut -d. -f1)" -ge 13 ]] || fail 'Minimal macOS 13.'
 [[ "$(uname -m)" == '@ARCH@' ]] || fail 'Arsitektur tidak cocok. Unduh paket Intel atau Apple Silicon yang sesuai.'
 [[ "$(id -u)" != 0 ]] || fail 'Jalankan dari akun pengguna yang login, tanpa sudo.'
 [[ ! -e /Library/LaunchDaemons/com.remotedesk.agent.plist ]] || fail 'Instalasi sistem lama terdeteksi. Minta admin memigrasikannya sebelum memasang agent per-user.'
@@ -128,7 +129,9 @@ launchctl bootstrap "$domain" "$plist"
 launchctl kickstart "$job"
 launchctl print "$job" >/dev/null
 printf '%s\n' 'Auto-start RemoteDesk terdaftar untuk akun ini. Periksa status online di dashboard dan agent.log; registrasi belum membuktikan koneksi server berhasil.'
-printf '%s\n' 'Agent berjalan setelah login pengguna, bukan sebelum login. Installer ini tidak menambahkan dukungan kontrol keyboard/mouse macOS.'
+printf '%s\n' 'Agent berjalan setelah login pengguna, bukan sebelum login. Untuk remote, izinkan rd-agent di System Settings > Privacy & Security > Screen Recording dan Accessibility.'
+printf '%s\n' 'Gunakan tombol + lalu Command+Shift+G: ~/Library/Application Support/RemoteDesk/rd-agent. Setelah izin diberikan, restart agent dengan: launchctl kickstart -k gui/$(id -u)/com.remotedesk.agent'
+printf '%s\n' 'Keyboard, mouse, dan clipboard tersedia pada build native Mac. Secure Input, login screen, dan FileVault tidak dapat dilewati. Setelah update, macOS mungkin meminta izin ulang.'
 read -r -p 'Tekan Enter untuk menutup...' || true
 `
 

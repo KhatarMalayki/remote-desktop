@@ -1,0 +1,44 @@
+name: Build native macOS agents
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        type: string
+        default: ''
+
+jobs:
+  build:
+    runs-on: macos-14
+    permissions:
+      contents: read
+    env:
+      CGO_ENABLED: '1'
+      MACOSX_DEPLOYMENT_TARGET: '13.0'
+      CGO_CFLAGS: '-mmacosx-version-min=13.0'
+      CGO_LDFLAGS: '-mmacosx-version-min=13.0'
+      RELEASE_VERSION: ${{ inputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Test native macOS code
+        run: go test ./internal/agent
+      - name: Build Intel and Apple Silicon agents
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p prebuilt-agent
+          flags='-s -w'
+          if [ -n "$RELEASE_VERSION" ]; then flags="$flags -X main.version=${RELEASE_VERSION#v}"; fi
+          for arch in amd64 arm64; do
+            GOOS=darwin GOARCH="$arch" go build -ldflags="$flags" -o "prebuilt-agent/rd-agent-darwin-$arch" ./cmd/agent
+            file "prebuilt-agent/rd-agent-darwin-$arch"
+            otool -L "prebuilt-agent/rd-agent-darwin-$arch"
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: native-macos-agents
+          path: prebuilt-agent/
+          if-no-files-found: error

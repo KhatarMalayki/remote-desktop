@@ -143,3 +143,14 @@ test('remote keyboard rejects paste unsupported by older agents', () => {
   });
   assert.match(toasts.pop() || '', /Kirim Clipboard/);
 });
+
+test('remote shortcut presets follow target OS rather than viewer OS', () => {
+  const { context } = harness();
+  const keys = (platform, shortcut) => Array.from(context.remoteShortcutKeys(platform, shortcut) || []);
+  assert.deepEqual(keys('darwin', 'alt-tab'), ['MetaLeft', 'Tab']);
+  assert.deepEqual(keys('darwin', 'task-manager'), ['MetaLeft', 'AltLeft', 'Escape']);
+  assert.deepEqual(keys('darwin', 'win-d'), ['ControlLeft', 'ArrowUp']);
+  assert.deepEqual(keys('windows', 'alt-tab'), ['AltLeft', 'Tab']);
+  assert.deepEqual(keys(undefined, 'win-d'), ['MetaLeft', 'KeyD']);
+  assert.deepEqual(keys('darwin', 'unknown'), []);
+});
