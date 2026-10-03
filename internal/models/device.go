@@ -40,6 +40,7 @@ type Device struct {
 	RegisteredAt       time.Time      `json:"registered_at"`
 	ManualAssetID      string         `json:"manual_asset_id,omitempty"`
 	Online             bool           `json:"online"`
+	UsingOldKey        bool           `json:"using_old_key,omitempty"`
 }
 
 type ManualAsset struct {

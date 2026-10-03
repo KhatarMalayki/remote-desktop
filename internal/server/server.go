@@ -283,6 +283,8 @@ type Server struct {
 	deviceApps     map[string][]string
 	deviceAppUsage map[string]map[string]int64
 	attachmentsDir string
+	oldAPIKeys     []string
+	oldKeyDevices  map[string]bool
 }
 
 func New(cfg Config, webFS embed.FS) (*Server, error) {
@@ -567,6 +569,7 @@ func (s *Server) handleDevices(w http.ResponseWriter, r *http.Request) {
 		for _, d := range devices {
 			s.enrichEndpoint(d)
 			d.Online = onlineSet[d.ID]
+			d.UsingOldKey = s.oldKeyDevices[d.ID]
 			d.Recommendation = deviceRecommendation(d)
 		}
 
@@ -1785,9 +1788,21 @@ func (s *Server) handleLogs(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleAgentWS(w http.ResponseWriter, r *http.Request) {
 	apiKey := r.URL.Query().Get("key")
+	usingOldKey := false
 	if apiKey != s.cfg.APIKey {
-		http.Error(w, "unauthorized", 401)
-		return
+		found := false
+		for _, k := range s.oldAPIKeys {
+			if apiKey == k {
+				found = true
+				break
+			}
+		}
+		if !found {
+			http.Error(w, "unauthorized", 401)
+			return
+		}
+		usingOldKey = true
+		log.Printf("[server] agent %s connected with old API key, sending reconfigure", r.URL.Query().Get("id"))
 	}
 	deviceID := r.URL.Query().Get("id")
 	if deviceID == "" {
@@ -1820,6 +1835,22 @@ func (s *Server) handleAgentWS(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.hub.RegisterAgent(client)
+	if usingOldKey {
+		s.oldKeyDevices[deviceID] = true
+		go func() {
+			rcMsg := map[string]interface{}{
+				"action": "reconfigure",
+				"data": map[string]string{
+					"api_key": s.cfg.APIKey,
+				},
+			}
+			if raw, err := json.Marshal(rcMsg); err == nil {
+				s.hub.SendToAgent(deviceID, raw)
+			}
+		}()
+	} else {
+		delete(s.oldKeyDevices, deviceID)
+	}
 	go client.WritePump()
 	client.ReadPump(s.handleAgentMessage)
 }
@@ -2604,8 +2635,8 @@ func (s *Server) handleReconfigureAgents(w http.ResponseWriter, r *http.Request)
 		jsonError(w, "invalid request body", 400)
 		return
 	}
-	if req.ServerURL == "" {
-		jsonError(w, "server_url is required", 400)
+	if req.ServerURL == "" && req.APIKey == "" {
+		jsonError(w, "server_url atau api_key harus diisi", 400)
 		return
 	}
 
@@ -2627,6 +2658,16 @@ func (s *Server) handleReconfigureAgents(w http.ResponseWriter, r *http.Request)
 		}
 	}
 	s.hub.mu.RUnlock()
+
+	if req.APIKey != "" && req.APIKey != s.cfg.APIKey {
+		s.oldAPIKeys = append(s.oldAPIKeys, s.cfg.APIKey)
+		if len(req.APIKey) >= 4 {
+			log.Printf("[server] hot-reload API key (old=%s... new=%s...)", s.cfg.APIKey[:4], req.APIKey[:4])
+		} else {
+			log.Printf("[server] hot-reload API key")
+		}
+		s.cfg.APIKey = req.APIKey
+	}
 
 	log.Printf("[server] reconfigure broadcast sent to %d agents: new endpoint=%s", count, req.ServerURL)
 	jsonResp(w, map[string]interface{}{

@@ -374,7 +374,8 @@ function buildDeviceTable(list) {
       var rustDeskID = /^\d{6,20}$/.test(String(d.rustdesk_id || '')) ? String(d.rustdesk_id) : '';
       
       var statusHtml = '<span class="badge-status ' + (d.online ? 'online' : 'offline') + '">' +
-        '<span class="status-dot ' + (d.online ? 'online' : 'offline') + '"></span>' + (d.online ? 'Online' : 'Offline') + '</span>';
+        '<span class="status-dot ' + (d.online ? 'online' : 'offline') + '"></span>' + (d.online ? 'Online' : 'Offline') + '</span>' +
+        (d.using_old_key ? ' <span class="badge-status" style="background:rgba(251,146,60,0.15);color:#f97316;font-size:0.7rem" title="Agent masih pakai API key lama">&#x26a0; Old Key</span>' : '');
       
       var hostHtml = '<div class="device-identity"><strong class="device-hostname">' + esc(d.hostname || d.id) + '</strong>' + statusHtml + '</div>' +
         '<div class="device-owner">' + (d.assigned_to ? esc(d.assigned_to) : 'Pemakai belum diisi') + '</div>' +
@@ -1204,7 +1205,7 @@ async function openDeviceModal(id) {
     '<div class="detail-item"><div class="label">CPU</div><div class="value">'+esc(dev.cpu_model)+' ('+dev.cpu_cores+' cores)</div></div>' +
     '<div class="detail-item"><div class="label">Memory</div><div class="value">'+fmtBytes(dev.memory_used)+' / '+fmtBytes(dev.memory_total)+'</div></div>' +
     '<div class="detail-item"><div class="label">Disk</div><div class="value">'+fmtBytes(dev.disk_used)+' / '+fmtBytes(dev.disk_total)+'</div></div>' +
-    '<div class="detail-item"><div class="label">Status</div><div class="value"><span class="status-dot '+(dev.online?'online':'offline')+'"></span>'+(dev.online?'Online':'Offline')+'</div></div>' +
+    '<div class="detail-item"><div class="label">Status</div><div class="value"><span class="status-dot '+(dev.online?'online':'offline')+'"></span>'+(dev.online?'Online':'Offline')+(dev.using_old_key?' <span style="color:#f97316;font-weight:600">&#x26a0; Old Key</span>':'')+'</div></div>' +
     '<div class="detail-item"><div class="label">RustDesk Self-host</div><div class="value">'+(rustDeskID ? esc(rustDeskID)+' <button class="btn btn-warning btn-sm" onclick="openRustDesk(\''+rustDeskID+'\')">Buka</button>' : 'Belum terdeteksi')+'</div></div>' +
     '<div class="detail-item"><div class="label">Cabang</div><div class="value">'+esc(dev.branch||dev.group||'-')+'</div></div>' +
     '<div class="detail-item"><div class="label">Pemakai / User</div><div class="value">'+esc(dev.assigned_to || 'Belum diisi')+'</div></div>' +
@@ -2012,18 +2013,28 @@ checkAuth();
 // ==================== RECONFIGURE ENDPOINT (ADMIN) ====================
 
 async function openReconfigureModal() {
-  var newUrl = await appPrompt('Masukkan Endpoint Baru untuk 400 Agent (misal: https://newserver.synology.me:8443):');
-  if (!newUrl || !newUrl.trim()) return;
-  newUrl = newUrl.trim();
-  if (!await appConfirm('PERHATIAN: Semua ' + (devices.length || '?') + ' agent yang sedang online akan berpindah ke endpoint baru:\n\n' + newUrl + '\n\nApakah yakin?')) return;
+  var newUrl = await appPrompt('Endpoint server (kosongkan jika tidak berubah):');
+  if (newUrl === null) return;
+  newUrl = (newUrl || '').trim();
+  var newKey = await appPrompt('API Key baru (kosongkan jika tidak berubah):');
+  if (newKey === null) return;
+  newKey = (newKey || '').trim();
+  if (!newUrl && !newKey) { appAlert('Tidak ada perubahan.'); return; }
+  var summary = [];
+  if (newUrl) summary.push('Endpoint: ' + newUrl);
+  if (newKey) summary.push('API Key: ' + newKey.substring(0,4) + '****');
+  if (!await appConfirm('PERHATIAN: Broadcast ke ' + (devices.length || '?') + ' agent online:\n\n' + summary.join('\n') + '\n\nServer juga akan langsung menerima key baru. Lanjutkan?')) return;
 
+  var body = {};
+  if (newUrl) body.server_url = newUrl;
+  if (newKey) body.api_key = newKey;
   var res = await api('/api/agent/reconfigure', {
     method: 'POST',
-    body: JSON.stringify({ server_url: newUrl })
+    body: JSON.stringify(body)
   });
 
   if (res && res.status === 'reconfigure_sent') {
-    showToast('Perintah pindah endpoint terkirim ke ' + res.agents_notified + ' agent. Config mereka akan otomatis terupdate.');
+    showToast('Reconfigure terkirim ke ' + res.agents_notified + ' agent.');
   } else {
     appAlert('Gagal: ' + ((res && res.error) || 'Unknown error'));
   }
