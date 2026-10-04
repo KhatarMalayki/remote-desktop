@@ -14,6 +14,50 @@ import (
 	"github.com/user/remote-desktop/internal/models"
 )
 
+func TestRetainShortLegacyKeyWithoutWeakeningNewKeys(t *testing.T) {
+	db, err := NewDB(t.TempDir() + "/keys.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	s := &Server{db: db, hub: NewHub(db), cfg: Config{APIKey: "current-key-for-tests"}}
+	if err := s.loadAPIKeys(); err != nil {
+		t.Fatal(err)
+	}
+	client := &Client{Send: make(chan []byte, 1)}
+	s.hub.agents["pilot"] = client
+	call := func(operation, key string) *httptest.ResponseRecorder {
+		body, _ := json.Marshal(map[string]string{"operation": operation, "api_key": key})
+		req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(string(body)))
+		req = req.WithContext(context.WithValue(req.Context(), userClaimsKey, &UserClaims{Role: "admin"}))
+		response := httptest.NewRecorder()
+		s.handleKeyRotation(response, req)
+		return response
+	}
+	legacy := "legacy#1234"
+	if response := call("prepare", legacy); response.Code != 400 {
+		t.Fatal("short new key accepted")
+	}
+	if response := call("retain", legacy); response.Code != 200 {
+		t.Fatalf("legacy recovery rejected: %s", response.Body.String())
+	}
+	if !s.acceptsAPIKey(legacy) || s.currentAPIKey() != "current-key-for-tests" || len(client.Send) != 0 {
+		t.Fatal("recovery changed current key or broadcast")
+	}
+	restarted := &Server{db: db, cfg: Config{APIKey: "different-bootstrap"}}
+	if err := restarted.loadAPIKeys(); err != nil {
+		t.Fatal(err)
+	}
+	if !restarted.acceptsAPIKey(legacy) {
+		t.Fatal("recovered key lost after restart")
+	}
+	for _, key := range []string{"", "   ", "bad\nkey", strings.Repeat("x", 513)} {
+		if response := call("retain", key); response.Code != 400 {
+			t.Fatal("invalid recovery key accepted")
+		}
+	}
+}
+
 func TestAPIKeyRotationIsExplicitAndPersistent(t *testing.T) {
 	db, err := NewDB(t.TempDir() + "/keys.db")
 	if err != nil {

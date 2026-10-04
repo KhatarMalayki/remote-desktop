@@ -2025,8 +2025,10 @@ async function openReconfigureModal() {
     dialog.innerHTML = '<h3 id="keyRotationTitle">Endpoint &amp; Migrasi API Key</h3>' +
       '<p class="asset-advice">Menyiapkan key tidak mengirim perubahan ke agent. Uji satu PC pilot, lalu migrasikan perangkat lain satu per satu. Key dan verifikasi tersimpan di database.</p>' +
       '<p id="keyRotationSummary" role="status"></p>' +
-      '<label for="rotationKey">Key baru / key lama untuk pemulihan (16–512 byte, simbol diperbolehkan)</label>' +
-      '<input id="rotationKey" class="search-input" style="width:100%;margin:8px 0" type="password" autocomplete="new-password">' +
+      '<label for="rotationKey">Key baru atau key lama untuk pemulihan (simbol diperbolehkan)</label>' +
+      '<p id="rotationKeyHelp" class="asset-advice">Key baru minimal 16 byte. Untuk memulihkan key lama yang lebih pendek, gunakan Terima key lama tambahan. Tidak perlu pilih perangkat atau isi endpoint.</p>' +
+      '<input id="rotationKey" class="search-input" style="width:100%;margin:8px 0" type="password" autocomplete="new-password" aria-describedby="rotationKeyHelp keyRotationResult">' +
+      '<p id="keyRotationResult" role="status" aria-live="polite" aria-atomic="true"></p>' +
       '<div class="modal-actions"><button class="btn btn-primary" data-key-operation="prepare">Siapkan key baru</button><button class="btn btn-ghost" data-key-operation="retain">Terima key lama tambahan</button></div>' +
       '<label for="rotationDevice">Perangkat pilot / target</label><select id="rotationDevice" class="filter-select" style="width:100%;margin:8px 0"></select>' +
       '<p class="asset-advice">Migrasi key memerlukan agent v0.2.62+. Perangkat offline tidak menerima perintah. Status terbaru baru muncul setelah koneksi dengan key tersebut terverifikasi.</p>' +
@@ -2034,7 +2036,6 @@ async function openReconfigureModal() {
       '<label for="rotationEndpoint" style="display:block;margin-top:16px">Endpoint baru (opsional, terpisah dari migrasi key)</label>' +
       '<input id="rotationEndpoint" class="search-input" style="width:100%;margin:8px 0" type="url" placeholder="https://server.example">' +
       '<button class="btn btn-ghost" data-key-operation="endpoint">Ubah endpoint perangkat ini</button>' +
-      '<p id="keyRotationResult" role="status" aria-live="polite"></p>' +
       '<div class="modal-actions"><button class="btn btn-danger" data-key-operation="revoke">Cabut semua key lama</button><button class="btn btn-ghost" id="keyRotationRefresh">Refresh</button><button class="btn btn-ghost" id="keyRotationClose">Tutup</button></div>';
     document.body.appendChild(dialog);
     dialog.querySelectorAll('[data-key-operation]').forEach(function(button) {
@@ -2074,7 +2075,7 @@ async function submitKeyRotation(operation) {
   if (operation === 'endpoint') body.server_url = document.getElementById('rotationEndpoint').value.trim();
   var messages = {
     prepare: 'Simpan key baru tanpa broadcast? Key sebelumnya tetap diterima.',
-    retain: 'Izinkan key lama ini untuk autentikasi agent? Hanya gunakan key yang masih dipercaya.',
+    retain: 'Izinkan key lama ini untuk memulihkan koneksi agent, termasuk jika lebih pendek dari 16 byte? Key aktif tidak berubah. Hanya gunakan key yang masih dipercaya; migrasikan ke key kuat setelah perangkat pulih.',
     migrate: 'Migrasikan hanya perangkat yang dipilih? Koneksi RemoteDesk perangkat ini akan terputus sementara.',
     endpoint: 'Ubah endpoint hanya perangkat yang dipilih? Endpoint yang salah dapat memutus akses.',
     revoke: 'Cabut seluruh key lama secara permanen? Server akan menolak jika masih ada perangkat belum terverifikasi menggunakan key terbaru.'
@@ -2084,11 +2085,16 @@ async function submitKeyRotation(operation) {
   buttons.forEach(function(button) { button.disabled = true; });
   try {
     var response = await api('/api/agent/reconfigure', { method: 'POST', body: JSON.stringify(body) });
-    if (!response || response.error) { result.textContent = (response && response.error) || 'Permintaan gagal'; return; }
+    if (!response || response.error) {
+      result.textContent = (response && response.error) || 'Permintaan gagal';
+      result.scrollIntoView({ block: 'nearest' });
+      return;
+    }
     document.getElementById('rotationKey').value = '';
-    result.textContent = operation === 'migrate' ? 'Perintah terkirim. Belum dinyatakan berhasil; refresh setelah agent reconnect.' : 'Perubahan tersimpan. Tidak ada broadcast massal.';
+    result.textContent = operation === 'migrate' ? 'Perintah terkirim. Belum dinyatakan berhasil; refresh setelah agent reconnect.' : operation === 'retain' ? 'Key pemulihan diterima. Key aktif tidak berubah; agent dengan key ini bisa mencoba tersambung kembali. Tidak ada broadcast.' : 'Perubahan tersimpan. Tidak ada broadcast massal.';
     await loadDevices();
     await openReconfigureModal();
+    result.scrollIntoView({ block: 'nearest' });
   } finally { buttons.forEach(function(button) { button.disabled = false; }); }
 }
 

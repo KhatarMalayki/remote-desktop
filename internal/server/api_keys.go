@@ -157,8 +157,14 @@ func (s *Server) handleKeyRotation(w http.ResponseWriter, r *http.Request) {
 	}
 	switch req.Operation {
 	case "prepare", "retain":
-		if !validAPIKey(req.APIKey) {
-			jsonError(w, "Key harus 16-512 byte tanpa karakter kontrol; simbol diperbolehkan", 400)
+		valid := validAPIKey(req.APIKey)
+		validationMessage := "Key baru harus 16-512 byte tanpa karakter kontrol; untuk memulihkan key pendek gunakan Terima key lama tambahan"
+		if req.Operation == "retain" {
+			valid = strings.TrimSpace(req.APIKey) != "" && len(req.APIKey) <= 512 && !strings.ContainsFunc(req.APIKey, unicode.IsControl)
+			validationMessage = "Key pemulihan wajib diisi, maksimal 512 byte, tanpa karakter kontrol"
+		}
+		if !valid {
+			jsonError(w, validationMessage, 400)
 			return
 		}
 		s.keyMu.Lock()

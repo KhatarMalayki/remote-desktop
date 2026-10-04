@@ -11,7 +11,7 @@ function harness() {
     rotationKey: { value: 'special-#&+%?= key' },
     rotationDevice: { value: 'pilot' },
     rotationEndpoint: { value: 'https://example.test' },
-    keyRotationResult: { textContent: '' }
+    keyRotationResult: { textContent: '', scrollIntoView() { this.scrolled = true; } }
   };
   const requests = [];
   const buttons = [{ disabled: false }];
@@ -52,5 +52,18 @@ test('cancel sends nothing and failed request does not claim success', async () 
   context.api = async () => ({ error: 'Device offline' });
   await context.submitKeyRotation('migrate');
   assert.equal(fields.keyRotationResult.textContent, 'Device offline');
+  assert.equal(fields.keyRotationResult.scrolled, true);
   assert.equal(buttons[0].disabled, false);
+});
+
+test('legacy recovery uses retain without selecting devices or changing the key', async () => {
+  const { context, fields, requests } = harness();
+  fields.rotationKey.value = 'legacy#1234';
+  await context.submitKeyRotation('retain');
+  assert.deepEqual(requests, [{ operation: 'retain', api_key: 'legacy#1234' }]);
+});
+
+test('rotation result is located directly below the secret input', () => {
+  assert.ok(rotation.indexOf('id="keyRotationResult"') > rotation.indexOf('id="rotationKey"'));
+  assert.ok(rotation.indexOf('id="keyRotationResult"') < rotation.indexOf('data-key-operation="prepare"'));
 });
