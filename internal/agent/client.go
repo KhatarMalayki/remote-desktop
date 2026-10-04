@@ -24,12 +24,13 @@ import (
 )
 
 type AgentConfig struct {
-	ServerURL string `json:"server_url"`
-	APIKey    string `json:"api_key"`
-	DeviceID  string `json:"device_id"`
-	Branch    string `json:"branch"`
-	Heartbeat int    `json:"heartbeat_seconds"`
-	UpdateURL string `json:"update_url"`
+	ServerURL      string `json:"server_url"`
+	APIKey         string `json:"api_key"`
+	PreviousAPIKey string `json:"previous_api_key,omitempty"`
+	DeviceID       string `json:"device_id"`
+	Branch         string `json:"branch"`
+	Heartbeat      int    `json:"heartbeat_seconds"`
+	UpdateURL      string `json:"update_url"`
 }
 
 type Agent struct {
@@ -111,12 +112,11 @@ func (a *Agent) Run() {
 	go a.periodicUpdateCheck()
 
 	for {
-		if err := a.connect(); err != nil {
+		if err := a.connectWithKeyRecovery(); err != nil {
 			log.Printf("[agent] connection failed: %v, retrying in 5s...", err)
 			time.Sleep(5 * time.Second)
 			continue
 		}
-
 		a.register()
 		go a.reportEndpoint()
 		go a.heartbeatLoop()
@@ -125,6 +125,29 @@ func (a *Agent) Run() {
 		log.Println("[agent] disconnected, reconnecting in 3s...")
 		time.Sleep(3 * time.Second)
 	}
+}
+
+func (a *Agent) connectWithKeyRecovery() error {
+	err := a.connect()
+	if a.cfg.PreviousAPIKey == "" {
+		return err
+	}
+	previous := a.cfg
+	if err != nil {
+		a.cfg.APIKey = a.cfg.PreviousAPIKey
+	}
+	a.cfg.PreviousAPIKey = ""
+	if saveErr := a.saveConfig(); saveErr != nil {
+		a.cfg = previous
+		if a.conn != nil {
+			a.conn.Close()
+		}
+		return fmt.Errorf("cannot persist key migration result")
+	}
+	if err != nil {
+		log.Printf("[agent] key migration failed; restored previous key")
+	}
+	return err
 }
 
 func (a *Agent) connect() error {
@@ -139,9 +162,11 @@ func (a *Agent) connect() error {
 	}
 
 	wsURL := fmt.Sprintf("%s://%s/ws/agent?key=%s&id=%s",
-		scheme, u.Host, a.cfg.APIKey, a.cfg.DeviceID)
+		scheme, u.Host, url.QueryEscape(a.cfg.APIKey), url.QueryEscape(a.cfg.DeviceID))
 
-	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	dialer := *websocket.DefaultDialer
+	dialer.HandshakeTimeout = 15 * time.Second
+	conn, _, err := dialer.Dial(wsURL, nil)
 	if err != nil {
 		return err
 	}
@@ -334,7 +359,9 @@ func (a *Agent) handleMessage(raw []byte) {
 	switch msg.Action {
 	case "vpn_pilot":
 		var command vpn.Command
-		if json.Unmarshal(msg.Data, &command) == nil { go a.handleVPNPilot(command) }
+		if json.Unmarshal(msg.Data, &command) == nil {
+			go a.handleVPNPilot(command)
+		}
 	case "lock_policy":
 		var request models.LockPolicyRequest
 		if json.Unmarshal(msg.Data, &request) == nil && request.Valid() {
@@ -362,6 +389,7 @@ func (a *Agent) handleMessage(raw []byte) {
 			APIKey    string `json:"api_key"`
 		}
 		if err := json.Unmarshal(msg.Data, &req); err == nil {
+			previous := a.cfg
 			changed := false
 			if req.ServerURL != "" && req.ServerURL != a.cfg.ServerURL {
 				log.Printf("[agent] server endpoint changed: %s -> %s", a.cfg.ServerURL, req.ServerURL)
@@ -369,11 +397,16 @@ func (a *Agent) handleMessage(raw []byte) {
 				changed = true
 			}
 			if req.APIKey != "" && req.APIKey != a.cfg.APIKey {
+				a.cfg.PreviousAPIKey = a.cfg.APIKey
 				a.cfg.APIKey = req.APIKey
 				changed = true
 			}
 			if changed {
-				a.saveConfig()
+				if err := a.saveConfig(); err != nil {
+					a.cfg = previous
+					log.Printf("[agent] reconfigure rejected: cannot persist configuration")
+					return
+				}
 				log.Println("[agent] config saved. Reconnecting to new endpoint...")
 				if a.conn != nil {
 					a.conn.Close()
@@ -500,7 +533,7 @@ func (a *Agent) getRustDeskID() string {
 	return a.rustDeskID
 }
 
-func (a *Agent) saveConfig() {
+func (a *Agent) saveConfig() error {
 	if a.cfgPath == "" {
 		candidates := []string{"agent.json"}
 		if exePath, err := os.Executable(); err == nil {
@@ -524,17 +557,36 @@ func (a *Agent) saveConfig() {
 	data, err := json.MarshalIndent(a.cfg, "", "  ")
 	if err != nil {
 		log.Printf("[agent] failed to marshal config: %v", err)
-		return
+		return err
 	}
-	if err := os.WriteFile(a.cfgPath, data, 0644); err != nil {
-		log.Printf("[agent] failed to save config to %s: %v", a.cfgPath, err)
-	} else {
-		log.Printf("[agent] config saved to %s", a.cfgPath)
+	temp, err := os.CreateTemp(filepath.Dir(a.cfgPath), ".agent-config-*")
+	if err != nil {
+		return err
 	}
+	defer os.Remove(temp.Name())
+	if _, err = temp.Write(data); err != nil {
+		temp.Close()
+		return err
+	}
+	if err = temp.Sync(); err != nil {
+		temp.Close()
+		return err
+	}
+	if err = temp.Close(); err != nil {
+		return err
+	}
+	if err = os.Rename(temp.Name(), a.cfgPath); err != nil {
+		return err
+	}
+	log.Printf("[agent] config saved to %s", a.cfgPath)
+	return nil
 }
 
 func (a *Agent) PerformUpdate(rawURL string) {
-	if err := a.stopVPNForUpdate(); err != nil { log.Printf("[agent] update aborted: VPN cleanup failed: %v", err); return }
+	if err := a.stopVPNForUpdate(); err != nil {
+		log.Printf("[agent] update aborted: VPN cleanup failed: %v", err)
+		return
+	}
 	a.updatingMu.Lock()
 	if a.isUpdating {
 		a.updatingMu.Unlock()

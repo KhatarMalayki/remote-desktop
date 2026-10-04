@@ -50,15 +50,20 @@ type remoteDeskService struct{ configPath string }
 func (s *remoteDeskService) Execute(_ []string, requests <-chan svc.ChangeRequest, changes chan<- svc.Status) (bool, uint32) {
 	changes <- svc.Status{State: svc.StartPending}
 	stop := make(chan struct{})
+	done := make(chan struct{})
 	var once sync.Once
 	writeServiceDiagnostic(s.configPath, "service accepted by SCM; starting console-worker supervisor")
-	go superviseConsoleWorker(s.configPath, stop)
+	go func() {
+		defer close(done)
+		superviseConsoleWorker(s.configPath, stop)
+	}()
 	changes <- svc.Status{State: svc.Running, Accepts: svc.AcceptStop | svc.AcceptShutdown}
 	for request := range requests {
 		switch request.Cmd {
 		case svc.Stop, svc.Shutdown:
 			once.Do(func() { close(stop) })
 			changes <- svc.Status{State: svc.StopPending}
+			<-done
 			return false, 0
 		}
 	}
@@ -75,7 +80,7 @@ func superviseConsoleWorker(configPath string, stop <-chan struct{}) {
 			return
 		default:
 		}
-		if err := startConsoleSystemWorker(configPath); err != nil {
+		if err := startConsoleSystemWorker(configPath, stop); err != nil {
 			log.Printf("[service] console worker not started: %v", err)
 			writeServiceDiagnostic(configPath, "console worker failed: "+err.Error())
 		}
@@ -87,7 +92,7 @@ func superviseConsoleWorker(configPath string, stop <-chan struct{}) {
 	}
 }
 
-func startConsoleSystemWorker(configPath string) error {
+func startConsoleSystemWorker(configPath string, stop <-chan struct{}) error {
 	sessionID := windows.WTSGetActiveConsoleSessionId()
 	if sessionID == 0xFFFFFFFF {
 		return fmt.Errorf("no active console session")
@@ -164,8 +169,28 @@ func startConsoleSystemWorker(configPath string) error {
 	writeServiceDiagnostic(configPath, fmt.Sprintf("SYSTEM worker started in session %d (pid %d)", sessionID, process.ProcessId))
 
 	// Wait for the worker to end before the supervisor considers a replacement.
-	_, _ = windows.WaitForSingleObject(process.Process, windows.INFINITE)
-	return nil
+	return waitConsoleWorker(process.Process, stop)
+}
+
+func waitConsoleWorker(process windows.Handle, stop <-chan struct{}) error {
+	for {
+		status, err := windows.WaitForSingleObject(process, 250)
+		if err != nil {
+			return err
+		}
+		if status == windows.WAIT_OBJECT_0 {
+			return nil
+		}
+		select {
+		case <-stop:
+			if err := windows.TerminateProcess(process, 0); err != nil {
+				return err
+			}
+			_, err := windows.WaitForSingleObject(process, 5000)
+			return err
+		default:
+		}
+	}
 }
 
 func enableTokenPrivilege(token windows.Token, privilege string) error {

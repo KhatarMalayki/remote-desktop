@@ -283,8 +283,8 @@ type Server struct {
 	deviceApps     map[string][]string
 	deviceAppUsage map[string]map[string]int64
 	attachmentsDir string
-	oldAPIKeys     []string
-	oldKeyDevices  map[string]bool
+	keyMu          sync.RWMutex
+	keys           apiKeyState
 }
 
 func New(cfg Config, webFS embed.FS) (*Server, error) {
@@ -297,7 +297,7 @@ func New(cfg Config, webFS embed.FS) (*Server, error) {
 		b := make([]byte, 16)
 		rand.Read(b)
 		cfg.APIKey = hex.EncodeToString(b)
-		log.Printf("[server] generated API key: %s", cfg.APIKey)
+		log.Printf("[server] generated bootstrap API key")
 	}
 
 	if cfg.JWTSecret == "" {
@@ -339,6 +339,10 @@ func New(cfg Config, webFS embed.FS) (*Server, error) {
 	}
 	if err := os.MkdirAll(s.attachmentsDir, 0700); err != nil {
 		return nil, fmt.Errorf("attachment storage: %w", err)
+	}
+	if err := s.loadAPIKeys(); err != nil {
+		db.Close()
+		return nil, err
 	}
 	s.initVPN()
 	return s, nil
@@ -569,7 +573,8 @@ func (s *Server) handleDevices(w http.ResponseWriter, r *http.Request) {
 		for _, d := range devices {
 			s.enrichEndpoint(d)
 			d.Online = onlineSet[d.ID]
-			d.UsingOldKey = s.oldKeyDevices[d.ID]
+			d.APIKeyStatus = s.deviceKeyStatus(d.ID)
+			d.UsingOldKey = d.APIKeyStatus == "old"
 			d.Recommendation = deviceRecommendation(d)
 		}
 
@@ -1788,21 +1793,9 @@ func (s *Server) handleLogs(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleAgentWS(w http.ResponseWriter, r *http.Request) {
 	apiKey := r.URL.Query().Get("key")
-	usingOldKey := false
-	if apiKey != s.cfg.APIKey {
-		found := false
-		for _, k := range s.oldAPIKeys {
-			if apiKey == k {
-				found = true
-				break
-			}
-		}
-		if !found {
-			http.Error(w, "unauthorized", 401)
-			return
-		}
-		usingOldKey = true
-		log.Printf("[server] agent %s connected with old API key, sending reconfigure", r.URL.Query().Get("id"))
+	if !s.acceptsAPIKey(apiKey) {
+		http.Error(w, "unauthorized", 401)
+		return
 	}
 	deviceID := r.URL.Query().Get("id")
 	if deviceID == "" {
@@ -1834,23 +1827,12 @@ func (s *Server) handleAgentWS(w http.ResponseWriter, r *http.Request) {
 		RemoteIP: remoteIP,
 	}
 
-	s.hub.RegisterAgent(client)
-	if usingOldKey {
-		s.oldKeyDevices[deviceID] = true
-		go func() {
-			rcMsg := map[string]interface{}{
-				"action": "reconfigure",
-				"data": map[string]string{
-					"api_key": s.cfg.APIKey,
-				},
-			}
-			if raw, err := json.Marshal(rcMsg); err == nil {
-				s.hub.SendToAgent(deviceID, raw)
-			}
-		}()
-	} else {
-		delete(s.oldKeyDevices, deviceID)
+	if err := s.recordDeviceKey(deviceID, apiKey); err != nil {
+		conn.Close()
+		log.Printf("[server] cannot persist agent key verification: %v", err)
+		return
 	}
+	s.hub.RegisterAgent(client)
 	go client.WritePump()
 	client.ReadPump(s.handleAgentMessage)
 }
@@ -1939,7 +1921,7 @@ func (s *Server) handleRelayWS(w http.ResponseWriter, r *http.Request) {
 			},
 		}
 	case "agent":
-		if r.URL.Query().Get("key") != s.cfg.APIKey {
+		if !s.acceptsAPIKey(r.URL.Query().Get("key")) {
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}
@@ -2219,7 +2201,7 @@ func (s *Server) authMiddleware(next http.HandlerFunc) http.HandlerFunc {
 				token = r.URL.Query().Get("key")
 			}
 			if token != "" {
-				if s.cfg.APIKey != "" && token == s.cfg.APIKey {
+				if s.currentAPIKey() != "" && token == s.currentAPIKey() {
 					ctx := context.WithValue(r.Context(), userClaimsKey, &UserClaims{
 						Username: "api_key",
 						Role:     "admin",
@@ -2245,7 +2227,7 @@ func (s *Server) authMiddleware(next http.HandlerFunc) http.HandlerFunc {
 			auth = strings.TrimPrefix(auth, "Bearer ")
 		}
 
-		if s.cfg.APIKey != "" && auth == s.cfg.APIKey {
+		if s.currentAPIKey() != "" && auth == s.currentAPIKey() {
 			ctx := context.WithValue(r.Context(), userClaimsKey, &UserClaims{
 				Username: "api_key",
 				Role:     "admin",
@@ -2295,13 +2277,13 @@ func (s *Server) handleAgentVersion(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleAgentDownload(w http.ResponseWriter, r *http.Request) {
 	key := r.URL.Query().Get("key")
-	if s.cfg.APIKey == "" || key != s.cfg.APIKey {
+	if !s.acceptsAPIKey(key) {
 		auth := r.Header.Get("Authorization")
 		token := strings.TrimPrefix(auth, "Bearer ")
 		if token == "" {
 			token = r.URL.Query().Get("token")
 		}
-		if (s.cfg.APIKey == "" || token != s.cfg.APIKey) && func() bool { _, ok := s.authorizeUserToken(w, r, token); return !ok }() {
+		if !s.acceptsAPIKey(token) && func() bool { _, ok := s.authorizeUserToken(w, r, token); return !ok }() {
 			return
 		}
 	}
@@ -2605,7 +2587,7 @@ func (s *Server) queueAgentUpdate(deviceID, actor string) (string, error) {
 		"action": "upgrade",
 		"data": map[string]string{
 			"version":      s.cfg.Version,
-			"download_url": fmt.Sprintf("/api/agent/download?os=%s&arch=%s&key=%s", device.OS, device.Arch, s.cfg.APIKey),
+			"download_url": fmt.Sprintf("/api/agent/download?os=%s&arch=%s&key=%s", device.OS, device.Arch, url.QueryEscape(s.currentAPIKey())),
 		},
 	}
 	upRaw, err := json.Marshal(upMsg)
@@ -2617,66 +2599,8 @@ func (s *Server) queueAgentUpdate(deviceID, actor string) (string, error) {
 }
 
 func (s *Server) handleReconfigureAgents(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "method not allowed", 405)
-		return
-	}
-	claims := getClaims(r)
-	if claims.Role != "admin" {
-		jsonError(w, "forbidden", 403)
-		return
-	}
-
-	var req struct {
-		ServerURL string `json:"server_url"`
-		APIKey    string `json:"api_key"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		jsonError(w, "invalid request body", 400)
-		return
-	}
-	if req.ServerURL == "" && req.APIKey == "" {
-		jsonError(w, "server_url atau api_key harus diisi", 400)
-		return
-	}
-
-	s.hub.mu.RLock()
-	count := len(s.hub.agents)
-	for _, client := range s.hub.agents {
-		msg := map[string]interface{}{
-			"action": "reconfigure",
-			"data": map[string]string{
-				"server_url": req.ServerURL,
-				"api_key":    req.APIKey,
-			},
-		}
-		if raw, err := json.Marshal(msg); err == nil {
-			select {
-			case client.Send <- raw:
-			default:
-			}
-		}
-	}
-	s.hub.mu.RUnlock()
-
-	if req.APIKey != "" && req.APIKey != s.cfg.APIKey {
-		s.oldAPIKeys = append(s.oldAPIKeys, s.cfg.APIKey)
-		if len(req.APIKey) >= 4 {
-			log.Printf("[server] hot-reload API key (old=%s... new=%s...)", s.cfg.APIKey[:4], req.APIKey[:4])
-		} else {
-			log.Printf("[server] hot-reload API key")
-		}
-		s.cfg.APIKey = req.APIKey
-	}
-
-	log.Printf("[server] reconfigure broadcast sent to %d agents: new endpoint=%s", count, req.ServerURL)
-	jsonResp(w, map[string]interface{}{
-		"status":          "reconfigure_sent",
-		"agents_notified": count,
-		"new_server_url":  req.ServerURL,
-	}, 200)
+	s.handleKeyRotation(w, r)
 }
-
 func (s *Server) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", 405)
@@ -3235,7 +3159,7 @@ func (s *Server) handleAgentPackageDownload(w http.ResponseWriter, r *http.Reque
 	// Create pre-configured agent.json
 	cfgObj := map[string]interface{}{
 		"server_url": serverURL,
-		"api_key":    s.cfg.APIKey,
+		"api_key":    s.currentAPIKey(),
 		"branch":     branch,
 		// Keep the identity key present even in a fresh package.  The installer
 		// can then safely retain an existing device ID during an in-place upgrade.

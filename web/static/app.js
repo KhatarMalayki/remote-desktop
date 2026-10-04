@@ -375,7 +375,7 @@ function buildDeviceTable(list) {
       
       var statusHtml = '<span class="badge-status ' + (d.online ? 'online' : 'offline') + '">' +
         '<span class="status-dot ' + (d.online ? 'online' : 'offline') + '"></span>' + (d.online ? 'Online' : 'Offline') + '</span>' +
-        (d.using_old_key ? ' <span class="badge-status" style="background:rgba(251,146,60,0.15);color:#f97316;font-size:0.7rem" title="Agent masih pakai API key lama">&#x26a0; Old Key</span>' : '');
+        ' <span class="badge-status" title="Key terakhir yang terverifikasi saat koneksi agent">' + keyStatusLabel(d.api_key_status) + '</span>';
       
       var hostHtml = '<div class="device-identity"><strong class="device-hostname">' + esc(d.hostname || d.id) + '</strong>' + statusHtml + '</div>' +
         '<div class="device-owner">' + (d.assigned_to ? esc(d.assigned_to) : 'Pemakai belum diisi') + '</div>' +
@@ -2013,31 +2013,83 @@ checkAuth();
 // ==================== RECONFIGURE ENDPOINT (ADMIN) ====================
 
 async function openReconfigureModal() {
-  var newUrl = await appPrompt('Endpoint server (kosongkan jika tidak berubah):');
-  if (newUrl === null) return;
-  newUrl = (newUrl || '').trim();
-  var newKey = await appPrompt('API Key baru (kosongkan jika tidak berubah):');
-  if (newKey === null) return;
-  newKey = (newKey || '').trim();
-  if (!newUrl && !newKey) { appAlert('Tidak ada perubahan.'); return; }
-  var summary = [];
-  if (newUrl) summary.push('Endpoint: ' + newUrl);
-  if (newKey) summary.push('API Key: ' + newKey.substring(0,4) + '****');
-  if (!await appConfirm('PERHATIAN: Broadcast ke ' + (devices.length || '?') + ' agent online:\n\n' + summary.join('\n') + '\n\nServer juga akan langsung menerima key baru. Lanjutkan?')) return;
-
-  var body = {};
-  if (newUrl) body.server_url = newUrl;
-  if (newKey) body.api_key = newKey;
-  var res = await api('/api/agent/reconfigure', {
-    method: 'POST',
-    body: JSON.stringify(body)
-  });
-
-  if (res && res.status === 'reconfigure_sent') {
-    showToast('Reconfigure terkirim ke ' + res.agents_notified + ' agent.');
-  } else {
-    appAlert('Gagal: ' + ((res && res.error) || 'Unknown error'));
+  var state = await api('/api/agent/reconfigure');
+  if (!state || state.error) { showToast('Gagal membaca status key'); return; }
+  var dialog = document.getElementById('keyRotationDialog');
+  if (!dialog) {
+    dialog = document.createElement('dialog');
+    dialog.id = 'keyRotationDialog';
+    dialog.className = 'modal';
+    dialog.style.cssText = 'margin:auto;width:min(680px,95vw);max-height:90vh;overflow:auto;color:var(--fg);background:var(--bg2);border:1px solid var(--border);';
+    dialog.setAttribute('aria-labelledby', 'keyRotationTitle');
+    dialog.innerHTML = '<h3 id="keyRotationTitle">Endpoint &amp; Migrasi API Key</h3>' +
+      '<p class="asset-advice">Menyiapkan key tidak mengirim perubahan ke agent. Uji satu PC pilot, lalu migrasikan perangkat lain satu per satu. Key dan verifikasi tersimpan di database.</p>' +
+      '<p id="keyRotationSummary" role="status"></p>' +
+      '<label for="rotationKey">Key baru / key lama untuk pemulihan (16–512 byte, simbol diperbolehkan)</label>' +
+      '<input id="rotationKey" class="search-input" style="width:100%;margin:8px 0" type="password" autocomplete="new-password">' +
+      '<div class="modal-actions"><button class="btn btn-primary" data-key-operation="prepare">Siapkan key baru</button><button class="btn btn-ghost" data-key-operation="retain">Terima key lama tambahan</button></div>' +
+      '<label for="rotationDevice">Perangkat pilot / target</label><select id="rotationDevice" class="filter-select" style="width:100%;margin:8px 0"></select>' +
+      '<p class="asset-advice">Migrasi key memerlukan agent v0.2.62+. Perangkat offline tidak menerima perintah. Status terbaru baru muncul setelah koneksi dengan key tersebut terverifikasi.</p>' +
+      '<button class="btn btn-primary" data-key-operation="migrate">Migrasikan key perangkat ini</button>' +
+      '<label for="rotationEndpoint" style="display:block;margin-top:16px">Endpoint baru (opsional, terpisah dari migrasi key)</label>' +
+      '<input id="rotationEndpoint" class="search-input" style="width:100%;margin:8px 0" type="url" placeholder="https://server.example">' +
+      '<button class="btn btn-ghost" data-key-operation="endpoint">Ubah endpoint perangkat ini</button>' +
+      '<p id="keyRotationResult" role="status" aria-live="polite"></p>' +
+      '<div class="modal-actions"><button class="btn btn-danger" data-key-operation="revoke">Cabut semua key lama</button><button class="btn btn-ghost" id="keyRotationRefresh">Refresh</button><button class="btn btn-ghost" id="keyRotationClose">Tutup</button></div>';
+    document.body.appendChild(dialog);
+    dialog.querySelectorAll('[data-key-operation]').forEach(function(button) {
+      button.addEventListener('click', function() { submitKeyRotation(button.dataset.keyOperation); });
+    });
+    document.getElementById('keyRotationClose').onclick = function() { dialog.close(); };
+    document.getElementById('keyRotationRefresh').onclick = openReconfigureModal;
+    dialog.addEventListener('close', function() { document.getElementById('rotationKey').value = ''; });
   }
+  document.getElementById('keyRotationSummary').textContent = 'Key lama masih diterima: ' + state.old_key_count + '. Tidak ada broadcast otomatis.';
+  var selected = document.getElementById('rotationDevice').value;
+  var list = [];
+  var result;
+  do {
+    result = await api('/api/devices?limit=100&offset=' + list.length);
+    if (!result || !Array.isArray(result.devices)) { showToast('Gagal membaca daftar perangkat'); return; }
+    list = list.concat(result.devices);
+  } while (result.devices.length && list.length < result.total);
+  var select = document.getElementById('rotationDevice');
+  select.replaceChildren(new Option('Pilih perangkat', ''));
+  list.forEach(function(device) {
+    select.add(new Option((device.hostname || device.id) + ' — ' + (device.online ? 'Online' : 'Offline') + ' — ' + keyStatusLabel(device.api_key_status), device.id));
+  });
+  select.value = selected;
+  if (!dialog.open) dialog.showModal();
+}
+
+function keyStatusLabel(status) {
+  return status === 'current' ? 'Key terbaru terverifikasi' : status === 'old' ? 'Key lama' : 'Key belum terverifikasi';
+}
+
+async function submitKeyRotation(operation) {
+  var body = { operation: operation };
+  var result = document.getElementById('keyRotationResult');
+  if (operation === 'prepare' || operation === 'retain') body.api_key = document.getElementById('rotationKey').value;
+  if (operation === 'migrate' || operation === 'endpoint') body.device_id = document.getElementById('rotationDevice').value;
+  if (operation === 'endpoint') body.server_url = document.getElementById('rotationEndpoint').value.trim();
+  var messages = {
+    prepare: 'Simpan key baru tanpa broadcast? Key sebelumnya tetap diterima.',
+    retain: 'Izinkan key lama ini untuk autentikasi agent? Hanya gunakan key yang masih dipercaya.',
+    migrate: 'Migrasikan hanya perangkat yang dipilih? Koneksi RemoteDesk perangkat ini akan terputus sementara.',
+    endpoint: 'Ubah endpoint hanya perangkat yang dipilih? Endpoint yang salah dapat memutus akses.',
+    revoke: 'Cabut seluruh key lama secara permanen? Server akan menolak jika masih ada perangkat belum terverifikasi menggunakan key terbaru.'
+  };
+  if (!await appConfirm(messages[operation])) return;
+  var buttons = document.querySelectorAll('#keyRotationDialog button');
+  buttons.forEach(function(button) { button.disabled = true; });
+  try {
+    var response = await api('/api/agent/reconfigure', { method: 'POST', body: JSON.stringify(body) });
+    if (!response || response.error) { result.textContent = (response && response.error) || 'Permintaan gagal'; return; }
+    document.getElementById('rotationKey').value = '';
+    result.textContent = operation === 'migrate' ? 'Perintah terkirim. Belum dinyatakan berhasil; refresh setelah agent reconnect.' : 'Perubahan tersimpan. Tidak ada broadcast massal.';
+    await loadDevices();
+    await openReconfigureModal();
+  } finally { buttons.forEach(function(button) { button.disabled = false; }); }
 }
 
 // ==================== CHANGE & RESET PASSWORD ====================

@@ -10,7 +10,7 @@ import (
 	"github.com/user/remote-desktop/internal/agent"
 )
 
-var version = "0.2.61"
+var version = "0.2.62"
 
 func main() {
 	vpnTray := flag.Bool("vpn-tray", false, "show RemoteDesk VPN safety tray")

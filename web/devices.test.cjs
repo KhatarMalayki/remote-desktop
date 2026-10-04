@@ -25,7 +25,8 @@ function harness(device) {
     startRemote() { calls.push('connect:' + select.value); },
     showToast(message) { calls.push(message); },
     endpointBadges: () => 'ME / SE', osIcon: () => '', timeAgo: () => '1 menit lalu',
-    isVersionNewer: () => false
+    isVersionNewer: () => false,
+    keyStatusLabel: status => status === 'current' ? 'Key terbaru terverifikasi' : status === 'old' ? 'Key lama' : 'Key belum terverifikasi'
   });
   vm.runInContext(source.slice(source.indexOf('function buildDeviceTable('), source.indexOf('function parseAgentVersion(')), context);
   vm.runInContext(source.slice(source.indexOf('function updateRemoteDeviceList('), source.indexOf('function openSelectedRustDesk(')), context);

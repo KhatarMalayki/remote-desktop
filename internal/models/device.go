@@ -41,6 +41,7 @@ type Device struct {
 	ManualAssetID      string         `json:"manual_asset_id,omitempty"`
 	Online             bool           `json:"online"`
 	UsingOldKey        bool           `json:"using_old_key,omitempty"`
+	APIKeyStatus       string         `json:"api_key_status,omitempty"`
 }
 
 type ManualAsset struct {
