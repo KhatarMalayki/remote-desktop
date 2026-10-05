@@ -22,7 +22,7 @@ func setInteractiveInputMode(enabled bool) { interactiveUserInput.Store(enabled)
 
 var (
 	user32DLL              = syscall.NewLazyDLL("user32.dll")
-	setCursorPos           = user32DLL.NewProc("SetCursorPos")
+	setCursorPos           = user32DLL.NewProc("SetPhysicalCursorPos")
 	mouseEventProc         = user32DLL.NewProc("mouse_event")
 	keybdEventProc         = user32DLL.NewProc("keybd_event")
 	openInputDesktopProc   = user32DLL.NewProc("OpenInputDesktop")
@@ -240,7 +240,7 @@ func setRemoteCursor(x, y float64, bounds image.Rectangle) error {
 	px := bounds.Min.X + int(x*float64(bounds.Dx()-1))
 	py := bounds.Min.Y + int(y*float64(bounds.Dy()-1))
 	if ok, _, callErr := setCursorPos.Call(uintptr(int32(px)), uintptr(int32(py))); ok == 0 {
-		return fmt.Errorf("Windows menolak posisi mouse (SetCursorPos: %v)", callErr)
+		return fmt.Errorf("Windows menolak posisi mouse (SetPhysicalCursorPos: %v)", callErr)
 	}
 	return nil
 }

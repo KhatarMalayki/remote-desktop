@@ -13,6 +13,15 @@ import (
 	"github.com/lxn/win"
 )
 
+func TestRemoteCursorUsesPhysicalCoordinates(t *testing.T) {
+	if setCursorPos.Name != "SetPhysicalCursorPos" {
+		t.Fatal("remote capture uses physical pixels; cursor positioning must not apply DPI scaling")
+	}
+	if err := setCursorPos.Find(); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestNativeInputDesktopProbe(t *testing.T) {
 	if os.Getenv("RD_NATIVE_INPUT_PROBE") != "1" {
 		t.Skip("set RD_NATIVE_INPUT_PROBE=1 for a zero-distance native mouse-move probe")
