@@ -1,12 +1,12 @@
 {
   "cmd/agent/main.go": {
-    "mtime": 1791184014.3755646,
-    "ast_hash": "8d5b770894e6c0b9b43eacd80d43d823",
+    "mtime": 1791194203.5446641,
+    "ast_hash": "84850776c19573e4aac5846149c81d77",
     "semantic_hash": ""
   },
   "cmd/server/main.go": {
-    "mtime": 1791184014.3765767,
-    "ast_hash": "23d7d862605e55cf9387f42cd652bd35",
+    "mtime": 1791194203.5457888,
+    "ast_hash": "d46acdfe196f47ef2bd31b5d006bfaff",
     "semantic_hash": ""
   },
   "go.mod": {
