@@ -63,6 +63,20 @@ test('legacy recovery uses retain without selecting devices or changing the key'
   assert.deepEqual(requests, [{ operation: 'retain', api_key: 'legacy#1234' }]);
 });
 
+test('bulk migration sends only an explicit operation and reports partial delivery', async () => {
+  const { context, fields, requests } = harness();
+  context.api = async (url, options) => {
+    requests.push(JSON.parse(options.body));
+    return { counts: { sent: 3, current: 1, offline: 2, update_required: 4, failed: 1 } };
+  };
+  await context.submitKeyRotation('migrate_all');
+  assert.deepEqual(requests, [{ operation: 'migrate_all' }]);
+  assert.match(fields.keyRotationResult.textContent, /Perintah terkirim: 3/);
+  assert.match(fields.keyRotationResult.textContent, /Offline: 2/);
+  assert.match(fields.keyRotationResult.textContent, /Perlu update agent: 4/);
+  assert.match(fields.keyRotationResult.textContent, /Belum berarti migrasi berhasil/);
+});
+
 test('rotation result is located directly below the secret input', () => {
   assert.ok(rotation.indexOf('id="keyRotationResult"') > rotation.indexOf('id="rotationKey"'));
   assert.ok(rotation.indexOf('id="keyRotationResult"') < rotation.indexOf('data-key-operation="prepare"'));

@@ -8,6 +8,7 @@ const root = path.join(__dirname, '..');
 const output = process.env.UI_SMOKE_OUTPUT || path.join(root, 'output', 'playwright');
 const fixture = {id:'test-workstation', hostname:'WORKSTATION-01', assigned_to:'Pengguna Pengujian', online:true, os:'windows', arch:'amd64', version:'0.2.58', cpu_cores:8, memory_total:16, memory_used:8, disk_total:512, disk_used:128, local_ip:'192.0.2.10', branch:'Cabang Pengujian', last_seen:Math.floor(Date.now()/1000), endpoint:{applications:[{label:'ME',status:'unknown'}]}};
 const responses = {
+  '/api/users': Array.from({length:18}, (_, index) => ({id:index+1,username:'demo_department_nama_panjang_'+index,role:'spv',branch:'Bintaro - Surya Sudeco, Bandung - Surya Sudeco',mfa_enabled:true})),
   '/api/agent/version': {version:'0.2.58'},
   '/api/auth/login': {token:'local-fixture-only'},
   '/api/auth/me': {id:1,username:'test-admin',role:'admin',mfa_enabled:true},
@@ -65,6 +66,12 @@ const responses = {
       }
       await page.locator('#navUsers').click();
       await page.locator('#usersModal').waitFor({state:'visible'});
+      await page.locator('#usersTableContainer tbody tr').first().waitFor();
+      assert.equal(await page.locator('#usersTableContainer tbody tr').count(),18);
+      assert.equal(await page.locator('#usersModal .modal').evaluate(element=>element.scrollWidth>element.clientWidth+1),false,'Account modal must not overflow horizontally');
+      await page.getByRole('button',{name:'Tutup kelola akun pengguna',exact:true}).click();
+      await page.locator('#usersModal').waitFor({state:'hidden'});
+      await page.locator('#navUsers').click();
       await page.screenshot({path:path.join(output,'administration-'+width+'.png')});
       assert.deepEqual(errors,[], 'Browser runtime errors');
       await page.close();

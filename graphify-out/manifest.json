@@ -1,22 +1,22 @@
 {
   "cmd/agent/main.go": {
-    "mtime": 1790777189.0772157,
-    "ast_hash": "de5c67d62547a50620748496e2f487e9",
+    "mtime": 1791184014.3755646,
+    "ast_hash": "8d5b770894e6c0b9b43eacd80d43d823",
     "semantic_hash": ""
   },
   "cmd/server/main.go": {
-    "mtime": 1790777189.1127837,
-    "ast_hash": "75b0765241400b41f52fe2af44bcac7a",
+    "mtime": 1791184014.3765767,
+    "ast_hash": "23d7d862605e55cf9387f42cd652bd35",
     "semantic_hash": ""
   },
   "go.mod": {
-    "mtime": 1789675895.3149962,
-    "ast_hash": "7e1297c82e53d79c655b96e0ea9b009b",
+    "mtime": 1791050248.130931,
+    "ast_hash": "4df94f5db3084576784ba09dbab6a3fa",
     "semantic_hash": ""
   },
   "internal/agent/client.go": {
-    "mtime": 1790785326.161227,
-    "ast_hash": "ea27b926294fc5a1e348694e647982ce",
+    "mtime": 1791065642.4767385,
+    "ast_hash": "c9e87508c7cc032f758ef3f0195ea9f5",
     "semantic_hash": ""
   },
   "internal/agent/sysinfo.go": {
@@ -25,8 +25,8 @@
     "semantic_hash": ""
   },
   "internal/models/device.go": {
-    "mtime": 1790785326.1054087,
-    "ast_hash": "cb1a1071b1945895bc5e1ca871ffd8ea",
+    "mtime": 1791065399.492097,
+    "ast_hash": "58c4fbfe8e8a63cff87336a290319f21",
     "semantic_hash": ""
   },
   "internal/server/db.go": {
@@ -45,8 +45,8 @@
     "semantic_hash": ""
   },
   "internal/server/server.go": {
-    "mtime": 1790777001.2195277,
-    "ast_hash": "6edc1ccebe46942b22a63c52b905b044",
+    "mtime": 1791065399.5519857,
+    "ast_hash": "682b1d53df2960333f2dc10418aa3e21",
     "semantic_hash": ""
   },
   "scripts/build.ps1": {
@@ -55,9 +55,9 @@
     "semantic_hash": "1a0228ad98e24d327acef26058ef442f"
   },
   "scripts/build.sh": {
-    "mtime": 1787541855.1912599,
-    "ast_hash": "9674b22ac57c4e97677544b899dd3ed2",
-    "semantic_hash": "9674b22ac57c4e97677544b899dd3ed2"
+    "mtime": 1791043620.3656397,
+    "ast_hash": "1d71cdf972f6b3abd325fe94490b78d5",
+    "semantic_hash": ""
   },
   "web.go": {
     "mtime": 1787542026.7083905,
@@ -65,8 +65,8 @@
     "semantic_hash": "8c9cb5d1b967f64d6abc8c1ca0fe3e90"
   },
   "web/static/app.js": {
-    "mtime": 1790789352.023537,
-    "ast_hash": "8fab01cb879348f7778b8ddc7f8fa8dc",
+    "mtime": 1791186837.406394,
+    "ast_hash": "0c29290d9d87a317d964f674bb42a407",
     "semantic_hash": ""
   },
   ".codex/hooks.json": {
@@ -75,8 +75,8 @@
     "semantic_hash": ""
   },
   "internal/server/db_test.go": {
-    "mtime": 1790664994.2702856,
-    "ast_hash": "e771b04512526e908f6ff71800199abf",
+    "mtime": 1790926349.0462794,
+    "ast_hash": "ad54fa6c05a6c4ff47ef393a337df60a",
     "semantic_hash": ""
   },
   "AGENTS.md": {
@@ -100,13 +100,13 @@
     "semantic_hash": ""
   },
   "docs/02-user-guide.md": {
-    "mtime": 1787558551.7640164,
-    "ast_hash": "0f6cee6f1e05bfa22b1601251c8a0a3d",
+    "mtime": 1790911246.760146,
+    "ast_hash": "aa8243df17598bc992314d39a811fbc5",
     "semantic_hash": ""
   },
   "docs/03-agent-deployment.md": {
-    "mtime": 1787558626.5013616,
-    "ast_hash": "81981322c28bfbaf648653713a491c14",
+    "mtime": 1791043370.3881776,
+    "ast_hash": "16d6762c8454bf847b46eaf3dcffded1",
     "semantic_hash": ""
   },
   "docs/04-api-reference.md": {
@@ -125,8 +125,8 @@
     "semantic_hash": ""
   },
   "web/index.html": {
-    "mtime": 1790859248.3014858,
-    "ast_hash": "b8e44ce3bf64f76523c8e6ac758084dd",
+    "mtime": 1791186862.9022288,
+    "ast_hash": "406564be4dbf3dd139b0bddbeaa6671b",
     "semantic_hash": ""
   },
   "scripts/update-server.sh": {
@@ -135,18 +135,18 @@
     "semantic_hash": ""
   },
   ".github/workflows/docker-publish.yml": {
-    "mtime": 1789972756.1543725,
-    "ast_hash": "8effd44ba307538daa67859ecc9f617d",
+    "mtime": 1791043370.3970478,
+    "ast_hash": "e6d4a6c277e253b4c6b104885240fb04",
     "semantic_hash": ""
   },
   "docker-compose.synology.yml": {
-    "mtime": 1789296592.125385,
-    "ast_hash": "eaeb5304f9ea20dfb3d814600edcdd79",
+    "mtime": 1791052429.3353658,
+    "ast_hash": "34f0e52f0598ca51d8aef895b65caaf1",
     "semantic_hash": ""
   },
   ".github/workflows/release-agent.yml": {
-    "mtime": 1789309348.4830832,
-    "ast_hash": "1fecae4770e8a1477fe51285a0dfbcb8",
+    "mtime": 1791043370.402185,
+    "ast_hash": "a2af6b05aaf1e75ccc982c33342106cf",
     "semantic_hash": ""
   },
   "internal/server/totp.go": {
@@ -165,8 +165,8 @@
     "semantic_hash": ""
   },
   "internal/server/ownership_test.go": {
-    "mtime": 1790147873.4700089,
-    "ast_hash": "0cfb5fbfbbcd4e482d32b7e246155071",
+    "mtime": 1790926349.2287881,
+    "ast_hash": "5da1f1f5535243ae635a776187f645ce",
     "semantic_hash": ""
   },
   "web/static/ownership.js": {
@@ -175,18 +175,18 @@
     "semantic_hash": ""
   },
   "internal/agent/remote.go": {
-    "mtime": 1790754508.027464,
-    "ast_hash": "7c61f8a4dd6cb33c073dcae3dd572534",
+    "mtime": 1791043370.375622,
+    "ast_hash": "e6128408a49d7685716048fab10b2669",
     "semantic_hash": ""
   },
   "internal/agent/remote_input_other.go": {
-    "mtime": 1790614202.2093146,
-    "ast_hash": "55f3f6e603a51689c2a9c2a978921191",
+    "mtime": 1791043064.1168427,
+    "ast_hash": "7bc12ae839d1026a9dd4323815583529",
     "semantic_hash": ""
   },
   "internal/agent/remote_input_windows.go": {
-    "mtime": 1790641989.2097292,
-    "ast_hash": "f90b808e5df28863c798d71b2b4b4d3b",
+    "mtime": 1791193549.4903753,
+    "ast_hash": "188bfe018fabf4edf601b54c67a083f0",
     "semantic_hash": ""
   },
   "internal/agent/remote_test.go": {
@@ -200,8 +200,8 @@
     "semantic_hash": ""
   },
   "internal/agent/remote_input_windows_test.go": {
-    "mtime": 1790642083.1881075,
-    "ast_hash": "abff0fbdc0599b23ce7f275203dd4be3",
+    "mtime": 1791193578.3146944,
+    "ast_hash": "d669abdc91714cd2a75cda9c51eb1a37",
     "semantic_hash": ""
   },
   "cmd/agent/system_service_other.go": {
@@ -210,13 +210,13 @@
     "semantic_hash": ""
   },
   "cmd/agent/system_service_windows.go": {
-    "mtime": 1790613143.2833238,
-    "ast_hash": "c1b3e7ef2d4b6f5ee6e42a337f304ed2",
+    "mtime": 1791065399.5213308,
+    "ast_hash": "de5591e8ba829d0269a44db269e0f00f",
     "semantic_hash": ""
   },
   "internal/agent/remote_desktop_other.go": {
-    "mtime": 1790641989.204198,
-    "ast_hash": "eb95918fb597d66ba03f90e6c5b4d59c",
+    "mtime": 1791043064.1200833,
+    "ast_hash": "6b19c6e315a5201dfa3a405526e06dcd",
     "semantic_hash": ""
   },
   "internal/agent/client_test.go": {
@@ -320,13 +320,13 @@
     "semantic_hash": ""
   },
   "internal/server/auth_security_test.go": {
-    "mtime": 1790150783.4417143,
-    "ast_hash": "4db31bb8474f12f0db35c941e5de3138",
+    "mtime": 1790926349.0419557,
+    "ast_hash": "2426861182272a5b3a49d4fcef36e9fc",
     "semantic_hash": ""
   },
   "docs/authentication.md": {
-    "mtime": 1790147974.3416069,
-    "ast_hash": "e14cfbce942bfceb426ba184195748ba",
+    "mtime": 1790926349.0680718,
+    "ast_hash": "f7bccd6aeb10dd42c762af4a0cc52427",
     "semantic_hash": ""
   },
   "internal/server/mfa_management.go": {
@@ -415,8 +415,8 @@
     "semantic_hash": ""
   },
   "web/remote.test.cjs": {
-    "mtime": 1790754578.091913,
-    "ast_hash": "fea59ef8d2ec138ae2be480b265ef214",
+    "mtime": 1791174229.4563384,
+    "ast_hash": "d8d2f4b3cabb05c5cee853933e236b88",
     "semantic_hash": ""
   },
   "docs/remote-session-controls.md": {
@@ -540,8 +540,8 @@
     "semantic_hash": ""
   },
   "web/ui-smoke.cjs": {
-    "mtime": 1790859526.5406244,
-    "ast_hash": "a80bac02539e6cc6a64358572916fd52",
+    "mtime": 1791185555.1313128,
+    "ast_hash": "416d4dbe82da8566028203bd43e52d37",
     "semantic_hash": ""
   },
   "output/playwright/assets-desktop.png": {
@@ -580,8 +580,8 @@
     "semantic_hash": ""
   },
   "output/playwright/login-1440.png": {
-    "mtime": 1790859654.6774528,
-    "ast_hash": "dcbf458de7ae78e6c8af5e7e45b0ef89",
+    "mtime": 1791188432.781747,
+    "ast_hash": "cb55ca09b1418d29f28dadeb6221bae8",
     "semantic_hash": ""
   },
   "output/playwright/redesign-login.png": {
@@ -592,6 +592,216 @@
   "output/playwright/remote-desktop.png": {
     "mtime": 1790859598.1954515,
     "ast_hash": "89f18e8d77c43cd40dfa24b03314b986",
+    "semantic_hash": ""
+  },
+  "web/devices.test.cjs": {
+    "mtime": 1791065759.3020017,
+    "ast_hash": "d67dfb85584a1a1fa4bee8cfbd883b68",
+    "semantic_hash": ""
+  },
+  "internal/agent/remote_clipboard.go": {
+    "mtime": 1791043064.1206067,
+    "ast_hash": "98074a2d51c7b492fc75d1040761783d",
+    "semantic_hash": ""
+  },
+  "internal/agent/remote_clipboard_test.go": {
+    "mtime": 1791043064.1246557,
+    "ast_hash": "e826a9385b936b1b8ffd57303892b59d",
+    "semantic_hash": ""
+  },
+  "internal/server/password_breach.go": {
+    "mtime": 1790926258.1822603,
+    "ast_hash": "ca1c5efe977d7923373e4cc140f5914c",
+    "semantic_hash": ""
+  },
+  "internal/server/password_breach_test.go": {
+    "mtime": 1790926602.384567,
+    "ast_hash": "c1a6d220b4ec426ec89965a6a32d5885",
+    "semantic_hash": ""
+  },
+  "internal/server/agent_package_mac.go": {
+    "mtime": 1791043370.3846407,
+    "ast_hash": "efe613d68a3c6309fa9095ad7c790f4f",
+    "semantic_hash": ""
+  },
+  "internal/server/agent_package_mac_test.go": {
+    "mtime": 1791043464.8336246,
+    "ast_hash": "59a565d443f7c1796e275be27794a222",
+    "semantic_hash": ""
+  },
+  "web/agent-download.test.cjs": {
+    "mtime": 1790934335.1432943,
+    "ast_hash": "6b22824bb1eef541eaa27aeb36aa5dc0",
+    "semantic_hash": ""
+  },
+  "internal/agent/remote_input_darwin.go": {
+    "mtime": 1791043464.9021344,
+    "ast_hash": "5c78c00ab9599b91d23a8fc301784dc4",
+    "semantic_hash": ""
+  },
+  "internal/agent/remote_mac_keys.go": {
+    "mtime": 1791043064.1262867,
+    "ast_hash": "acb6bfe3b3abcb622c1e93a0fd19192e",
+    "semantic_hash": ""
+  },
+  "internal/agent/remote_mac_keys_test.go": {
+    "mtime": 1791043064.1283107,
+    "ast_hash": "feca7aa77b07a8fe6352dead71883c24",
+    "semantic_hash": ""
+  },
+  "internal/agent/remote_native_darwin.m": {
+    "mtime": 1791043212.8546286,
+    "ast_hash": "ef6e624a02a90a068692d6c8c147ae51",
+    "semantic_hash": ""
+  },
+  ".github/workflows/build-macos-agent.yml": {
+    "mtime": 1791043370.3911996,
+    "ast_hash": "3043b52bb2822ef7b81c9479bd44d6f5",
+    "semantic_hash": ""
+  },
+  "cmd/agent/system_service_stop_windows_test.go": {
+    "mtime": 1791065528.6786501,
+    "ast_hash": "b0d4cd2920ac44d90342e16d9b5d4273",
+    "semantic_hash": ""
+  },
+  "internal/agent/key_rotation_test.go": {
+    "mtime": 1791065642.4705384,
+    "ast_hash": "44433d3486d11ff6874ecab9b69d9d2b",
+    "semantic_hash": ""
+  },
+  "internal/agent/vpn.go": {
+    "mtime": 1791048240.7509477,
+    "ast_hash": "5b2a90a9de74c781f954ba5c61c3ea06",
+    "semantic_hash": ""
+  },
+  "internal/agent/vpn_other.go": {
+    "mtime": 1791048240.7686539,
+    "ast_hash": "645ab41608634de7b42cb6774ebd477e",
+    "semantic_hash": ""
+  },
+  "internal/agent/vpn_tray_windows.go": {
+    "mtime": 1791049499.5673823,
+    "ast_hash": "c9c1b4bd3652907eef4725b88c5c8ad3",
+    "semantic_hash": ""
+  },
+  "internal/agent/vpn_windows.go": {
+    "mtime": 1791050304.651251,
+    "ast_hash": "fa037f393ac1242dfe5a3cdc6ec6ea97",
+    "semantic_hash": ""
+  },
+  "internal/server/api_keys.go": {
+    "mtime": 1791172184.028628,
+    "ast_hash": "148dda89f68b60f6f705bc62243a298d",
+    "semantic_hash": ""
+  },
+  "internal/server/api_keys_test.go": {
+    "mtime": 1791172184.029227,
+    "ast_hash": "d4aaec99cdc014bc54d7cef617c7aa57",
+    "semantic_hash": ""
+  },
+  "internal/server/vpn.go": {
+    "mtime": 1791048085.8725116,
+    "ast_hash": "5e55a1ba8799183054d5cd1ae1a0988d",
+    "semantic_hash": ""
+  },
+  "internal/server/vpn_test.go": {
+    "mtime": 1791049602.2046945,
+    "ast_hash": "ab4481433eadf0969325946d69bce4c9",
+    "semantic_hash": ""
+  },
+  "internal/vpn/pilot.go": {
+    "mtime": 1791047884.4030845,
+    "ast_hash": "3be4dd42af51ba352533d18b0f6bce32",
+    "semantic_hash": ""
+  },
+  "internal/vpn/pilot_test.go": {
+    "mtime": 1791047884.4030845,
+    "ast_hash": "a4cf286300ca763fe66cced3ffb7ce01",
+    "semantic_hash": ""
+  },
+  "web/key-rotation.test.cjs": {
+    "mtime": 1791172151.6897461,
+    "ast_hash": "63218e0fc8ed312b592e78d334f1af06",
+    "semantic_hash": ""
+  },
+  "web/static/vpn.js": {
+    "mtime": 1791048490.3605864,
+    "ast_hash": "c51a4f8ecdb36abdf30e2889e6811d56",
+    "semantic_hash": ""
+  },
+  "docs/api-key-rotation.md": {
+    "mtime": 1791171978.25107,
+    "ast_hash": "8025ef61cd0b5987703effc90fe38630",
+    "semantic_hash": ""
+  },
+  "scripts/playwright-opera.ps1": {
+    "mtime": 1791174706.9561608,
+    "ast_hash": "554c8d1e2b93ccaa3c9a033d2c234752",
+    "semantic_hash": ""
+  },
+  "scripts/playwright-opera.test.ps1": {
+    "mtime": 1791174731.376215,
+    "ast_hash": "779f7703631da6ea6f568035011be045",
+    "semantic_hash": ""
+  },
+  ".playwright-mcp/page-2026-10-05T06-42-02-207Z.yml": {
+    "mtime": 1791182522.2135992,
+    "ast_hash": "8789805674cb07d5a0aa33882c049f4e",
+    "semantic_hash": ""
+  },
+  ".playwright-mcp/page-2026-10-05T06-43-44-269Z.yml": {
+    "mtime": 1791182624.2714577,
+    "ast_hash": "7576eeea466c428782fd009013d56367",
+    "semantic_hash": ""
+  },
+  ".playwright-mcp/page-2026-10-05T06-45-31-948Z.yml": {
+    "mtime": 1791182731.9579794,
+    "ast_hash": "503609c5410a80b4a89f61adedfbb2fd",
+    "semantic_hash": ""
+  },
+  ".playwright-mcp/page-2026-10-05T06-54-04-607Z.yml": {
+    "mtime": 1791183244.6098936,
+    "ast_hash": "c46b87a1d009da630408d02b1412c876",
+    "semantic_hash": ""
+  },
+  ".playwright-mcp/page-2026-10-05T06-43-49-855Z.png": {
+    "mtime": 1791182629.8601081,
+    "ast_hash": "c6eeaf71b581b87ff05594ca455f47df",
+    "semantic_hash": ""
+  },
+  ".playwright-mcp/page-2026-10-05T06-45-42-444Z.png": {
+    "mtime": 1791182742.4464352,
+    "ast_hash": "7db9c6df4c7fb59218ce90ea92d416cd",
+    "semantic_hash": ""
+  },
+  ".playwright-mcp/page-2026-10-05T06-49-36-750Z.png": {
+    "mtime": 1791182976.7536807,
+    "ast_hash": "aa7b69b2db7387f2612564894183f533",
+    "semantic_hash": ""
+  },
+  ".playwright-mcp/page-2026-10-05T06-54-13-119Z.png": {
+    "mtime": 1791183253.1264436,
+    "ast_hash": "474683aa6b25d4e721a405024a8f7f73",
+    "semantic_hash": ""
+  },
+  ".playwright-mcp/page-2026-10-05T06-55-01-608Z.png": {
+    "mtime": 1791183301.6123269,
+    "ast_hash": "c6e99c8c0dade55f1ea618d585ad1151",
+    "semantic_hash": ""
+  },
+  ".playwright-mcp/page-2026-10-05T07-30-51-963Z.yml": {
+    "mtime": 1791185451.9682121,
+    "ast_hash": "f8b14cbd6953bf41d3d5594ec3e22880",
+    "semantic_hash": ""
+  },
+  "web/users-ui.test.cjs": {
+    "mtime": 1791186872.3296638,
+    "ast_hash": "666685d56064a6533797c102965f8a12",
+    "semantic_hash": ""
+  },
+  "output/users-modal-desktop.png": {
+    "mtime": 1791185587.7425077,
+    "ast_hash": "67316bbf90787a5adffef2333d403ac6",
     "semantic_hash": ""
   }
 }

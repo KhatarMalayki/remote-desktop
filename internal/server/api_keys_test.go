@@ -58,6 +58,79 @@ func TestRetainShortLegacyKeyWithoutWeakeningNewKeys(t *testing.T) {
 	}
 }
 
+func TestBulkKeyMigrationRequiresPilotAndSkipsIneligible(t *testing.T) {
+	db, err := NewDB(t.TempDir() + "/keys.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	s := &Server{db: db, hub: NewHub(db), cfg: Config{APIKey: "current-key-for-tests"}}
+	if err := s.loadAPIKeys(); err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range []string{"pilot", "eligible", "offline", "old-agent", "full"} {
+		version := "0.2.62"
+		if id == "old-agent" {
+			version = "0.2.61"
+		}
+		if err := db.UpsertDevice(&models.Device{ID: id, OS: "windows", Version: version}); err != nil {
+			t.Fatal(err)
+		}
+		if id != "offline" {
+			s.hub.agents[id] = &Client{Send: make(chan []byte, 1)}
+		}
+	}
+	s.hub.agents["full"].Send <- []byte("occupied")
+	call := func(role string) *httptest.ResponseRecorder {
+		req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(`{"operation":"migrate_all"}`))
+		req = req.WithContext(context.WithValue(req.Context(), userClaimsKey, &UserClaims{Role: role}))
+		response := httptest.NewRecorder()
+		s.handleKeyRotation(response, req)
+		return response
+	}
+	if response := call("user"); response.Code != 403 {
+		t.Fatal("non-admin allowed")
+	}
+	if response := call("admin"); response.Code != 409 {
+		t.Fatal("migration allowed without pilot")
+	}
+	if len(s.hub.agents["eligible"].Send) != 0 {
+		t.Fatal("sent before pilot verification")
+	}
+	if err := s.recordDeviceKey("pilot", s.currentAPIKey()); err != nil {
+		t.Fatal(err)
+	}
+	response := call("admin")
+	if response.Code != 202 {
+		t.Fatal(response.Body.String())
+	}
+	var result struct {
+		Counts map[string]int `json:"counts"`
+	}
+	if err := json.Unmarshal(response.Body.Bytes(), &result); err != nil {
+		t.Fatal(err)
+	}
+	for _, reason := range []string{"sent", "current", "offline", "update_required", "failed"} {
+		if result.Counts[reason] != 1 {
+			t.Fatalf("counts=%v", result.Counts)
+		}
+	}
+	if len(s.hub.agents["pilot"].Send) != 0 || len(s.hub.agents["old-agent"].Send) != 0 {
+		t.Fatal("ineligible device received command")
+	}
+	var command struct {
+		Data struct {
+			APIKey string `json:"api_key"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(<-s.hub.agents["eligible"].Send, &command); err != nil {
+		t.Fatal(err)
+	}
+	if command.Data.APIKey != s.currentAPIKey() || s.deviceKeyStatus("eligible") != "unknown" {
+		t.Fatal("wrong key or unverified success")
+	}
+}
+
 func TestAPIKeyRotationIsExplicitAndPersistent(t *testing.T) {
 	db, err := NewDB(t.TempDir() + "/keys.db")
 	if err != nil {

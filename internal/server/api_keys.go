@@ -219,6 +219,47 @@ func (s *Server) handleKeyRotation(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		jsonResp(w, map[string]string{"status": "migration_sent"}, 202)
+	case "migrate_all":
+		if req.DeviceID != "" || req.APIKey != "" || req.ServerURL != "" {
+			jsonError(w, "Migrasi massal hanya memakai key aktif yang sudah disiapkan", 400)
+			return
+		}
+		devices, total, err := s.db.ListDevices("", "", 100000, 0)
+		if err != nil || total > len(devices) {
+			jsonError(w, "Gagal membaca seluruh perangkat; tidak ada perintah dikirim", 500)
+			return
+		}
+		s.keyMu.RLock()
+		defer s.keyMu.RUnlock()
+		fingerprint := keyID(s.keys.Current)
+		pilotVerified := false
+		for _, device := range devices {
+			if s.keys.Verified[device.ID] == fingerprint && s.hub.IsOnline(device.ID) {
+				pilotVerified = true
+				break
+			}
+		}
+		if !pilotVerified || s.keys.Current == "" {
+			jsonError(w, "Verifikasi satu PC pilot dengan key aktif dan pastikan online sebelum migrasi massal", 409)
+			return
+		}
+		counts := map[string]int{"sent": 0, "current": 0, "offline": 0, "update_required": 0, "failed": 0}
+		raw, _ := json.Marshal(map[string]interface{}{"action": "reconfigure", "data": map[string]string{"api_key": s.keys.Current}})
+		for _, device := range devices {
+			switch {
+			case s.keys.Verified[device.ID] == fingerprint:
+				counts["current"]++
+			case !s.hub.IsOnline(device.ID):
+				counts["offline"]++
+			case strings.TrimPrefix(device.Version, "v") != "0.2.62" && !versioncmp.IsNewer(device.Version, "0.2.62"):
+				counts["update_required"]++
+			case s.hub.SendToAgent(device.ID, raw):
+				counts["sent"]++
+			default:
+				counts["failed"]++
+			}
+		}
+		jsonResp(w, map[string]interface{}{"status": "bulk_migration_sent", "counts": counts}, 202)
 	case "revoke":
 		devices, total, err := s.db.ListDevices("", "", 100000, 0)
 		if err != nil || total > len(devices) {

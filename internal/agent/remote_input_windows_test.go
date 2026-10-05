@@ -13,6 +13,10 @@ import (
 	"github.com/lxn/win"
 )
 
+func TestDPIAwarenessInit(t *testing.T) {
+	initDPIAwareness()
+}
+
 func TestRemoteCursorUsesPhysicalCoordinates(t *testing.T) {
 	if setCursorPos.Name != "SetPhysicalCursorPos" {
 		t.Fatal("remote capture uses physical pixels; cursor positioning must not apply DPI scaling")

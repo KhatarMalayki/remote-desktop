@@ -22,6 +22,10 @@ func setInteractiveInputMode(enabled bool) { interactiveUserInput.Store(enabled)
 
 var (
 	user32DLL              = syscall.NewLazyDLL("user32.dll")
+	shcoreDLL                     = syscall.NewLazyDLL("shcore.dll")
+	setProcessDpiAwarenessContext = user32DLL.NewProc("SetProcessDpiAwarenessContext")
+	setProcessDpiAwareness        = shcoreDLL.NewProc("SetProcessDpiAwareness")
+	setProcessDPIAware            = user32DLL.NewProc("SetProcessDPIAware")
 	setCursorPos           = user32DLL.NewProc("SetPhysicalCursorPos")
 	mouseEventProc         = user32DLL.NewProc("mouse_event")
 	keybdEventProc         = user32DLL.NewProc("keybd_event")
@@ -33,6 +37,27 @@ var (
 	getCurrentThreadIDProc = syscall.NewLazyDLL("kernel32.dll").NewProc("GetCurrentThreadId")
 	sendInputCall          = user32DLL.NewProc("SendInput").Call
 )
+
+func init() {
+	initDPIAwareness()
+}
+
+func initDPIAwareness() {
+	if setProcessDpiAwarenessContext.Find() == nil {
+		const dpiContextPerMonitorV2 = ^uintptr(3)
+		if ok, _, _ := setProcessDpiAwarenessContext.Call(dpiContextPerMonitorV2); ok != 0 {
+			return
+		}
+	}
+	if setProcessDpiAwareness.Find() == nil {
+		if ok, _, _ := setProcessDpiAwareness.Call(2); ok == 0 {
+			return
+		}
+	}
+	if setProcessDPIAware.Find() == nil {
+		setProcessDPIAware.Call()
+	}
+}
 
 func handleRemoteInput(command remoteCommand, bounds image.Rectangle) error {
 	switch command.Type {

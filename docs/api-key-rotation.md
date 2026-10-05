@@ -1,6 +1,7 @@
 # Rotasi API key bertahap (v0.2.62)
 
 - Menu **Ubah Endpoint / API Key**: siapkan key tanpa broadcast, pilih satu perangkat pilot, lalu migrasikan perangkat lain satu per satu.
+- Setelah pilot online dengan key aktif terverifikasi dan koneksinya stabil, **Migrasikan semua yang memenuhi syarat** mengirim hanya ke agent online v0.2.62+ yang belum terverifikasi memakai key aktif. Hasil membedakan perintah terkirim, sudah terbaru, offline, perlu update, dan gagal dikirim. Pengiriman bukan bukti migrasi selesai. Device offline tidak diantrekan otomatis; ulangi setelah siap. Key lama tidak dicabut oleh migrasi massal.
 - Key menerima simbol, spasi, dan Unicode; panjang 16-512 byte, tanpa karakter kontrol. Gunakan key acak yang panjang. Agent v0.2.62 meng-encode parameter URL; agent lebih lama ditolak untuk migrasi, sehingga harus di-update dahulu.
 - Key lama tetap menerima koneksi. Tidak ada migrasi otomatis ketika perangkat kembali online. Tombol migrasi hanya mengirim ke perangkat terpilih yang sedang online.
 - **Terima key lama tambahan** menerima key legacy pendek khusus pemulihan (tidak kosong, maksimal 512 byte, tanpa karakter kontrol). Key aktif tidak berubah. Gunakan tombol ini untuk key 11 byte yang sudah dipakai PC, bukan **Siapkan key baru**. Tidak perlu memilih perangkat atau mengisi endpoint. Setelah pulih, migrasikan ke key baru minimal 16 byte.

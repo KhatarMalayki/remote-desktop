@@ -1015,8 +1015,19 @@ function exportBranchAssetsCSV() {
 
 // ==================== USER MANAGEMENT ====================
 
-async function openUsersModal() { document.getElementById('usersModal').style.display = 'flex'; loadUsers(); }
-function closeUsersModal() { document.getElementById('usersModal').style.display = 'none'; }
+async function openUsersModal() {
+  var modal = document.getElementById('usersModal');
+  if (modal) modal.style.display = 'flex';
+  var newUserSel = document.getElementById('newUserBranch');
+  if (newUserSel && (!newUserSel.options || newUserSel.options.length <= 1)) {
+    newUserSel.innerHTML = '<option value="">-- Pilih Lokasi / Bisnis Unit --</option>' + buildBranchOptionsHTML(true);
+  }
+  loadUsers();
+}
+function closeUsersModal() {
+  var modal = document.getElementById('usersModal');
+  if (modal) modal.style.display = 'none';
+}
 
 var cachedUsersList = [];
 
@@ -1025,7 +1036,14 @@ async function loadUsers() {
   cachedUsersList = users || [];
   var container = document.getElementById('usersTableContainer');
   if (!container) return;
-  if (!users || users.length === 0) { container.innerHTML = '<p style="color:var(--fg2);font-size:12px">Belum ada user terdaftar.</p>'; return; }
+  var countBadge = document.getElementById('usersCountBadge');
+  if (countBadge) {
+    countBadge.textContent = cachedUsersList.length ? cachedUsersList.length + ' akun' : '';
+  }
+  if (!users || users.length === 0) {
+    container.innerHTML = '<p style="color:var(--fg2);font-size:12px;padding:16px;text-align:center">Belum ada user terdaftar.</p>';
+    return;
+  }
   container.innerHTML = '<table class="device-table"><thead><tr><th>Username</th><th>Role</th><th>Cabang</th><th>Aksi</th></tr></thead><tbody>' +
     users.map(function(u) {
       var isSelf = (currentUser && u.username === currentUser.username);
@@ -1040,7 +1058,15 @@ async function loadUsers() {
           actions.push('<button class="btn btn-ghost btn-sm" onclick="resetUserMFA('+u.id+', \''+esc(u.username)+'\')">Reset 2FA</button>');
         }
       }
-      return '<tr><td><strong>'+esc(u.username)+'</strong>'+(isSelf?' <small style="color:var(--accent)">(Anda)</small>':'')+(u.mfa_enabled?' <span class="badge-status verified" style="font-size:10px;padding:1px 6px">2FA ON</span>':'')+'</td><td><span class="user-badge '+u.role+'">'+(u.role==='spv'?'SPV Dept':(u.role==='it_support'?'IT Support':(u.role==='ga_pusat'?'GA Pusat':(u.role==='adh'?'ADH Cabang':esc(u.role)))))+'</span></td><td>'+esc(u.branch||'-')+'</td><td><div style="display:flex;gap:4px;flex-wrap:wrap">'+actions.join(' ')+'</div></td></tr>';
+      return '<tr>' +
+        '<td><div class="user-cell-meta"><strong>'+esc(u.username)+'</strong>' +
+          (isSelf ? ' <span class="user-self-pill">Anda</span>' : '') +
+          (u.mfa_enabled ? ' <span class="badge-status verified" style="font-size:10px;padding:1px 6px">2FA ON</span>' : '') +
+        '</div></td>' +
+        '<td><span class="user-badge '+u.role+'">'+(u.role==='spv'?'SPV Dept':(u.role==='it_support'?'IT Support':(u.role==='ga_pusat'?'GA Pusat':(u.role==='adh'?'ADH Cabang':esc(u.role)))))+'</span></td>' +
+        '<td>'+esc(u.branch||'-')+'</td>' +
+        '<td><div class="user-action-group">'+actions.join(' ')+'</div></td>' +
+      '</tr>';
     }).join('') + '</tbody></table>';
 }
 
@@ -1446,7 +1472,7 @@ function exportAssets() {
 
 function updateRemoteDeviceList() {
   var sel = document.getElementById('remoteDeviceSelect');
-  if (!sel) return;
+  if (!sel || sel.disabled) return;
   var cur = sel.value;
   sel.innerHTML = '<option value="">Select Device...</option>';
   var available = devices.slice();
@@ -1875,6 +1901,7 @@ function stopRemote() {
 }
 
 function setRemoteStatus(status) {
+  document.getElementById('remoteDeviceSelect').disabled = status === 'connecting' || status === 'connected';
   var el = document.getElementById('remoteStatus');
   el.className = 'connection-status ' + status;
   el.textContent = status.charAt(0).toUpperCase() + status.slice(1);
@@ -2033,6 +2060,8 @@ async function openReconfigureModal() {
       '<label for="rotationDevice">Perangkat pilot / target</label><select id="rotationDevice" class="filter-select" style="width:100%;margin:8px 0"></select>' +
       '<p class="asset-advice">Migrasi key memerlukan agent v0.2.62+. Perangkat offline tidak menerima perintah. Status terbaru baru muncul setelah koneksi dengan key tersebut terverifikasi.</p>' +
       '<button class="btn btn-primary" data-key-operation="migrate">Migrasikan key perangkat ini</button>' +
+      '<button class="btn btn-ghost" data-key-operation="migrate_all">Migrasikan semua yang memenuhi syarat</button>' +
+      '<p class="asset-advice">Migrasi massal memerlukan pilot online dengan key terbaru terverifikasi. Device offline, agent lama, dan perangkat yang sudah memakai key terbaru dilewati. Tidak ada antrean otomatis untuk device offline.</p>' +
       '<label for="rotationEndpoint" style="display:block;margin-top:16px">Endpoint baru (opsional, terpisah dari migrasi key)</label>' +
       '<input id="rotationEndpoint" class="search-input" style="width:100%;margin:8px 0" type="url" placeholder="https://server.example">' +
       '<button class="btn btn-ghost" data-key-operation="endpoint">Ubah endpoint perangkat ini</button>' +
@@ -2077,6 +2106,7 @@ async function submitKeyRotation(operation) {
     prepare: 'Simpan key baru tanpa broadcast? Key sebelumnya tetap diterima.',
     retain: 'Izinkan key lama ini untuk memulihkan koneksi agent, termasuk jika lebih pendek dari 16 byte? Key aktif tidak berubah. Hanya gunakan key yang masih dipercaya; migrasikan ke key kuat setelah perangkat pulih.',
     migrate: 'Migrasikan hanya perangkat yang dipilih? Koneksi RemoteDesk perangkat ini akan terputus sementara.',
+    migrate_all: 'Kirim key aktif ke seluruh perangkat online yang belum memakai key terbaru dan sudah menjalankan agent v0.2.62+? Koneksi mereka akan terputus sementara. Device offline dan agent lama dilewati; key lama tidak dicabut. Pastikan pilot sudah stabil.',
     endpoint: 'Ubah endpoint hanya perangkat yang dipilih? Endpoint yang salah dapat memutus akses.',
     revoke: 'Cabut seluruh key lama secara permanen? Server akan menolak jika masih ada perangkat belum terverifikasi menggunakan key terbaru.'
   };
@@ -2094,6 +2124,10 @@ async function submitKeyRotation(operation) {
     result.textContent = operation === 'migrate' ? 'Perintah terkirim. Belum dinyatakan berhasil; refresh setelah agent reconnect.' : operation === 'retain' ? 'Key pemulihan diterima. Key aktif tidak berubah; agent dengan key ini bisa mencoba tersambung kembali. Tidak ada broadcast.' : 'Perubahan tersimpan. Tidak ada broadcast massal.';
     await loadDevices();
     await openReconfigureModal();
+    if (operation === 'migrate_all') {
+      var counts = response.counts;
+      result.textContent = 'Perintah terkirim: ' + counts.sent + '. Sudah key terbaru: ' + counts.current + '. Offline: ' + counts.offline + '. Perlu update agent: ' + counts.update_required + '. Gagal dikirim: ' + counts.failed + '. Belum berarti migrasi berhasil; refresh untuk verifikasi. Device yang dilewati perlu dicoba lagi setelah siap.';
+    }
     result.scrollIntoView({ block: 'nearest' });
   } finally { buttons.forEach(function(button) { button.disabled = false; }); }
 }

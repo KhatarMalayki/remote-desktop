@@ -24,6 +24,23 @@ function harness() {
   return { context, elements };
 }
 
+test('remote selection stays locked and unchanged during an active session', () => {
+  const { context, elements } = harness();
+  const select = context.document.getElementById('remoteDeviceSelect');
+  select.value = 'original-device';
+  select.innerHTML = '<option value="original-device">Original device</option>';
+  for (const status of ['connecting', 'connected']) {
+    context.setRemoteStatus(status);
+    assert.equal(select.disabled, true);
+    context.devices = [{ id: 'other-device', hostname: 'Other device', online: true }];
+    context.updateRemoteDeviceList();
+    assert.equal(select.value, 'original-device');
+    assert.equal(select.innerHTML, '<option value="original-device">Original device</option>');
+  }
+  context.setRemoteStatus('disconnected');
+  assert.equal(select.disabled, false);
+});
+
 test('disconnect reasons distinguish evidence from unknown network causes', () => {
   const { context } = harness();
   assert.match(context.remoteDisconnectReason({ code: 1006 }, false), /operator offline/);
