@@ -318,7 +318,7 @@
         <button class="btn btn-primary" id="btnConnect" onclick="startRemote()">&#9654; Connect</button>
         <button class="btn btn-warning" id="btnRustDesk" onclick="openSelectedRustDesk()">RustDesk (Lock Screen)</button>
         <button class="btn btn-danger" id="btnDisconnect" onclick="stopRemote()" style="display:none">&#9632; Disconnect</button>
-        <select class="filter-select" id="remoteMonitorSelect" onchange="changeRemoteMonitor()" style="display:none;min-width:130px"></select>
+        <select class="filter-select" id="remoteMonitorSelect" aria-label="Monitor fisik target" title="Memilih monitor fisik, bukan mengubah resolusi Windows target" onchange="changeRemoteMonitor()" style="display:none;min-width:130px"></select>
         <select class="filter-select" id="remoteQualitySelect" onchange="changeRemoteQuality()" style="display:none;min-width:135px">
           <option value="smooth">Lancar</option><option value="balanced" selected>Seimbang</option><option value="sharp">Tajam</option>
         </select>
@@ -338,6 +338,7 @@
         <span class="remote-stats" id="remoteStats"></span>
       </div>
       <p class="device-list-hint">Klik layar remote untuk fokus keyboard. Fullscreen / Hotkey meminta Keyboard Lock bila didukung browser; beberapa shortcut OS tetap tidak dapat ditangkap. Ctrl+V mengirim teks langsung pada agent 0.2.59+; agent lama memakai Kirim Clipboard.</p>
+      <p class="device-list-hint">Monitor memilih layar fisik target, bukan pilihan resolusi. Satu pilihan berarti agent melaporkan satu monitor. Resolusi mengikuti pengaturan layar target; setelah mengubahnya, putuskan lalu sambungkan ulang sesi remote.</p>
       <div class="remote-container" id="remoteContainer">
         <div class="empty-state">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
@@ -1017,12 +1018,39 @@
     <div class="modal-actions"><button class="btn btn-ghost" onclick="closeRustDeskManageModal()">Batal</button><button class="btn btn-primary" onclick="submitRustDeskManage()">Kirim ke Perangkat</button></div>
   </div>
 </div>
+<div id="vpnModal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeVPNModal()">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="vpnModalTitle" aria-describedby="vpnModalHelp" onkeydown="handleVPNDialogKeydown(event)">
+    <h3 id="vpnModalTitle">VPN Pilot</h3>
+    <p id="vpnModalHelp" class="users-subtitle">Uji VPN maksimal 15 menit. Hanya subnet pilot; bukan akses seluruh LAN. Membuka panel ini tidak mengaktifkan VPN.</p>
+    <div class="form-group">
+      <label for="vpnDevicePicker">Perangkat target</label>
+      <select id="vpnDevicePicker" onchange="onVPNDevicePickerChange(this.value)"></select>
+      <small id="vpnTargetInfo" class="users-help-text"></small>
+    </div>
+    <div class="users-card" aria-live="polite">
+      <h4 class="users-card-title">Hub <span id="vpnHubStatus" class="badge-status">Memuat</span></h4>
+      <p id="vpnHubDetail">Memuat status hub...</p>
+      <div class="users-help-text">Subnet: <span id="vpnNetworkInfo">Belum diatur</span></div>
+    </div>
+    <div class="users-card" aria-live="polite">
+      <h4 class="users-card-title">Koneksi target: <span id="vpnClientStatus">DISCONNECTED</span></h4>
+      <p id="vpnClientDetail">VPN belum aktif.</p>
+      <div class="users-help-text">IP VPN: <span id="vpnAssignedIP">Belum terhubung</span></div>
+    </div>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-ghost" onclick="refreshVPNState()">Refresh Status</button>
+      <button type="button" id="btnVPNConnect" class="btn btn-primary" onclick="triggerVPN('connect')" disabled>Connect VPN Pilot</button>
+      <button type="button" id="btnVPNDisconnect" class="btn btn-danger" onclick="triggerVPN('disconnect')" disabled>Disconnect VPN</button>
+      <button type="button" class="btn btn-ghost" onclick="closeVPNModal()">Tutup</button>
+    </div>
+  </div>
+</div>
 <script src="/static/dialogs.js?v=20260924"></script>
 <script src="/static/ownership.js?v=20260924"></script>
 <script src="/static/app.js?v=20261005-users"></script>
 <script src="/static/deploy.js?v=20260930"></script>
 <script src="/static/endpoint.js?v=0.2.58"></script>
-<script src="/static/vpn.js?v=0.2.61"></script>
+<script src="/static/vpn.js?v=20261005-vpn-dialog"></script>
 <div id="fileManagerModal" class="modal-overlay" style="display:none">
  <div class="modal" style="max-width:1000px">
   <h3>Transfer file</h3>

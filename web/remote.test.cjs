@@ -24,6 +24,25 @@ function harness() {
   return { context, elements };
 }
 
+test('monitor picker uses target resolutions and switches physical monitors', () => {
+  const { context } = harness();
+  const source = fs.readFileSync(path.join(__dirname, 'static/app.js'), 'utf8');
+  const start = source.indexOf("          var monitorSelect = document.getElementById('remoteMonitorSelect');");
+  const end = source.indexOf(';', source.indexOf('          monitorSelect.value =', start)) + 1;
+  context.relayMessage = {monitor: 1, monitors: [
+    {index: 0, width: 1920, height: 1080}, {index: 1, width: 2560, height: 1440}
+  ]};
+  vm.runInContext(source.slice(start, end), context);
+  const select = context.document.getElementById('remoteMonitorSelect');
+  assert.match(select.innerHTML, /1920×1080/);
+  assert.match(select.innerHTML, /2560×1440/);
+  assert.equal(select.value, '1');
+  const sent = [];
+  context.remoteWS = {readyState: 1, send: payload => sent.push(JSON.parse(payload))};
+  context.changeRemoteMonitor();
+  assert.deepEqual(sent, [{type: 'set_monitor', monitor: 1}]);
+});
+
 test('remote selection stays locked and unchanged during an active session', () => {
   const { context, elements } = harness();
   const select = context.document.getElementById('remoteDeviceSelect');

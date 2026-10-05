@@ -16,6 +16,7 @@ const responses = {
   '/api/stats': {total_devices:1,online_devices:1,offline_devices:0,os_distribution:{windows:1}},
   '/api/devices': {devices:[fixture],total:1,offset:0,limit:50,server_version:'0.2.58'},
   '/api/groups': ['Cabang Pengujian'],
+  '/api/vpn/pilot': {ready:false, detail:'Hub VPN belum dikonfigurasi', network:'', sessions:{}},
   '/api/devices/test-workstation': fixture
 };
 (async () => {
@@ -52,6 +53,16 @@ const responses = {
           const remoteLink = page.locator('#devicesTable a[target="_blank"]');
           assert.equal(await remoteLink.getAttribute('rel'), 'noopener noreferrer');
           assert.equal(await remoteLink.getAttribute('href'), '#remote=test-workstation');
+          await page.locator('#devicesTable').getByRole('button',{name:'VPN',exact:true}).click();
+          await page.locator('#vpnModal').waitFor({state:'visible'});
+          await page.getByText('Hub VPN belum dikonfigurasi',{exact:true}).waitFor();
+          assert.equal(await page.locator('#btnVPNConnect').isDisabled(),true);
+          assert.equal(await page.locator('#vpnDevicePicker').inputValue(),'test-workstation');
+          await page.screenshot({path:path.join(output,'vpn-'+width+'.png')});
+          await page.locator('#vpnDevicePicker').press('Shift+Tab');
+          assert.equal(await page.locator('#vpnModal button').last().evaluate(element=>element===document.activeElement),true);
+          await page.keyboard.press('Escape');
+          await page.locator('#vpnModal').waitFor({state:'hidden'});
         }
         const overflow = await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1);
         results.push({width,section,overflow});
