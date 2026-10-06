@@ -15,7 +15,7 @@ function harness(response) {
   }
   const calls = [];
   const context = vm.createContext({
-    currentUser: {role: 'admin'}, devices: [{id: 'pc', hostname: '<PC>', online: true, os: 'windows', version: '0.2.65'}],
+    currentUser: {role: 'admin'}, devices: [{id: 'pc', hostname: '<PC>', online: true, os: 'windows', version: '0.2.66'}],
     document: {getElementById: id => elements[id], createElement: () => ({}), activeElement: {focus() {}}},
     api: async (url, options) => { calls.push({url, options}); return response; },
     setInterval() { calls.push('poll'); return 1; }, clearInterval() { calls.push('stop'); },

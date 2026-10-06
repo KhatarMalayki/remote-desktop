@@ -29,7 +29,7 @@ func (a *Agent) initVPNPilot() {
 	if err:=vpnPlatformDisconnect();err!=nil{a.vpnPilot.status.State="error";a.vpnPilot.status.Detail=err.Error()}
 	initVPNTray()
 	go func(){
-		for range time.NewTicker(10*time.Second).C {
+		for range time.NewTicker(3*time.Second).C {
 			a.vpnPilot.Lock()
 			if a.vpnPilot.status.State=="running" {
 				running,err:=vpnPlatformRunning()

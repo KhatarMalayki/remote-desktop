@@ -190,12 +190,21 @@ func (s *Server) receiveVPN(device string,raw json.RawMessage) {
 	if report.State!="running" || !session.provisioned{return}
 	session.status.Updated=time.Now().Unix()
 	if time.Since(session.started)>vpn.SessionLimit {s.stopVPNSession(device,session,"batas sesi 15 menit");return}
-	output,err:=pilot.run("wg","show","rdpilot","latest-handshakes");if err!=nil{return}
-	for _,line:=range strings.Split(string(output),"\n") {
-		fields:=strings.Fields(line);if len(fields)!=2 || fields[0]!=session.status.PublicKey{continue}
-		stamp,_:=strconv.ParseInt(fields[1],10,64)
-		if stamp<session.started.Unix() || time.Now().Unix()-stamp>180 {return}
-		session.status.State="connected";session.status.Detail="Handshake WireGuard terverifikasi; split tunnel pilot aktif"
-		s.sendVPN(device,vpn.Command{Operation:"keepalive",ID:report.ID,Expires:time.Now().Add(30*time.Second).Unix()})
+	output,err:=pilot.run("wg","show","rdpilot","latest-handshakes")
+	hasValidHandshake:=false
+	if err==nil {
+		for _,line:=range strings.Split(string(output),"\n") {
+			fields:=strings.Fields(line);if len(fields)!=2 || fields[0]!=session.status.PublicKey{continue}
+			stamp,_:=strconv.ParseInt(fields[1],10,64)
+			if stamp>=session.started.Unix() && time.Now().Unix()-stamp<=300 {
+				hasValidHandshake=true
+				break
+			}
+		}
 	}
+	if hasValidHandshake {
+		session.status.State="connected"
+		session.status.Detail="Handshake WireGuard terverifikasi; split tunnel pilot aktif"
+	}
+	s.sendVPN(device,vpn.Command{Operation:"keepalive",ID:report.ID,Expires:time.Now().Add(60*time.Second).Unix()})
 }
