@@ -66,50 +66,7 @@ jobs:
           if ($uiAccessSignature.Status -ne 'Valid') { throw "Tanda tangan UIAccess agent tidak valid: $($uiAccessSignature.Status)" }
 
           # Download and unpack official signed WireGuard Windows runtime for client VPN pilot bundling
-          $wgMsi = Join-Path $env:RUNNER_TEMP 'wireguard-amd64.msi'
-          Invoke-WebRequest 'https://download.wireguard.com/windows-client/wireguard-amd64-0.5.3.msi' -OutFile $wgMsi -UseBasicParsing
-          $expectedMsiHash = '76FCEC042C5989C5B816CD32EAED1E5B1C3B998A4B1C9ECA55F299E3314EF7E4'
-          $actualMsiHash = (Get-FileHash -Algorithm SHA256 $wgMsi).Hash
-          if ($actualMsiHash -ne $expectedMsiHash) { throw "WireGuard MSI hash mismatch: $actualMsiHash" }
-          $msiSig = Get-AuthenticodeSignature -FilePath $wgMsi
-          if ($msiSig.Status -ne 'Valid' -or -not $msiSig.SignerCertificate.Subject.Contains('WireGuard')) { throw "WireGuard MSI signature invalid: $($msiSig.Status)" }
-
-          $code = @'
-          using System;
-          using System.IO;
-          using System.Runtime.InteropServices;
-          public class WgMsiDumper {
-              [DllImport("msi.dll", CharSet = CharSet.Unicode)] static extern uint MsiOpenDatabase(string path, IntPtr persist, out IntPtr db);
-              [DllImport("msi.dll", CharSet = CharSet.Unicode)] static extern uint MsiDatabaseOpenView(IntPtr db, string query, out IntPtr view);
-              [DllImport("msi.dll")] static extern uint MsiViewExecute(IntPtr view, IntPtr record);
-              [DllImport("msi.dll")] static extern uint MsiViewFetch(IntPtr view, out IntPtr record);
-              [DllImport("msi.dll")] static extern uint MsiRecordReadStream(IntPtr record, uint field, byte[] buffer, ref uint count);
-              [DllImport("msi.dll")] static extern uint MsiCloseHandle(IntPtr handle);
-              public static void ExtractStream(string msi, string streamName, string outPath) {
-                  IntPtr db, view, record;
-                  if (MsiOpenDatabase(msi, IntPtr.Zero, out db) != 0) throw new Exception("open db failed");
-                  if (MsiDatabaseOpenView(db, "SELECT Data FROM _Streams WHERE Name = '" + streamName + "'", out view) != 0) throw new Exception("open view failed");
-                  MsiViewExecute(view, IntPtr.Zero);
-                  if (MsiViewFetch(view, out record) != 0) throw new Exception("fetch failed");
-                  using (var fs = File.Create(outPath)) {
-                      byte[] buf = new byte[65536]; uint read = (uint)buf.Length;
-                      while (MsiRecordReadStream(record, 1, buf, ref read) == 0 && read > 0) { fs.Write(buf, 0, (int)read); read = (uint)buf.Length; }
-                  }
-                  MsiCloseHandle(record); MsiCloseHandle(view); MsiCloseHandle(db);
-              }
-          }
-'@
-          Add-Type -TypeDefinition $code -Language CSharp
-          $wgCab = Join-Path $env:RUNNER_TEMP 'wg-cab.cab'
-          [WgMsiDumper]::ExtractStream($wgMsi, "cab1.cab", $wgCab)
-          $wgExtracted = Join-Path $env:RUNNER_TEMP 'wg-extracted'
-          New-Item -ItemType Directory -Force -Path $wgExtracted | Out-Null
-          & expand.exe -R $wgCab -F:* $wgExtracted | Out-Null
-          $wgExe = Get-ChildItem -Path $wgExtracted -Recurse -File -Filter 'wireguard.exe' | Select-Object -First 1
-          if (-not $wgExe) { throw 'wireguard.exe not found in MSI' }
-          $wgSig = Get-AuthenticodeSignature -FilePath $wgExe.FullName
-          if ($wgSig.Status -ne 'Valid' -or -not $wgSig.SignerCertificate.Subject.Contains('WireGuard')) { throw "wireguard.exe signature invalid: $($wgSig.Status)" }
-          Copy-Item -LiteralPath $wgExe.FullName -Destination (Join-Path $PWD 'prebuilt-agent\wireguard.exe') -Force
+          & pwsh scripts/extract-wireguard.ps1 -DestinationDir (Join-Path $PWD 'prebuilt-agent')
 
       - name: Upload signed agent
         uses: actions/upload-artifact@v4
