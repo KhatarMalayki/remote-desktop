@@ -57,7 +57,7 @@ func (a *Agent) handleVPNPilot(command vpn.Command) {
 		a.updatingMu.Lock();updating:=a.isUpdating;a.updatingMu.Unlock();if updating{return}
 		if len(pilot.seen)>=1000 {fail(fmt.Errorf("batas sesi proses tercapai; restart agent sebelum pilot berikutnya"));break}
 		pilot.seen[command.ID]=true;pilot.status=vpn.Status{ID:command.ID,State:"preparing"};pilot.preparedUntil=command.Expires
-		private,public,err:=vpnPlatformPrepare()
+		private,public,err:=vpnPlatformPrepare(a.cfg.ServerURL, a.cfg.APIKey)
 		if err!=nil {fail(err);break}
 		pilot.private=private;pilot.status.PublicKey=public;pilot.status.State="ready";pilot.status.Detail="Prasyarat lokal lolos; menunggu konfigurasi hub"
 	case "connect":

@@ -262,6 +262,21 @@ func TestAgentVersionEndpoint(t *testing.T) {
 	if wDl.Body.String() != "fake-agent-binary-content" {
 		t.Fatalf("unexpected content: %s", wDl.Body.String())
 	}
+
+	// Test /api/agent/download with file=wireguard.exe
+	dummyWg := filepath.Join(tempDir, "wireguard.exe")
+	if err := os.WriteFile(dummyWg, []byte("fake-wireguard-runtime-content"), 0755); err != nil {
+		t.Fatalf("write dummy wireguard: %v", err)
+	}
+	reqWg := httptest.NewRequest("GET", "/api/agent/download?os=windows&arch=amd64&file=wireguard.exe&key=test-key", nil)
+	wWg := httptest.NewRecorder()
+	s.handleAgentDownload(wWg, reqWg)
+	if wWg.Code != 200 {
+		t.Fatalf("expected 200 for wireguard download, got %d", wWg.Code)
+	}
+	if wWg.Body.String() != "fake-wireguard-runtime-content" {
+		t.Fatalf("unexpected wireguard content: %s", wWg.Body.String())
+	}
 }
 
 func TestChangePasswordAndRateLimit(t *testing.T) {

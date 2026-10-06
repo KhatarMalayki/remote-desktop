@@ -2288,6 +2288,34 @@ func (s *Server) handleAgentDownload(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	if r.URL.Query().Get("file") == "wireguard.exe" {
+		candidates := []string{}
+		if s.cfg.AgentsDir != "" {
+			candidates = append(candidates, filepath.Join(s.cfg.AgentsDir, "wireguard.exe"))
+		}
+		candidates = append(candidates,
+			filepath.Join("bin", "agents", "wireguard.exe"),
+			filepath.Join("bin", "wireguard.exe"),
+			filepath.Join("prebuilt-agent", "wireguard.exe"),
+			"wireguard.exe",
+		)
+		var foundPath string
+		for _, p := range candidates {
+			if fi, err := os.Stat(p); err == nil && !fi.IsDir() && fi.Size() > 0 {
+				foundPath = p
+				break
+			}
+		}
+		if foundPath == "" {
+			http.Error(w, "wireguard runtime not found on server", 404)
+			return
+		}
+		w.Header().Set("Content-Disposition", `attachment; filename="wireguard.exe"`)
+		w.Header().Set("Content-Type", "application/octet-stream")
+		http.ServeFile(w, r, foundPath)
+		return
+	}
+
 	targetOS := strings.ToLower(r.URL.Query().Get("os"))
 	targetArch := strings.ToLower(r.URL.Query().Get("arch"))
 	if targetOS == "" {
@@ -3218,6 +3246,25 @@ func (s *Server) handleAgentPackageDownload(w http.ResponseWriter, r *http.Reque
 			_, _ = fUIAccess.Write(uiAccessBytes)
 		}
 
+		wireguardCandidates := []string{}
+		if s.cfg.AgentsDir != "" {
+			wireguardCandidates = append(wireguardCandidates, filepath.Join(s.cfg.AgentsDir, "wireguard.exe"))
+		}
+		wireguardCandidates = append(wireguardCandidates,
+			filepath.Join("bin", "agents", "wireguard.exe"),
+			filepath.Join("bin", "wireguard.exe"),
+			filepath.Join("prebuilt-agent", "wireguard.exe"),
+			"wireguard.exe",
+		)
+		for _, candidate := range wireguardCandidates {
+			if wgBytes, readErr := os.ReadFile(candidate); readErr == nil && len(wgBytes) > 0 {
+				if fWg, createErr := zw.Create("wireguard.exe"); createErr == nil {
+					_, _ = fWg.Write(wgBytes)
+				}
+				break
+			}
+		}
+
 		// UIAccess only accepts an executable whose certificate chains to a root
 		// trusted by Windows.  The root is public (the signing key is never put
 		// in this ZIP) and is installed once by the elevated installer below.
@@ -3305,6 +3352,9 @@ New-Item -ItemType Directory -Path $installDir -Force | Out-Null
 New-Item -ItemType Directory -Path $configDir -Force | Out-Null
 Copy-WithRetry (Join-Path $packageDir "rd-agent.exe") (Join-Path $installDir "rd-agent.exe")
 Copy-WithRetry (Join-Path $packageDir "rd-agent-uiaccess.exe") (Join-Path $installDir "rd-agent-uiaccess.exe")
+if (Test-Path -LiteralPath (Join-Path $packageDir "wireguard.exe")) {
+    Copy-WithRetry (Join-Path $packageDir "wireguard.exe") (Join-Path $installDir "wireguard.exe")
+}
 Copy-WithRetry (Join-Path $packageDir "agent.json") (Join-Path $configDir "agent.json")
 $exe = Join-Path $installDir "rd-agent.exe"
 $config = Join-Path $configDir "agent.json"

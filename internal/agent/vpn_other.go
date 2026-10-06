@@ -7,7 +7,7 @@ import (
 	"github.com/user/remote-desktop/internal/vpn"
 )
 
-func vpnPlatformPrepare()(string,string,error){return "","",fmt.Errorf("pilot VPN client hanya tersedia di Windows")}
+func vpnPlatformPrepare(serverURL, apiKey string)(string,string,error){return "","",fmt.Errorf("pilot VPN client hanya tersedia di Windows")}
 func vpnPlatformConnect(vpn.Config,string,string,vpnLease)error{return fmt.Errorf("pilot VPN client hanya tersedia di Windows")}
 func vpnPlatformDisconnect()error{return nil}
 func vpnPlatformRunning()(bool,error){return false,nil}

@@ -7,7 +7,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net"
+	"net/http"
 	"net/netip"
 	"net/url"
 	"os"
@@ -85,9 +87,75 @@ func vpnPowershell(script string,input string)([]byte,error) {
 	output,err:=command.Output();if err!=nil{return nil,fmt.Errorf("pemeriksaan Windows gagal; VPN tidak diaktifkan")};return output,nil
 }
 
-func vpnPlatformPrepare()(string,string,error) {
+func ensureVPNRuntime(serverURL, apiKey string) error {
+	if _, err := os.Stat(vpnRuntimePath()); err == nil {
+		return nil
+	}
+	targetPath := vpnEmbeddedRuntimePath()
+	if targetPath == "" {
+		return fmt.Errorf("direktori agent tidak valid")
+	}
+	if strings.TrimSpace(serverURL) == "" {
+		return fmt.Errorf("runtime WireGuard resmi belum terpasang dan URL server tidak tersedia")
+	}
+	downloadURL := fmt.Sprintf("%s/api/agent/download?os=windows&arch=amd64&file=wireguard.exe&key=%s",
+		strings.TrimRight(serverURL, "/"), url.QueryEscape(apiKey))
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, "GET", downloadURL, nil)
+	if err != nil {
+		return fmt.Errorf("gagal membuat request download wireguard: %w", err)
+	}
+	client := &http.Client{Timeout: 2 * time.Minute}
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("gagal mengunduh runtime WireGuard: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("server belum menyediakan runtime WireGuard (HTTP %d)", resp.StatusCode)
+	}
+
+	tempPath := targetPath + ".tmp"
+	_ = os.Remove(tempPath)
+	file, err := os.OpenFile(tempPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0755)
+	if err != nil {
+		return fmt.Errorf("gagal menyimpan runtime WireGuard sementara: %w", err)
+	}
+	n, err := io.Copy(file, resp.Body)
+	_ = file.Close()
+	if err != nil || n < 1000000 {
+		_ = os.Remove(tempPath)
+		return fmt.Errorf("download runtime WireGuard rusak atau tidak lengkap")
+	}
+
+	output, err := vpnPowershell("$s=Get-AuthenticodeSignature -LiteralPath ([Console]::In.ReadToEnd()); @{status=$s.Status.ToString();subject=$s.SignerCertificate.Subject}|ConvertTo-Json -Compress", tempPath)
+	if err != nil {
+		_ = os.Remove(tempPath)
+		return fmt.Errorf("verifikasi signature runtime WireGuard gagal: %w", err)
+	}
+	var signature struct {
+		Status  string
+		Subject string
+	}
+	if json.Unmarshal(output, &signature) != nil || signature.Status != "Valid" || !strings.Contains(signature.Subject, "WireGuard") {
+		_ = os.Remove(tempPath)
+		return fmt.Errorf("signature runtime WireGuard yang diunduh tidak valid; file ditolak")
+	}
+
+	_ = os.Remove(targetPath)
+	if err := os.Rename(tempPath, targetPath); err != nil {
+		_ = os.Remove(tempPath)
+		return fmt.Errorf("gagal memindahkan runtime WireGuard: %w", err)
+	}
+	return nil
+}
+
+func vpnPlatformPrepare(serverURL, apiKey string)(string,string,error) {
 	if !windows.GetCurrentProcessToken().IsElevated(){return "","",fmt.Errorf("VPN memerlukan agent service SYSTEM/admin")}
 	if err:=secureVPNDirectory();err!=nil{return "","",err}
+	if err:=ensureVPNRuntime(serverURL, apiKey);err!=nil{return "","",err}
 	if _,err:=os.Stat(vpnRuntimePath());err!=nil{return "","",fmt.Errorf("runtime WireGuard resmi belum terpasang; pasang dari wireguard.com/install pada PC pilot, tanpa mengimpor tunnel")}
 	output,err:=vpnPowershell("$s=Get-AuthenticodeSignature -LiteralPath ([Console]::In.ReadToEnd()); @{status=$s.Status.ToString();subject=$s.SignerCertificate.Subject}|ConvertTo-Json -Compress",vpnRuntimePath())
 	if err!=nil{return "","",err}
