@@ -26,7 +26,9 @@ RUN mkdir -p /agents && \
 # Runtime stage - minimal & secure
 FROM alpine:3.19
 
-RUN apk add --no-cache ca-certificates sqlite-libs tzdata iproute2 iptables wireguard-tools
+RUN apk add --no-cache ca-certificates sqlite-libs tzdata iproute2 iptables iptables-legacy wireguard-tools && \
+    ln -sf /sbin/iptables-legacy /sbin/iptables && \
+    iptables --version | grep -q '(legacy)'
 
 COPY --from=builder /bin/rd-server /usr/local/bin/rd-server
 COPY --from=builder /wireguard/wireguard /usr/local/bin/wireguard-go
