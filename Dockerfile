@@ -3,6 +3,8 @@ FROM golang:1.24-alpine AS builder
 
 RUN apk add --no-cache gcc musl-dev sqlite-dev
 
+RUN CGO_ENABLED=0 GOBIN=/wireguard go install golang.zx2c4.com/wireguard@v0.0.0-20231211153847-12269c276173
+
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
@@ -27,6 +29,7 @@ FROM alpine:3.19
 RUN apk add --no-cache ca-certificates sqlite-libs tzdata iproute2 iptables wireguard-tools
 
 COPY --from=builder /bin/rd-server /usr/local/bin/rd-server
+COPY --from=builder /wireguard/wireguard /usr/local/bin/wireguard-go
 COPY --from=builder /agents /app/agents
 COPY certs/RemoteDesk-Internal-Root.cer /app/certs/RemoteDesk-Internal-Root.cer
 
