@@ -24,6 +24,11 @@ type vpnLease struct {
 	Ack time.Time `json:"ack"`
 }
 
+func vpnLeaseSuperseded(initial, current vpnLease, now time.Time) bool {
+	return current.ID != initial.ID && vpn.ValidCommand(vpn.Command{ID: current.ID, Expires: now.Add(vpn.Lease).Unix()}, now) &&
+		!current.Started.After(current.Ack) && !current.Started.Before(initial.Started) && !vpn.LeaseExpired(now, current.Started, current.Ack)
+}
+
 func (a *Agent) initVPNPilot() {
 	a.vpnPilot=&vpnClient{status:vpn.Status{State:"disconnected",Detail:"VPN nonaktif; aktivasi manual diperlukan"},seen:map[string]bool{}}
 	if err:=vpnPlatformDisconnect();err!=nil{a.vpnPilot.status.State="error";a.vpnPilot.status.Detail=err.Error()}

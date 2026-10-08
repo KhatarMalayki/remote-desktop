@@ -400,7 +400,7 @@ func encodeRemoteFrameProfile(img image.Image, quality, maxWidth int) ([]byte, e
 	if maxWidth > 0 && img.Bounds().Dx() > maxWidth {
 		height := img.Bounds().Dy() * maxWidth / img.Bounds().Dx()
 		resized := image.NewRGBA(image.Rect(0, 0, maxWidth, height))
-		draw.CatmullRom.Scale(resized, resized.Bounds(), img, img.Bounds(), draw.Over, nil)
+		draw.ApproxBiLinear.Scale(resized, resized.Bounds(), img, img.Bounds(), draw.Src, nil)
 		img = resized
 	}
 	var frame bytes.Buffer

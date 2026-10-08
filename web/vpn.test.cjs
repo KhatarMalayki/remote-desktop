@@ -57,3 +57,14 @@ test('VPN connect sends selected device only after confirmation', async () => {
   const sent = calls.find(call => call.options);
   assert.deepEqual(JSON.parse(sent.options.body), {device: 'pc', operation: 'connect'});
 });
+
+test('preparing and connecting sessions remain cancellable', async () => {
+  for (const state of ['preparing','connecting']) {
+    const {context,elements,calls} = harness({ready:true,sessions:{pc:{state,detail:'waiting'}}});
+    await context.openVPNModal('pc');
+    assert.equal(elements.btnVPNConnect.disabled,true);
+    assert.equal(elements.btnVPNDisconnect.disabled,false);
+    await context.triggerVPN('disconnect');
+    assert.deepEqual(JSON.parse(calls.find(call=>call.options).options.body),{device:'pc',operation:'disconnect'});
+  }
+});

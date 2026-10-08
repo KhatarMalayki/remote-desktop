@@ -754,11 +754,13 @@ func (s *Server) handleDevice(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		var req struct {
-			Tags            string `json:"tags"`
-			Group           string `json:"group"`
-			Note            string `json:"note"`
-			OwnerUsername   string `json:"owner_username"`
-			AcquisitionYear *int   `json:"acquisition_year"`
+			Tags            string  `json:"tags"`
+			Group           string  `json:"group"`
+			Note            string  `json:"note"`
+			OwnerUsername   string  `json:"owner_username"`
+			AcquisitionYear *int    `json:"acquisition_year"`
+			SerialNumber    *string `json:"serial_number"`
+			ProductID       *string `json:"product_id"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			jsonError(w, "invalid body", 400)
@@ -772,17 +774,31 @@ func (s *Server) handleDevice(w http.ResponseWriter, r *http.Request) {
 		}
 		// Ownership changes must go through the audited switch workflow.
 		req.OwnerUsername = dev.OwnerUsername
+		if !isAssetHolderRole(claims.Role) {
+			for _, field := range []struct {
+				input  *string
+				target *string
+			}{{req.SerialNumber, &dev.SerialNumber}, {req.ProductID, &dev.ProductID}} {
+				if field.input == nil {
+					continue
+				}
+				value := strings.TrimSpace(*field.input)
+				if len(value) > 128 || strings.ContainsAny(value, "\x00\r\n") {
+					jsonError(w, "SN/Product ID maksimal 128 byte, tanpa baris baru atau NUL", 400)
+					return
+				}
+				*field.target = value
+			}
+		}
 		if req.AcquisitionYear != nil && !isAssetHolderRole(claims.Role) {
 			if *req.AcquisitionYear != 0 && (*req.AcquisitionYear < 1970 || *req.AcquisitionYear > time.Now().Year()) {
 				jsonError(w, "Tahun pengadaan tidak valid", 400)
 				return
 			}
-			if _, err := s.db.db.Exec(`UPDATE devices SET acquisition_year=? WHERE id=?`, *req.AcquisitionYear, id); err != nil {
-				jsonError(w, err.Error(), 500)
-				return
-			}
+			dev.AcquisitionYear = *req.AcquisitionYear
 		}
-		if err := s.db.UpdateDeviceMeta(id, req.Tags, req.Group, req.Note, strings.TrimSpace(req.OwnerUsername)); err != nil {
+		dev.Tags, dev.GroupName, dev.Note = req.Tags, req.Group, req.Note
+		if err := s.db.UpdateDeviceMeta(dev); err != nil {
 			jsonError(w, err.Error(), 500)
 			return
 		}

@@ -57,3 +57,16 @@ func TestEncodeRemoteFrameProfileDownscalesLargeDesktop(t *testing.T) {
 		t.Fatalf("scaled dimensions = %v, want 1280x720", decoded.Bounds())
 	}
 }
+
+func BenchmarkRemoteFrame4K(b *testing.B) {
+	img := image.NewRGBA(image.Rect(0, 0, 3840, 2160))
+	for offset := range img.Pix {
+		img.Pix[offset] = byte(offset * 17)
+	}
+	b.ResetTimer()
+	for index := 0; index < b.N; index++ {
+		if _, err := encodeRemoteFrameProfile(img, 52, 1600); err != nil {
+			b.Fatal(err)
+		}
+	}
+}

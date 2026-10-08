@@ -81,7 +81,7 @@ function renderVPNModal() {
   const btnDisconnect = document.getElementById('btnVPNDisconnect');
   const isBusy = session.state === 'preparing' || session.state === 'connecting' || session.state === 'disconnecting';
   btnConnect.disabled = !vpnPilotState.ready || !device || !device.online || device.os !== 'windows' || session.state === 'running' || session.state === 'connected' || isBusy;
-  btnDisconnect.disabled = !device || session.state === 'disconnected' || isBusy;
+  btnDisconnect.disabled = !device || session.state === 'disconnected' || session.state === 'disconnecting';
 }
 
 async function triggerVPN(operation) {

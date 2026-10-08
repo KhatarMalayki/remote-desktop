@@ -226,6 +226,7 @@ func vpnPreflight(config vpn.Config,serverURL string)error {
 }
 
 func vpnPlatformConnect(config vpn.Config,private,serverURL string,lease vpnLease)(err error) {
+	lock,err:=vpnLockLifecycle(15*time.Second);if err!=nil{return fmt.Errorf("siklus VPN sedang dipakai atau tidak dapat dikunci: %w",err)};defer lock.Close()
 	if err=vpnPreflight(config,serverURL);err!=nil{return err}
 	rendered,err:=config.Render(private);if err!=nil{return err}
 	if err=vpnAtomicFile(vpn.TunnelName+".conf",[]byte(rendered));err!=nil{return err}
@@ -263,13 +264,43 @@ func RunVPNWatchdog() error {
 	if err=vpnAtomicFile("watchdog.ready",[]byte(initial.ID));err!=nil{return err}
 	seenRunning:=false
 	for {
-		running,queryErr:=vpnPlatformRunning()
-		if queryErr==nil && running{seenRunning=true}
-		if queryErr==nil && !running && (seenRunning || time.Since(initial.Started)>20*time.Second){return nil}
-		raw,err=os.ReadFile(filepath.Join(vpnDirectory(),"lease.json"))
-		var lease vpnLease
-		invalid:=err!=nil || json.Unmarshal(raw,&lease)!=nil || lease.ID!=initial.ID || !lease.Started.Equal(initial.Started) || vpn.LeaseExpired(time.Now(),initial.Started,lease.Ack)
-		if invalid || queryErr!=nil {if err=vpnPlatformDisconnect();err==nil{return nil}}
+		done,running,stepErr:=vpnWatchdogStep(initial,seenRunning)
+		seenRunning=seenRunning || running
+		if done{return stepErr}
 		time.Sleep(2*time.Second)
 	}
+}
+
+func vpnLockLifecycle(wait time.Duration) (*os.File,error) {
+	file,err:=os.OpenFile(filepath.Join(vpnDirectory(),"lifecycle.lock"),os.O_CREATE|os.O_RDWR,0600)
+	if err!=nil{return nil,err}
+	deadline:=time.Now().Add(wait)
+	for {
+		err=windows.LockFileEx(windows.Handle(file.Fd()),windows.LOCKFILE_EXCLUSIVE_LOCK|windows.LOCKFILE_FAIL_IMMEDIATELY,0,1,0,&windows.Overlapped{})
+		if err==nil{return file,nil}
+		if !errors.Is(err,windows.ERROR_LOCK_VIOLATION) || !time.Now().Before(deadline){file.Close();return nil,err}
+		time.Sleep(50*time.Millisecond)
+	}
+}
+
+func vpnWatchdogStep(initial vpnLease,seenRunning bool)(bool,bool,error) {
+	lock,err:=vpnLockLifecycle(0)
+	if errors.Is(err,windows.ERROR_LOCK_VIOLATION){return false,false,nil}
+	if err!=nil {
+		if stopErr:=vpnPlatformDisconnect();stopErr!=nil{return false,false,stopErr}
+		return true,false,err
+	}
+	defer lock.Close()
+	raw,readErr:=os.ReadFile(filepath.Join(vpnDirectory(),"lease.json"))
+	var lease vpnLease
+	decodeErr:=json.Unmarshal(raw,&lease)
+	if readErr==nil && decodeErr==nil && vpnLeaseSuperseded(initial,lease,time.Now()){return true,false,nil}
+	running,queryErr:=vpnPlatformRunning()
+	if queryErr==nil && !running && (seenRunning || time.Since(initial.Started)>20*time.Second){return true,false,nil}
+	invalid:=readErr!=nil || decodeErr!=nil || lease.ID!=initial.ID || !lease.Started.Equal(initial.Started) || vpn.LeaseExpired(time.Now(),initial.Started,lease.Ack)
+	if invalid || queryErr!=nil {
+		err=vpnPlatformDisconnect()
+		return err==nil,running,err
+	}
+	return false,running,nil
 }

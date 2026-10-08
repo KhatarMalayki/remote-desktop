@@ -31,6 +31,8 @@ type Device struct {
 	VerifiedBy         string         `json:"verified_by"`
 	VerificationNote   string         `json:"verification_note"`
 	Note               string         `json:"note"`
+	SerialNumber       string         `json:"serial_number"`
+	ProductID          string         `json:"product_id"`
 	AcquisitionYear    int            `json:"acquisition_year"`
 	OwnerUsername      string         `json:"owner_username"`
 	AssignedTo         string         `json:"assigned_to"`

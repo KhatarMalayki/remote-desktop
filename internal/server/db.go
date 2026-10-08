@@ -254,6 +254,8 @@ func migrate(db *sql.DB) error {
 		`ALTER TABLE devices ADD COLUMN manual_asset_id TEXT NOT NULL DEFAULT ''`,
 		`ALTER TABLE asset_switch_requests ADD COLUMN assigned_to TEXT NOT NULL DEFAULT ''`,
 		`ALTER TABLE devices ADD COLUMN all_ips TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE devices ADD COLUMN serial_number TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE devices ADD COLUMN product_id TEXT NOT NULL DEFAULT ''`,
 	}
 	for _, q := range alters {
 		_, _ = db.Exec(q)
@@ -406,7 +408,7 @@ func (d *DB) GetDevice(id string) (*models.Device, error) {
 		memory_total, memory_used, disk_total, disk_used, version, rustdesk_id, status, tags, group_name,
 		branch, verification_status, verified_at, verified_by, verification_note, note,
 		owner_username, acquisition_year, last_seen, registered_at,
-		COALESCE(assigned_to, ''), COALESCE(condition, 'good'), manual_asset_id FROM devices WHERE id=?`, id)
+		COALESCE(assigned_to, ''), COALESCE(condition, 'good'), manual_asset_id, serial_number, product_id FROM devices WHERE id=?`, id)
 	return scanDevice(row)
 }
 
@@ -428,9 +430,9 @@ func (d *DB) ListDevices(group, search string, limit, offset int) ([]*models.Dev
 		}
 	}
 	if search != "" {
-		where += " AND (hostname LIKE ? OR ip LIKE ? OR id LIKE ? OR branch LIKE ? OR assigned_to LIKE ?)"
+		where += " AND (hostname LIKE ? OR ip LIKE ? OR id LIKE ? OR branch LIKE ? OR assigned_to LIKE ? OR serial_number LIKE ? OR product_id LIKE ?)"
 		s := "%" + search + "%"
-		args = append(args, s, s, s, s, s)
+		args = append(args, s, s, s, s, s, s, s)
 	}
 
 	var total int
@@ -445,7 +447,7 @@ func (d *DB) ListDevices(group, search string, limit, offset int) ([]*models.Dev
 		memory_total, memory_used, disk_total, disk_used, version, rustdesk_id, status, tags, group_name,
 		branch, verification_status, verified_at, verified_by, verification_note, note,
 		owner_username, acquisition_year, last_seen, registered_at,
-		COALESCE(assigned_to, ''), COALESCE(condition, 'good'), manual_asset_id FROM devices WHERE %s ORDER BY hostname COLLATE NOCASE ASC, id ASC LIMIT ? OFFSET ?`, where)
+		COALESCE(assigned_to, ''), COALESCE(condition, 'good'), manual_asset_id, serial_number, product_id FROM devices WHERE %s ORDER BY hostname COLLATE NOCASE ASC, id ASC LIMIT ? OFFSET ?`, where)
 	args = append(args, limit, offset)
 	rows, err := d.db.Query(query, args...)
 	if err != nil {
@@ -468,9 +470,9 @@ func (d *DB) ListDevicesForOwner(username, search string, limit, offset int) ([]
 	where := "owner_username=?"
 	args := []interface{}{username}
 	if search != "" {
-		where += " AND (hostname LIKE ? OR ip LIKE ? OR id LIKE ? OR branch LIKE ? OR assigned_to LIKE ?)"
+		where += " AND (hostname LIKE ? OR ip LIKE ? OR id LIKE ? OR branch LIKE ? OR assigned_to LIKE ? OR serial_number LIKE ? OR product_id LIKE ?)"
 		s := "%" + search + "%"
-		args = append(args, s, s, s, s, s)
+		args = append(args, s, s, s, s, s, s, s)
 	}
 	var total int
 	countArgs := make([]interface{}, len(args))
@@ -482,7 +484,7 @@ func (d *DB) ListDevicesForOwner(username, search string, limit, offset int) ([]
 		memory_total, memory_used, disk_total, disk_used, version, rustdesk_id, status, tags, group_name,
 		branch, verification_status, verified_at, verified_by, verification_note, note,
 		owner_username, acquisition_year, last_seen, registered_at,
-		COALESCE(assigned_to, ''), COALESCE(condition, 'good'), manual_asset_id FROM devices WHERE %s ORDER BY hostname COLLATE NOCASE ASC, id ASC LIMIT ? OFFSET ?`, where)
+		COALESCE(assigned_to, ''), COALESCE(condition, 'good'), manual_asset_id, serial_number, product_id FROM devices WHERE %s ORDER BY hostname COLLATE NOCASE ASC, id ASC LIMIT ? OFFSET ?`, where)
 	args = append(args, limit, offset)
 	rows, err := d.db.Query(query, args...)
 	if err != nil {
@@ -500,9 +502,9 @@ func (d *DB) ListDevicesForOwner(username, search string, limit, offset int) ([]
 	return devices, total, nil
 }
 
-func (d *DB) UpdateDeviceMeta(id, tags, group, note, ownerUsername string) error {
-	_, err := d.db.Exec(`UPDATE devices SET tags=?, group_name=?, branch=?, note=? WHERE id=?`,
-		tags, group, group, note, id)
+func (d *DB) UpdateDeviceMeta(dev *models.Device) error {
+	_, err := d.db.Exec(`UPDATE devices SET tags=?, group_name=?, branch=?, note=?, serial_number=?, product_id=?, acquisition_year=? WHERE id=?`,
+		dev.Tags, dev.GroupName, dev.GroupName, dev.Note, dev.SerialNumber, dev.ProductID, dev.AcquisitionYear, dev.ID)
 	return err
 }
 
@@ -1456,7 +1458,7 @@ func scanDevice(row scanner) (*models.Device, error) {
 		&dev.DiskTotal, &dev.DiskUsed, &dev.Version, &dev.RustDeskID, &dev.Status,
 		&dev.Tags, &dev.GroupName, &dev.Branch, &dev.VerificationStatus, &vAt,
 		&dev.VerifiedBy, &dev.VerificationNote, &dev.Note, &dev.OwnerUsername, &dev.AcquisitionYear, &dev.LastSeen, &dev.RegisteredAt,
-		&dev.AssignedTo, &dev.Condition, &dev.ManualAssetID)
+		&dev.AssignedTo, &dev.Condition, &dev.ManualAssetID, &dev.SerialNumber, &dev.ProductID)
 	if err != nil {
 		return nil, err
 	}

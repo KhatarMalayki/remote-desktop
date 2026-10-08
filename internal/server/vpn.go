@@ -24,8 +24,10 @@ import (
 type vpnSession struct {
 	status vpn.Status
 	started time.Time
+	connectingAt time.Time
 	config vpn.Config
 	provisioned bool
+	stopReason string
 }
 
 type vpnServer struct {
@@ -55,8 +57,10 @@ func (s *Server) initVPN() {
 			pilot.Lock()
 			for device,session:=range pilot.sessions {
 				if session.status.State=="disconnected" || session.status.State=="error" { continue }
-				if time.Since(session.started)>vpn.SessionLimit || time.Now().Unix()-session.status.Updated>int64(vpn.Lease.Seconds()) {
-					s.stopVPNSession(device,session,"Lease pilot habis atau agent tidak merespons")
+				if time.Since(session.started)>vpn.SessionLimit {
+					s.stopVPNSession(device,session,"Batas sesi pilot 15 menit tercapai")
+				} else if time.Now().Unix()-session.status.Updated>int64(vpn.Lease.Seconds()) {
+					s.stopVPNSession(device,session,"Lease pilot habis: laporan agent tidak diterima selama 60 detik")
 				}
 			}
 			pilot.Unlock()
@@ -165,7 +169,8 @@ func (s *Server) stopVPNSession(device string,session *vpnSession,reason string)
 		session.provisioned=false
 	}
 	s.sendVPN(device,vpn.Command{Operation:"disconnect",ID:session.status.ID,Expires:time.Now().Add(time.Minute).Unix()})
-	session.status.State="disconnecting";session.status.Detail=reason+"; menunggu konfirmasi agent";session.status.Updated=time.Now().Unix()
+	if session.stopReason=="" {session.stopReason=reason}
+	session.status.State="disconnecting";session.status.Detail=session.stopReason+"; menunggu konfirmasi agent";session.status.Updated=time.Now().Unix()
 }
 
 func (s *Server) receiveVPN(device string,raw json.RawMessage) {
@@ -176,20 +181,25 @@ func (s *Server) receiveVPN(device string,raw json.RawMessage) {
 	if session==nil || session.status.ID!=report.ID {return}
 	if report.State=="error" || report.State=="disconnected" {
 		if session.provisioned {s.stopVPNSession(device,session,"agent menghentikan VPN");if session.provisioned{return}}
-		session.status.State=report.State;session.status.Detail=report.Detail;session.status.Updated=time.Now().Unix();return
+		session.status.State=report.State;session.status.Detail=report.Detail
+		if session.stopReason!="" {session.status.Detail=session.stopReason+"; "+report.Detail}
+		session.status.Updated=time.Now().Unix();return
 	}
 	if session.status.State=="disconnecting" || session.status.State=="disconnected" || session.status.State=="error" {return}
 	if report.State=="ready" && session.status.State=="preparing" && vpn.ValidKey(report.PublicKey) {
 		for other,peer:=range pilot.sessions {if other!=device && peer.provisioned && peer.status.PublicKey==report.PublicKey{return}}
 		session.status.PublicKey=report.PublicKey
 		if _,err:=pilot.run("wg","set","rdpilot","peer",report.PublicKey,"allowed-ips",session.config.Address+"/32");err!=nil{session.status.State="error";session.status.Detail=err.Error();return}
-		session.provisioned=true;session.status.State="connecting";session.status.Updated=time.Now().Unix()
+		session.provisioned=true;session.status.State="connecting";session.status.Updated=time.Now().Unix();session.connectingAt=time.Now()
 		if !s.sendVPN(device,vpn.Command{Operation:"connect",ID:report.ID,Expires:time.Now().Add(time.Minute).Unix(),Config:&session.config}) {s.stopVPNSession(device,session,"pengiriman konfigurasi gagal")}
 		return
 	}
 	if report.State!="running" || !session.provisioned{return}
 	session.status.Updated=time.Now().Unix()
 	if time.Since(session.started)>vpn.SessionLimit {s.stopVPNSession(device,session,"batas sesi 15 menit");return}
+	if !s.sendVPN(device,vpn.Command{Operation:"keepalive",ID:report.ID,Expires:time.Now().Add(vpn.Lease).Unix()}) {
+		s.stopVPNSession(device,session,"Keepalive tidak dapat dikirim ke agent");return
+	}
 	output,err:=pilot.run("wg","show","rdpilot","latest-handshakes")
 	hasValidHandshake:=false
 	if err==nil {
@@ -205,6 +215,12 @@ func (s *Server) receiveVPN(device string,raw json.RawMessage) {
 	if hasValidHandshake {
 		session.status.State="connected"
 		session.status.Detail="Handshake WireGuard terverifikasi; split tunnel pilot aktif"
+	} else {
+		session.status.State="connecting"
+		session.status.Detail="Tunnel agent berjalan, tetapi handshake hub belum terverifikasi; periksa endpoint UDP, port forwarding, dan firewall hub"
+		if err!=nil {session.status.Detail="Hub gagal memeriksa handshake WireGuard; periksa runtime VPN pada NAS"}
+		if !session.connectingAt.IsZero() && time.Since(session.connectingAt)>60*time.Second {
+			s.stopVPNSession(device,session,session.status.Detail+" (timeout)")
+		}
 	}
-	s.sendVPN(device,vpn.Command{Operation:"keepalive",ID:report.ID,Expires:time.Now().Add(60*time.Second).Unix()})
 }

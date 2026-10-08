@@ -16,6 +16,9 @@ let remoteFileBusy = false;
 let remoteTransitionHistory = [];
 let searchTimeout = null;
 let idleTimer = null;
+let lastIdleActivity = 0;
+let lastIdlePublish = 0;
+let refreshTimer = null;
 let serverAgentVersion = '';
 let pendingAgentUpdates = {};
 const IDLE_TIMEOUT_MS = 30 * 60 * 1000;
@@ -188,16 +191,27 @@ function updateUserUI() {
 // ==================== INIT ====================
 
 function init() {
+  resetIdleTimer();
   ownershipUI();
-  loadStats();
   loadDevices().then(openRemoteFromLocation);
-  loadGroups();
-  loadBranches();
-  loadBranchAssets();
+  if (!new URLSearchParams(location.hash.slice(1)).has('remote')) {
+    loadStats();
+    loadGroups();
+    loadBranches();
+    loadBranchAssets();
+  }
   if (!isAssetUser()) connectWS();
-  setInterval(loadStats, 30000);
-  setInterval(loadDevices, 30000);
-  setInterval(loadBranchAssets, 30000);
+  clearInterval(refreshTimer);
+  refreshTimer = setInterval(refreshVisiblePage, 30000);
+}
+
+function refreshVisiblePage() {
+  if (document.hidden) return;
+  if (currentPage === 'dashboard') { loadStats(); loadDevices(); }
+  else if (currentPage === 'devices') loadDevices();
+  else if (currentPage === 'branch-assets') loadBranchAssets();
+  else if (currentPage === 'assets') loadBranchAssets().then(renderAssets);
+  else if (currentPage === 'remote' && !remoteWS) loadDevices();
 }
 
 // ==================== API ====================
@@ -1241,6 +1255,10 @@ async function openDeviceModal(id) {
   document.getElementById('modalTags').value = dev.tags || '';
   document.getElementById('modalGroup').value = dev.group || 'default';
   document.getElementById('modalNote').value = dev.note || '';
+  document.getElementById('modalSerialNumber').value = dev.serial_number || '';
+  document.getElementById('modalProductID').value = dev.product_id || '';
+  document.getElementById('modalSerialNumber').disabled = isAssetUser();
+  document.getElementById('modalProductID').disabled = isAssetUser();
   document.getElementById('modalAcquisitionYear').value = dev.acquisition_year || '';
   document.getElementById('modalAcquisitionYear').disabled = isAssetUser();
   document.getElementById('modalOwnership').textContent = 'Pemegang: ' + (dev.owner_username || 'Belum ditugaskan') + '. ' + (dev.recommendation || '') + ' ' + responsibilityNotice;
@@ -1386,8 +1404,30 @@ async function startNetworkScan() {
 
 function resetIdleTimer() {
   if (!token) return;
+  lastIdleActivity = Date.now();
+  if (lastIdleActivity - lastIdlePublish >= 1000) {
+    try { localStorage.setItem('rd_last_activity', String(lastIdleActivity)); } catch (_) {}
+    lastIdlePublish = lastIdleActivity;
+  }
+  scheduleIdleLogout();
+}
+
+function scheduleIdleLogout() {
   clearTimeout(idleTimer);
-  idleTimer = setTimeout(function(){ appAlert('Sesi berakhir karena 30 menit tidak ada aktivitas.'); doLogout(); }, IDLE_TIMEOUT_MS);
+  if (!token) return;
+  const now = Date.now();
+  let activity = lastIdleActivity;
+  try {
+    const shared = Number(localStorage.getItem('rd_last_activity'));
+    if (Number.isFinite(shared) && shared > activity && shared <= now) activity = shared;
+  } catch (_) {}
+  const remaining = IDLE_TIMEOUT_MS - (now - activity);
+  if (remaining <= 0) {
+    appAlert('Sesi berakhir karena 30 menit tidak ada aktivitas.');
+    doLogout();
+    return;
+  }
+  idleTimer = setTimeout(scheduleIdleLogout, remaining);
 }
 ['click','keydown','mousemove','touchstart'].forEach(function(e){ document.addEventListener(e, resetIdleTimer, {passive:true}); });
 
@@ -1399,6 +1439,8 @@ async function saveDeviceMeta() {
       tags: document.getElementById('modalTags').value,
       group: document.getElementById('modalGroup').value,
       note: document.getElementById('modalNote').value,
+      serial_number: document.getElementById('modalSerialNumber').value.trim(),
+      product_id: document.getElementById('modalProductID').value.trim(),
       acquisition_year: Number(document.getElementById('modalAcquisitionYear').value) || 0
     })
   });
@@ -1543,6 +1585,7 @@ function startRemote(reconnecting) {
   var decodingFrame = false;
   var pendingFrame = null;
   var frameCount = 0;
+  var frameBytes = 0;
   var relayAgentVersion = 'belum diketahui';
   var fpsStarted = performance.now();
   var pendingMove = null;
@@ -1571,6 +1614,7 @@ function startRemote(reconnecting) {
     var imageURL = URL.createObjectURL(blob);
     var img = new Image();
     img.onload = function() {
+      if (remoteWS !== sessionSocket) { URL.revokeObjectURL(imageURL); decodingFrame = false; pendingFrame = null; return; }
       if (canvas.width !== img.width || canvas.height !== img.height) { canvas.width = img.width; canvas.height = img.height; }
       canvas.getContext('2d', { alpha: false }).drawImage(img, 0, 0);
       URL.revokeObjectURL(imageURL);
@@ -1578,8 +1622,8 @@ function startRemote(reconnecting) {
       frameCount++;
       var elapsed = performance.now() - fpsStarted;
       if (elapsed >= 1000) {
-        document.getElementById('remoteStats').textContent = 'Agent ' + relayAgentVersion + ' • ' + Math.round(frameCount * 1000 / elapsed) + ' FPS • ' + img.width + '×' + img.height;
-        frameCount = 0; fpsStarted = performance.now();
+        document.getElementById('remoteStats').textContent = 'Agent ' + relayAgentVersion + ' • ' + Math.round(frameCount * 1000 / elapsed) + ' FPS • ' + (frameBytes * 8 / elapsed / 1000).toFixed(1) + ' Mbps • ' + img.width + '×' + img.height;
+        frameCount = 0; frameBytes = 0; fpsStarted = performance.now();
       }
       if (pendingFrame) { var newest = pendingFrame; pendingFrame = null; renderLatestFrame(newest); }
     };
@@ -1599,9 +1643,10 @@ function startRemote(reconnecting) {
   sessionSocket.onmessage = function(e) {
     if (remoteWS !== sessionSocket) return;
     if (e.data instanceof ArrayBuffer) {
+      frameBytes += e.data.byteLength;
+      if (!receivedFrame) setRemoteStatus('connected');
       receivedFrame = true;
       clearTimeout(connectTimer);
-      setRemoteStatus('connected');
       renderLatestFrame(e.data);
     } else {
       try {
