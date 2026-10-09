@@ -41,6 +41,45 @@ func TestVPNPolicyRequiresAdminAndValidation(t *testing.T) {
 	}
 }
 
+func TestVPNHandshakeRecoveryGetsFreshTimeout(t *testing.T) {
+	now := time.Now()
+	session := &vpnSession{started: now.Add(-6 * time.Minute), connectingAt: now.Add(-6 * time.Minute), provisioned: true, status: vpn.Status{ID: strings.Repeat("a", 32), State: "connecting", PublicKey: "peer"}}
+	hub := NewHub(nil)
+	hub.agents["device"] = &Client{Send: make(chan []byte, 20)}
+	handshake := now.Unix()
+	removed := false
+	server := &Server{hub: hub, vpnPilot: &vpnServer{sessions: map[string]*vpnSession{"device": session}, run: func(_ string, args ...string) ([]byte, error) {
+		if args[0] == "set" {
+			removed = true
+			return nil, nil
+		}
+		return []byte(fmt.Sprintf("peer\t%d\n", handshake)), nil
+	}}}
+	report, _ := json.Marshal(vpn.Status{ID: session.status.ID, State: "running"})
+	for attempt := 0; attempt < 2; attempt++ {
+		handshake = time.Now().Unix()
+		server.receiveVPN("device", report)
+		if session.status.State != "connected" {
+			t.Fatalf("healthy handshake rejected: %+v", session.status)
+		}
+		handshake = now.Add(-301 * time.Second).Unix()
+		server.receiveVPN("device", report)
+		if removed || session.status.State != "connecting" || time.Since(session.connectingAt) > time.Second {
+			t.Fatalf("recovery reused initial connection deadline: %+v", session)
+		}
+		deadlineStart := session.connectingAt
+		server.receiveVPN("device", report)
+		if session.connectingAt != deadlineStart {
+			t.Fatal("repeated failed handshake extended recovery deadline")
+		}
+	}
+	session.connectingAt = time.Now().Add(-61 * time.Second)
+	server.receiveVPN("device", report)
+	if !removed || session.provisioned || session.status.State != "disconnecting" {
+		t.Fatalf("expired recovery did not revoke peer: %+v", session)
+	}
+}
+
 func TestVPNDisconnectPreservesServerReason(t *testing.T) {
 	session := &vpnSession{status: vpn.Status{ID: "session", State: "connected"}}
 	server := &Server{hub: NewHub(nil), vpnPilot: &vpnServer{sessions: map[string]*vpnSession{"device": session}}}
@@ -54,6 +93,21 @@ func TestVPNDisconnectPreservesServerReason(t *testing.T) {
 	server.receiveVPN("device", report)
 	if !strings.Contains(session.status.Detail, "Lease pilot habis") {
 		t.Fatalf("repeated report erased reason: %+v", session.status)
+	}
+}
+
+func TestVPNCleanupPreservesInitialAgentFailure(t *testing.T) {
+	session := &vpnSession{provisioned: true, status: vpn.Status{ID: "session", State: "connected"}}
+	server := &Server{hub: NewHub(nil), vpnPilot: &vpnServer{sessions: map[string]*vpnSession{"device": session}, run: func(string, ...string) ([]byte, error) { return nil, nil }}}
+	for _, report := range []vpn.Status{
+		{ID: "session", State: "error", Detail: "penyimpanan lease gagal: sharing violation"},
+		{ID: "session", State: "disconnected", Detail: "VPN nonaktif; service RemoteDesk tetap berjalan"},
+	} {
+		raw, _ := json.Marshal(report)
+		server.receiveVPN("device", raw)
+		if !strings.Contains(session.status.Detail, "sharing violation") {
+			t.Fatalf("cleanup erased initial failure: %+v", session.status)
+		}
 	}
 }
 

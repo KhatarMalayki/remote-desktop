@@ -25,7 +25,21 @@ BenchmarkRemoteFrame4K: gambar sintetis RGBA 3840x2160, output 1600 piksel, kual
 - Koneksi WireGuard nyata, port UDP/firewall NAS, kualitas remote pada desktop pengguna, dan deployment belum diverifikasi. Akses lease VPN lokal ditolak ACL; tidak ada perubahan ACL atau restart service.
 - Penerapan memerlukan server baru untuk UI/database/protokol hub dan agent Windows baru untuk resize/watchdog. Versi server dan agent: 0.2.67. Publikasi image dan kesehatan deployment harus diverifikasi terpisah setelah push.
 
+## Perbaikan disconnect prematur WireGuard pilot (v0.2.68)
+
+- Reproduksi native Windows pada direktori sementara: reader os.Open yang masih memegang lease.json selama 100 ms membuat os.Rename gagal Access is denied. Jalur keepalive menganggap kegagalan tulis ini fatal dan menghentikan VPN. Ini membuktikan cacat kode, bukan konfirmasi penyebab tunggal sesi pengguna; log penyebab sesi tersebut tidak tersedia.
+- vpnAtomicFile kini mengulang rename hanya untuk sharing violation/access denied, maksimal satu detik. Tidak menghapus file lama terlebih dahulu; kegagalan persisten tetap dilaporkan dan pengaman tetap berlaku.
+- Error asli pembaruan lease dipertahankan oleh agent. Server mempertahankan laporan kegagalan pertama ketika perintah cleanup menghasilkan pesan disconnected generik.
+- Tes reader sementara dan cleanup server gagal sebelum patch. Tes tambahan memastikan lock persisten tetap gagal, file lama tidak hilang, dan file sementara dibersihkan. Semua tes memakai file sementara, bukan service VPN aktif.
+- Patch diterapkan pada v0.2.68: toleransi sharing violation, retensi lease ack saat baca sementara gagal, perbaikan clock skew di LeaseExpired, dan non-fatal lease write error.
+
 ## Uji setelah penerapan yang diotorisasi
+
+Verifikasi lanjutan VPN (2026-10-09):
+- Tes server mereproduksi putus langsung setelah handshake lama kedaluwarsa: connectingAt masih memakai awal sesi. Setelah handshake sukses timer dikosongkan; gangguan berikutnya mendapat jendela pemulihan 60 detik, tidak diperpanjang oleh laporan gagal berulang. Tes mencakup pulih, gangguan kedua, dan pencabutan peer setelah timeout.
+- Tes native Windows mereproduksi watchdog keluar ketika penghentian service gagal pada patch sebelumnya. Watchdog kini mencoba lagi sampai penghentian berhasil.
+- Source upstream yang dibaca: https://github.com/WireGuard/wireguard-go/blob/12269c276173/device/constants.go dan https://github.com/WireGuard/wireguard-go/blob/12269c276173/device/timers.go (revisi runtime pada Dockerfile). Timer retry/keepalive WireGuard terpisah dari lease kontrol RemoteDesk; tidak ada bukti bahwa menambah keepalive hub menyelesaikan kasus ini.
+- Kedua regresi gagal sebelum perbaikan masing-masing. Pengujian memakai mock hub/service dan file sementara, bukan koneksi VPN ke NAS. Penyebab sesi pada screenshot belum terkonfirmasi tanpa log runtime.
 
 1. Cadangkan database; jalankan server baru dan pastikan SN/Product ID bertahan setelah refresh.
 2. Perbarui agent target. Connect VPN, pastikan handshake terverifikasi, lalu Disconnect dan segera Connect ulang. Jika gagal, kumpulkan alasan UI dan log hub/agent pada waktu yang sama.

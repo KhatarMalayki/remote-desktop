@@ -103,5 +103,5 @@ func ValidCommand(command Command, now time.Time) bool {
 }
 
 func LeaseExpired(now, started, lastAck time.Time) bool {
-	return now.Sub(lastAck) > Lease || now.Sub(started) > SessionLimit || now.Before(lastAck)
+	return now.Sub(lastAck) > Lease || now.Sub(started) > SessionLimit || lastAck.Sub(now) > Lease
 }

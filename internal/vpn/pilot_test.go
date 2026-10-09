@@ -40,6 +40,8 @@ func TestPilotLeaseAndCommandExpiry(t *testing.T) {
 	command.Expires=now.Add(-time.Second).Unix()
 	if ValidCommand(command,now) { t.Fatal("expired command accepted") }
 	if LeaseExpired(now,now,now) { t.Fatal("fresh lease rejected") }
+	if LeaseExpired(now,now,now.Add(500*time.Millisecond)) { t.Fatal("subsecond future clock drift must not expire lease") }
+	if !LeaseExpired(now,now,now.Add(61*time.Second)) { t.Fatal("excessive future clock tampering must expire lease") }
 	if !LeaseExpired(now,now.Add(-2*time.Minute),now.Add(-61*time.Second)) { t.Fatal("lost dashboard does not disconnect") }
 	if !LeaseExpired(now,now.Add(-16*time.Minute),now) { t.Fatal("pilot exceeded 15 minutes") }
 }

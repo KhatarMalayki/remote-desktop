@@ -180,9 +180,12 @@ func (s *Server) receiveVPN(device string,raw json.RawMessage) {
 	session:=pilot.sessions[device]
 	if session==nil || session.status.ID!=report.ID {return}
 	if report.State=="error" || report.State=="disconnected" {
-		if session.provisioned {s.stopVPNSession(device,session,"agent menghentikan VPN");if session.provisioned{return}}
+		if session.provisioned {s.stopVPNSession(device,session,"agent menghentikan VPN: "+report.Detail);if session.provisioned{return}}
 		session.status.State=report.State;session.status.Detail=report.Detail
-		if session.stopReason!="" {session.status.Detail=session.stopReason+"; "+report.Detail}
+		if session.stopReason!="" {
+			session.status.Detail=session.stopReason
+			if report.Detail!="" && !strings.HasSuffix(session.stopReason,report.Detail) {session.status.Detail+="; "+report.Detail}
+		}
 		session.status.Updated=time.Now().Unix();return
 	}
 	if session.status.State=="disconnecting" || session.status.State=="disconnected" || session.status.State=="error" {return}
@@ -213,9 +216,11 @@ func (s *Server) receiveVPN(device string,raw json.RawMessage) {
 		}
 	}
 	if hasValidHandshake {
+		session.connectingAt=time.Time{}
 		session.status.State="connected"
 		session.status.Detail="Handshake WireGuard terverifikasi; split tunnel pilot aktif"
 	} else {
+		if session.connectingAt.IsZero() {session.connectingAt=time.Now()}
 		session.status.State="connecting"
 		session.status.Detail="Tunnel agent berjalan, tetapi handshake hub belum terverifikasi; periksa endpoint UDP, port forwarding, dan firewall hub"
 		if err!=nil {session.status.Detail="Hub gagal memeriksa handshake WireGuard; periksa runtime VPN pada NAS"}

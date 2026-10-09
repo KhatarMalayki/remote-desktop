@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"net/http"
 	"net/netip"
@@ -77,7 +78,12 @@ func vpnAtomicFile(name string,data []byte) error {
 	if _,err=file.Write(data);err!=nil{file.Close();return err}
 	if err=file.Sync();err!=nil{file.Close();return err}
 	if err=file.Close();err!=nil{return err}
-	return os.Rename(temporary,path)
+	deadline:=time.Now().Add(time.Second)
+	for {
+		err=os.Rename(temporary,path)
+		if err==nil || (!errors.Is(err,windows.ERROR_SHARING_VIOLATION) && !errors.Is(err,windows.ERROR_ACCESS_DENIED)) || !time.Now().Before(deadline){return err}
+		time.Sleep(25*time.Millisecond)
+	}
 }
 
 func vpnPowershell(script string,input string)([]byte,error) {
@@ -258,14 +264,19 @@ func vpnPlatformConnect(config vpn.Config,private,serverURL string,lease vpnLeas
 	return fmt.Errorf("startup VPN timeout; rollback diminta")
 }
 
+var vpnRunningCheck = vpnPlatformRunning
+var vpnDisconnectFunc = vpnPlatformDisconnect
+
 func RunVPNWatchdog() error {
 	raw,err:=os.ReadFile(filepath.Join(vpnDirectory(),"lease.json"));if err!=nil{return err}
 	var initial vpnLease;if json.Unmarshal(raw,&initial)!=nil || len(initial.ID)!=32 || vpn.LeaseExpired(time.Now(),initial.Started,initial.Ack){return fmt.Errorf("lease watchdog tidak valid")}
 	if err=vpnAtomicFile("watchdog.ready",[]byte(initial.ID));err!=nil{return err}
 	seenRunning:=false
+	lastAck:=initial.Ack
 	for {
-		done,running,stepErr:=vpnWatchdogStep(initial,seenRunning)
+		done,running,nextAck,stepErr:=vpnWatchdogStep(initial,seenRunning,lastAck)
 		seenRunning=seenRunning || running
+		if !nextAck.IsZero() {lastAck=nextAck}
 		if done{return stepErr}
 		time.Sleep(2*time.Second)
 	}
@@ -283,24 +294,33 @@ func vpnLockLifecycle(wait time.Duration) (*os.File,error) {
 	}
 }
 
-func vpnWatchdogStep(initial vpnLease,seenRunning bool)(bool,bool,error) {
+func vpnWatchdogStep(initial vpnLease,seenRunning bool,lastAck time.Time)(bool,bool,time.Time,error) {
 	lock,err:=vpnLockLifecycle(0)
-	if errors.Is(err,windows.ERROR_LOCK_VIOLATION){return false,false,nil}
+	if errors.Is(err,windows.ERROR_LOCK_VIOLATION){return false,false,lastAck,nil}
 	if err!=nil {
-		if stopErr:=vpnPlatformDisconnect();stopErr!=nil{return false,false,stopErr}
-		return true,false,err
+		if stopErr:=vpnPlatformDisconnect();stopErr!=nil{return false,false,lastAck,stopErr}
+		return true,false,lastAck,err
 	}
 	defer lock.Close()
 	raw,readErr:=os.ReadFile(filepath.Join(vpnDirectory(),"lease.json"))
 	var lease vpnLease
 	decodeErr:=json.Unmarshal(raw,&lease)
-	if readErr==nil && decodeErr==nil && vpnLeaseSuperseded(initial,lease,time.Now()){return true,false,nil}
-	running,queryErr:=vpnPlatformRunning()
-	if queryErr==nil && !running && (seenRunning || time.Since(initial.Started)>20*time.Second){return true,false,nil}
-	invalid:=readErr!=nil || decodeErr!=nil || lease.ID!=initial.ID || !lease.Started.Equal(initial.Started) || vpn.LeaseExpired(time.Now(),initial.Started,lease.Ack)
-	if invalid || queryErr!=nil {
-		err=vpnPlatformDisconnect()
-		return err==nil,running,err
+	if readErr==nil && decodeErr==nil {
+		if vpnLeaseSuperseded(initial,lease,time.Now()) {return true,false,lease.Ack,nil}
+		if lease.ID!=initial.ID || lease.Started.Unix()!=initial.Started.Unix() {
+			log.Printf("[vpn-watchdog] lease mismatch: id=%s vs %s", lease.ID, initial.ID)
+			err=vpnPlatformDisconnect()
+			return err==nil,false,lastAck,err
+		}
+		lastAck=lease.Ack
 	}
-	return false,running,nil
+	running,queryErr:=vpnRunningCheck()
+	if queryErr==nil && !running && (seenRunning || time.Since(initial.Started)>20*time.Second){return true,false,lastAck,nil}
+	expired:=vpn.LeaseExpired(time.Now(),initial.Started,lastAck)
+	if expired || queryErr!=nil {
+		log.Printf("[vpn-watchdog] stopping tunnel: expired=%v queryErr=%v lastAckAge=%v", expired, queryErr, time.Since(lastAck))
+		err=vpnDisconnectFunc()
+		return err==nil,running,lastAck,err
+	}
+	return false,running,lastAck,nil
 }
