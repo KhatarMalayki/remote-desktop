@@ -18,6 +18,8 @@ type vpnClient struct {
 	lastLeaseWrite time.Time
 	preparedUntil int64
 	seen map[string]bool
+	selfMu sync.Mutex
+	selfReplies chan vpn.SelfReply
 }
 
 type vpnLease struct {
@@ -33,8 +35,10 @@ func vpnLeaseSuperseded(initial, current vpnLease, now time.Time) bool {
 
 func (a *Agent) initVPNPilot() {
 	a.vpnPilot=&vpnClient{status:vpn.Status{State:"disconnected",Detail:"VPN nonaktif; aktivasi manual diperlukan"},seen:map[string]bool{}}
+	a.vpnPilot.selfReplies = make(chan vpn.SelfReply, 4)
 	if err:=vpnPlatformDisconnect();err!=nil{a.vpnPilot.status.State="error";a.vpnPilot.status.Detail=err.Error()}
-	initVPNTray()
+	initVPNTray(a.cfg.ServerURL)
+	a.initVPNSelfService()
 	go func(){
 		for range time.NewTicker(3*time.Second).C {
 			a.vpnPilot.Lock()
@@ -45,7 +49,7 @@ func (a *Agent) initVPNPilot() {
 					a.vpnPilot.status.State="error";a.vpnPilot.status.Detail=err.Error()
 				} else if !running{
 					log.Printf("[vpn] service stopped unexpectedly (watchdog or external)")
-					a.vpnPilot.status.State="disconnected";a.vpnPilot.status.Detail="VPN dihentikan lokal/watchdog; tidak tersambung ulang otomatis"
+					if cleanupErr:=vpnPlatformDisconnect();cleanupErr!=nil {a.vpnPilot.status.State="error";a.vpnPilot.status.Detail=cleanupErr.Error()} else {a.vpnPilot.status.State="disconnected";a.vpnPilot.status.Detail="VPN dihentikan lokal/watchdog; tidak tersambung ulang otomatis"}
 				}
 			}
 			a.reportVPNLocked()

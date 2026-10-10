@@ -348,6 +348,7 @@ async function loadDevices() {
   var data = await api('/api/devices?group=' + encodeURIComponent(group) + '&search=' + encodeURIComponent(search) + '&offset=' + currentOffset + '&limit=' + PAGE_SIZE);
   if (!data) return;
   devices = data.devices || [];
+  devices.forEach(function(device) { device.vpn = (data.vpn_statuses || {})[device.id]; });
   serverAgentVersion = data.server_version || serverAgentVersion;
   if (currentPage === 'devices') renderDevices();
   if (currentPage === 'dashboard') renderRecentDevices();
@@ -401,7 +402,8 @@ function buildDeviceTable(list) {
       
       var ipHtml = '<div class="device-ip">' + esc(d.local_ip || d.ip || 'Belum tersedia') + '</div>' +
         (d.ip && d.local_ip && d.ip !== d.local_ip ? '<div class="device-meta">Publik<br><span class="device-ip-secondary">' + esc(d.ip) + '</span></div>' : '') +
-        (d.all_ips ? '<span class="device-network-hint" title="' + esc(d.all_ips) + '">VPN / Multi-IP</span>' : '');
+        (d.all_ips ? '<span class="device-network-hint" title="' + esc(d.all_ips) + '">Multi-IP</span>' : '') +
+        deviceVPNBadge(d);
       
       var actionsHtml = '<div class="device-actions">' +
         (d.online ? '<a class="btn btn-primary btn-sm" href="#remote=' + encodeURIComponent(d.id) + '" target="_blank" rel="noopener noreferrer" aria-label="Remote ' + esc(d.hostname || d.id) + ' di tab baru">Remote Web <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h6v6M10 14 21 3"/><path d="M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5"/></svg></a>' : '') +
@@ -428,6 +430,16 @@ function deviceResourceUsage(label, used, total) {
   }
   var percent = Math.min(100, Math.round(used / total * 100));
   return '<div class="device-resource"><span>' + label + '</span><strong>' + percent + '%</strong><meter min="0" max="100" low="60" high="80" optimum="0" value="' + percent + '" aria-label="Pemakaian ' + label + '">' + percent + '%</meter></div>';
+}
+
+function deviceVPNBadge(device) {
+  var status = device.vpn || {};
+  var state = status.state || 'unknown';
+  if (!device.online && state !== 'disconnected' && state !== 'error') state = 'unknown';
+  var labels = {connected: 'VPN ON', disconnected: 'VPN OFF', preparing: 'VPN Menyiapkan', connecting: 'VPN Menghubungkan', running: 'VPN Verifikasi', disconnecting: 'VPN Memutus', error: 'VPN Error', unknown: 'VPN Belum diketahui'};
+  return '<div class="device-meta"><span class="badge-status ' + (state === 'connected' ? 'online' : 'offline') + '">' + (labels[state] || labels.unknown) + '</span>' +
+    (state === 'connected' && status.address ? '<div class="device-ip-secondary">' + esc(status.address) + '</div>' : '') +
+    (state === 'connected' && (status.advertise_lan || status.route_lan) ? '<div class="device-ip-secondary">' + (status.advertise_lan ? 'Gateway LAN: ' : 'Akses LAN: ') + esc(status.advertise_lan || status.route_lan) + '</div>' : '') + '</div>';
 }
 
 function parseAgentVersion(value) {

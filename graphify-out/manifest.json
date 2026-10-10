@@ -1,12 +1,12 @@
 {
   "cmd/agent/main.go": {
-    "mtime": 1791194203.5446641,
-    "ast_hash": "84850776c19573e4aac5846149c81d77",
+    "mtime": 1791631485.4767435,
+    "ast_hash": "c72d90239a93cfb21d35bd45b1386e62",
     "semantic_hash": ""
   },
   "cmd/server/main.go": {
-    "mtime": 1791194203.5457888,
-    "ast_hash": "d46acdfe196f47ef2bd31b5d006bfaff",
+    "mtime": 1791602384.7483327,
+    "ast_hash": "00c37db78261fa8b1f06f5b4db6db598",
     "semantic_hash": ""
   },
   "go.mod": {
@@ -15,8 +15,8 @@
     "semantic_hash": ""
   },
   "internal/agent/client.go": {
-    "mtime": 1791065642.4767385,
-    "ast_hash": "c9e87508c7cc032f758ef3f0195ea9f5",
+    "mtime": 1791632884.6170268,
+    "ast_hash": "e5c7f12b27137cadf619b5b346597c2f",
     "semantic_hash": ""
   },
   "internal/agent/sysinfo.go": {
@@ -25,13 +25,13 @@
     "semantic_hash": ""
   },
   "internal/models/device.go": {
-    "mtime": 1791065399.492097,
-    "ast_hash": "58c4fbfe8e8a63cff87336a290319f21",
+    "mtime": 1791465966.657622,
+    "ast_hash": "d00c9419ae8b52dac6028cc939606c83",
     "semantic_hash": ""
   },
   "internal/server/db.go": {
-    "mtime": 1790785326.1478183,
-    "ast_hash": "e1271bf688e93935fd3c2433d322206c",
+    "mtime": 1791466040.7837367,
+    "ast_hash": "e8c47cd8f0b1ca2baf2fc3dda0f9fd95",
     "semantic_hash": ""
   },
   "internal/server/hub.go": {
@@ -45,8 +45,8 @@
     "semantic_hash": ""
   },
   "internal/server/server.go": {
-    "mtime": 1791065399.5519857,
-    "ast_hash": "682b1d53df2960333f2dc10418aa3e21",
+    "mtime": 1791632828.7702012,
+    "ast_hash": "4d939c96474f2a179f0e0423e7196db7",
     "semantic_hash": ""
   },
   "scripts/build.ps1": {
@@ -65,8 +65,8 @@
     "semantic_hash": "8c9cb5d1b967f64d6abc8c1ca0fe3e90"
   },
   "web/static/app.js": {
-    "mtime": 1791186837.406394,
-    "ast_hash": "0c29290d9d87a317d964f674bb42a407",
+    "mtime": 1791602510.9053538,
+    "ast_hash": "97c1d048a3c98125b6ab7524c9e17416",
     "semantic_hash": ""
   },
   ".codex/hooks.json": {
@@ -75,8 +75,8 @@
     "semantic_hash": ""
   },
   "internal/server/db_test.go": {
-    "mtime": 1790926349.0462794,
-    "ast_hash": "ad54fa6c05a6c4ff47ef393a337df60a",
+    "mtime": 1791260156.395403,
+    "ast_hash": "dca5ddbfaedd7efaa8b5bda12e730364",
     "semantic_hash": ""
   },
   "AGENTS.md": {
@@ -125,8 +125,8 @@
     "semantic_hash": ""
   },
   "web/index.html": {
-    "mtime": 1791186862.9022288,
-    "ast_hash": "406564be4dbf3dd139b0bddbeaa6671b",
+    "mtime": 1791633176.7249637,
+    "ast_hash": "1f479125d9c5f7bb6bc5074c9224557c",
     "semantic_hash": ""
   },
   "scripts/update-server.sh": {
@@ -135,8 +135,8 @@
     "semantic_hash": ""
   },
   ".github/workflows/docker-publish.yml": {
-    "mtime": 1791043370.3970478,
-    "ast_hash": "e6d4a6c277e253b4c6b104885240fb04",
+    "mtime": 1791262294.0733333,
+    "ast_hash": "f85e7deda5329114e865d87d37981586",
     "semantic_hash": ""
   },
   "docker-compose.synology.yml": {
@@ -175,8 +175,8 @@
     "semantic_hash": ""
   },
   "internal/agent/remote.go": {
-    "mtime": 1791043370.375622,
-    "ast_hash": "e6128408a49d7685716048fab10b2669",
+    "mtime": 1791466103.5717568,
+    "ast_hash": "2bfa401c770d40273a3e0af976b1e097",
     "semantic_hash": ""
   },
   "internal/agent/remote_input_other.go": {
@@ -190,8 +190,8 @@
     "semantic_hash": ""
   },
   "internal/agent/remote_test.go": {
-    "mtime": 1789675924.402036,
-    "ast_hash": "62074515e8e2bd57727b8c6232fe4e71",
+    "mtime": 1791466648.7229788,
+    "ast_hash": "0d120f846b01426f4b82ae375e0b63c7",
     "semantic_hash": ""
   },
   "internal/server/relay_test.go": {
@@ -415,8 +415,8 @@
     "semantic_hash": ""
   },
   "web/remote.test.cjs": {
-    "mtime": 1791174229.4563384,
-    "ast_hash": "d8d2f4b3cabb05c5cee853933e236b88",
+    "mtime": 1791213835.324651,
+    "ast_hash": "750ca1e50d0f79c69dcf054098134252",
     "semantic_hash": ""
   },
   "docs/remote-session-controls.md": {
@@ -540,8 +540,8 @@
     "semantic_hash": ""
   },
   "web/ui-smoke.cjs": {
-    "mtime": 1791185555.1313128,
-    "ast_hash": "416d4dbe82da8566028203bd43e52d37",
+    "mtime": 1791213873.5085573,
+    "ast_hash": "0500bfe9711404c4b4afac52eaa86f5a",
     "semantic_hash": ""
   },
   "output/playwright/assets-desktop.png": {
@@ -595,8 +595,8 @@
     "semantic_hash": ""
   },
   "web/devices.test.cjs": {
-    "mtime": 1791065759.3020017,
-    "ast_hash": "d67dfb85584a1a1fa4bee8cfbd883b68",
+    "mtime": 1791586278.753718,
+    "ast_hash": "4e0c97e02f8948c644bdf38912c01fdc",
     "semantic_hash": ""
   },
   "internal/agent/remote_clipboard.go": {
@@ -670,23 +670,23 @@
     "semantic_hash": ""
   },
   "internal/agent/vpn.go": {
-    "mtime": 1791048240.7509477,
-    "ast_hash": "5b2a90a9de74c781f954ba5c61c3ea06",
+    "mtime": 1791632800.952319,
+    "ast_hash": "8683ef45d66103a1b3fc6c0710d47a9e",
     "semantic_hash": ""
   },
   "internal/agent/vpn_other.go": {
-    "mtime": 1791048240.7686539,
-    "ast_hash": "645ab41608634de7b42cb6774ebd477e",
+    "mtime": 1791632800.956799,
+    "ast_hash": "a67b44518b2191ac67f8f577956ad744",
     "semantic_hash": ""
   },
   "internal/agent/vpn_tray_windows.go": {
-    "mtime": 1791049499.5673823,
-    "ast_hash": "c9c1b4bd3652907eef4725b88c5c8ad3",
+    "mtime": 1791633011.2100794,
+    "ast_hash": "d3dbf2307f98bd3753e7b85b86830a58",
     "semantic_hash": ""
   },
   "internal/agent/vpn_windows.go": {
-    "mtime": 1791050304.651251,
-    "ast_hash": "fa037f393ac1242dfe5a3cdc6ec6ea97",
+    "mtime": 1791602539.6791358,
+    "ast_hash": "aa3cec6a1cb010fab4466d62f898f900",
     "semantic_hash": ""
   },
   "internal/server/api_keys.go": {
@@ -700,23 +700,23 @@
     "semantic_hash": ""
   },
   "internal/server/vpn.go": {
-    "mtime": 1791048085.8725116,
-    "ast_hash": "5e55a1ba8799183054d5cd1ae1a0988d",
+    "mtime": 1791632884.770715,
+    "ast_hash": "6894f84158ea43dfc3f5ccc02cf9791a",
     "semantic_hash": ""
   },
   "internal/server/vpn_test.go": {
-    "mtime": 1791049602.2046945,
-    "ast_hash": "ab4481433eadf0969325946d69bce4c9",
+    "mtime": 1791586449.397638,
+    "ast_hash": "a3ac0ac6a8ba511732d08c666a31c3a9",
     "semantic_hash": ""
   },
   "internal/vpn/pilot.go": {
-    "mtime": 1791047884.4030845,
-    "ast_hash": "3be4dd42af51ba352533d18b0f6bce32",
+    "mtime": 1791602539.6733403,
+    "ast_hash": "784d1366ca97719cd21233f4df3983f9",
     "semantic_hash": ""
   },
   "internal/vpn/pilot_test.go": {
-    "mtime": 1791047884.4030845,
-    "ast_hash": "a4cf286300ca763fe66cced3ffb7ce01",
+    "mtime": 1791503044.6672914,
+    "ast_hash": "ccebb05e34aacb047ba1045805b0ee81",
     "semantic_hash": ""
   },
   "web/key-rotation.test.cjs": {
@@ -725,8 +725,8 @@
     "semantic_hash": ""
   },
   "web/static/vpn.js": {
-    "mtime": 1791048490.3605864,
-    "ast_hash": "c51a4f8ecdb36abdf30e2889e6811d56",
+    "mtime": 1791632884.6271987,
+    "ast_hash": "359890dc658b87d1639c14e428c5d3f6",
     "semantic_hash": ""
   },
   "docs/api-key-rotation.md": {
@@ -802,6 +802,191 @@
   "output/users-modal-desktop.png": {
     "mtime": 1791185587.7425077,
     "ast_hash": "67316bbf90787a5adffef2333d403ac6",
+    "semantic_hash": ""
+  },
+  "web/vpn.test.cjs": {
+    "mtime": 1791633176.7308967,
+    "ast_hash": "197045d0c74e949f23967e2a1a490b82",
+    "semantic_hash": ""
+  },
+  ".playwright-mcp/page-2026-10-05T15-09-32-796Z.yml": {
+    "mtime": 1791212972.8031058,
+    "ast_hash": "f722fd0a52f1a1e32e7f9201339fed0e",
+    "semantic_hash": ""
+  },
+  ".playwright-mcp/page-2026-10-05T15-28-01-406Z.yml": {
+    "mtime": 1791214081.4097197,
+    "ast_hash": "f8b14cbd6953bf41d3d5594ec3e22880",
+    "semantic_hash": ""
+  },
+  "output/playwright/vpn-fixed-desktop.png": {
+    "mtime": 1791214167.3301039,
+    "ast_hash": "aef86990f2170edf06fdca578a4c924b",
+    "semantic_hash": ""
+  },
+  ".playwright-mcp/page-2026-10-06T01-37-58-805Z.yml": {
+    "mtime": 1791250678.8087432,
+    "ast_hash": "f5a957b9b63189c1fa35306e988454cd",
+    "semantic_hash": ""
+  },
+  ".playwright-mcp/page-2026-10-06T02-00-57-786Z.yml": {
+    "mtime": 1791252057.7942145,
+    "ast_hash": "bd59f9aa248ab60555a40700adbc5657",
+    "semantic_hash": ""
+  },
+  ".playwright-mcp/page-2026-10-06T02-13-41-156Z.yml": {
+    "mtime": 1791252821.1617217,
+    "ast_hash": "0d642a15c6926908b05abc968d0f1bff",
+    "semantic_hash": ""
+  },
+  "scripts/extract-wireguard.ps1": {
+    "mtime": 1791262325.1017814,
+    "ast_hash": "64af6d253c42662a898a23e67b144529",
+    "semantic_hash": ""
+  },
+  "web/idle.test.cjs": {
+    "mtime": 1791464372.3557596,
+    "ast_hash": "0eb253b39ba251f3189f2c0611a03768",
+    "semantic_hash": ""
+  },
+  "internal/agent/vpn_watchdog_test.go": {
+    "mtime": 1791466648.7031436,
+    "ast_hash": "a610b8651e8793c1006acb4fbe6db457",
+    "semantic_hash": ""
+  },
+  "internal/agent/vpn_watchdog_windows_test.go": {
+    "mtime": 1791526542.3630402,
+    "ast_hash": "3cb78b1235c4f563836a390d5f211406",
+    "semantic_hash": ""
+  },
+  "internal/server/device_identity_test.go": {
+    "mtime": 1791466851.3541799,
+    "ast_hash": "ffc50a5a757913c2ba6824388c448fdc",
+    "semantic_hash": ""
+  },
+  "web/refresh.test.cjs": {
+    "mtime": 1791466675.1577747,
+    "ast_hash": "0c4b90f0d830b2acd1ce5ba3584f949a",
+    "semantic_hash": ""
+  },
+  ".playwright-mcp/page-2026-10-08T13-41-56-090Z.yml": {
+    "mtime": 1791466916.097298,
+    "ast_hash": "ac0f5e4fb11af6341d4aeccae1dfea1c",
+    "semantic_hash": ""
+  },
+  "docs/priority-fixes-2026-10-09.md": {
+    "mtime": 1791526574.364071,
+    "ast_hash": "2692d4fb3e6999b4eea98afbd2157450",
+    "semantic_hash": ""
+  },
+  "internal/agent/vpn_lan_windows.go": {
+    "mtime": 1791602935.71005,
+    "ast_hash": "a148ced13c28a7e2a5b7da76c0c7612f",
+    "semantic_hash": ""
+  },
+  "internal/agent/vpn_lan_windows_test.go": {
+    "mtime": 1791602935.985793,
+    "ast_hash": "12408e9b5bbe89def43f07136faf1aba",
+    "semantic_hash": ""
+  },
+  "internal/server/vpn_lan.go": {
+    "mtime": 1791603332.6823728,
+    "ast_hash": "9b650471f3465cd87cb94867cd1c6d48",
+    "semantic_hash": ""
+  },
+  "internal/server/vpn_lan_test.go": {
+    "mtime": 1791603131.4724312,
+    "ast_hash": "9653cb86650fd87675ce211521f11220",
+    "semantic_hash": ""
+  },
+  "internal/vpn/lan_test.go": {
+    "mtime": 1791602820.4895077,
+    "ast_hash": "a80cbde147b74ed132c42bc0303d9177",
+    "semantic_hash": ""
+  },
+  "docs/vpn-lan-pilot.md": {
+    "mtime": 1791603131.2587366,
+    "ast_hash": "a9ee84222519c7e0464fbfb0e0e0cc6a",
+    "semantic_hash": ""
+  },
+  "output/playwright/vpn-lan-preview.html": {
+    "mtime": 1791603420.7851388,
+    "ast_hash": "a90e975a70fe66b3b2be7a82625b14df",
+    "semantic_hash": ""
+  },
+  "output/playwright/vpn-lan-desktop.png": {
+    "mtime": 1791603495.1236124,
+    "ast_hash": "4d9fae31779e55712e6c4becabc68af8",
+    "semantic_hash": ""
+  },
+  "output/playwright/vpn-lan-mobile.png": {
+    "mtime": 1791603500.1955593,
+    "ast_hash": "1e210910910272f0d704188c35f65864",
+    "semantic_hash": ""
+  },
+  "internal/agent/vpn_tray_launch_windows.go": {
+    "mtime": 1791631602.4716299,
+    "ast_hash": "6ee42665cae7d4737255da3c661d1ae6",
+    "semantic_hash": ""
+  },
+  "internal/agent/vpn_tray_windows_test.go": {
+    "mtime": 1791631602.4726565,
+    "ast_hash": "1adfe716221111086d9827f874f41c43",
+    "semantic_hash": ""
+  },
+  "docs/vpn-tray.md": {
+    "mtime": 1791633176.7259831,
+    "ast_hash": "c3a4fa5845a7b0159c10a85852f688b4",
+    "semantic_hash": ""
+  },
+  "internal/agent/vpn_self_service.go": {
+    "mtime": 1791632884.7651238,
+    "ast_hash": "55799ca57d92e542a87630055a93a1f9",
+    "semantic_hash": ""
+  },
+  "internal/agent/vpn_self_service_test.go": {
+    "mtime": 1791632965.006995,
+    "ast_hash": "027230a669ca35413a97f1c29469d2f9",
+    "semantic_hash": ""
+  },
+  "internal/agent/vpn_self_service_windows.go": {
+    "mtime": 1791633311.6023133,
+    "ast_hash": "25cdba60801f068b3ec0816a58d439d4",
+    "semantic_hash": ""
+  },
+  "internal/agent/vpn_self_service_windows_test.go": {
+    "mtime": 1791633311.6043859,
+    "ast_hash": "4d4c17f5df364346f84057e258b78653",
+    "semantic_hash": ""
+  },
+  "internal/server/vpn_self_service.go": {
+    "mtime": 1791633176.9463856,
+    "ast_hash": "164de42727b0c57804f67c5632243dcb",
+    "semantic_hash": ""
+  },
+  "internal/server/vpn_self_service_test.go": {
+    "mtime": 1791632965.0075445,
+    "ast_hash": "d292c4ba2af164de95d8d0c57c32ef40",
+    "semantic_hash": ""
+  },
+  "internal/vpn/self_service.go": {
+    "mtime": 1791632884.7681398,
+    "ast_hash": "663c19157ab4fd97860a97e71dc688ff",
+    "semantic_hash": ""
+  },
+  "output/playwright/vpn-self-preview.cjs": {
+    "mtime": 1791633356.0333128,
+    "ast_hash": "4659a495a3d27d0c85be5d7d2e4d2a74",
+    "semantic_hash": ""
+  },
+  "output/playwright/vpn-self-desktop.png": {
+    "mtime": 1791633452.5613465,
+    "ast_hash": "d2658004dd8ea816afa6cd80866fd1b9",
+    "semantic_hash": ""
+  },
+  "output/playwright/vpn-self-mobile.png": {
+    "mtime": 1791633452.8122616,
+    "ast_hash": "57bc4e1789e435a7829bf1eb3006ec16",
     "semantic_hash": ""
   }
 }

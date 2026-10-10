@@ -9,8 +9,61 @@ import (
 	"testing"
 	"time"
 
+	"github.com/user/remote-desktop/internal/models"
 	"github.com/user/remote-desktop/internal/vpn"
 )
+
+func TestDeviceListVPNStatusScopeAndFreshness(t *testing.T) {
+	server := securityServer(t)
+	server.hub = NewHub(server.db)
+	for _, id := range []string{"visible", "hidden"} {
+		if err := server.db.UpsertDevice(&models.Device{ID: id, Hostname: id, GroupName: id, OS: "windows"}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	server.hub.agents["visible"] = &Client{Send: make(chan []byte, 1)}
+	session := &vpnSession{status: vpn.Status{State: "connected", Address: "10.77.0.2", PublicKey: "must-not-leak", Updated: time.Now().Unix()}}
+	server.vpnPilot = &vpnServer{sessions: map[string]*vpnSession{"visible": session, "hidden": session}}
+	read := func() map[string]map[string]string {
+		request := httptest.NewRequest("GET", "/api/devices?group=visible", nil)
+		request = request.WithContext(context.WithValue(request.Context(), userClaimsKey, &UserClaims{Username: "admin", Role: "admin"}))
+		response := httptest.NewRecorder()
+		server.handleDevices(response, request)
+		if response.Code != 200 {
+			t.Fatalf("response: %d %s", response.Code, response.Body.String())
+		}
+		var result struct {
+			Statuses map[string]map[string]string `json:"vpn_statuses"`
+		}
+		if err := json.Unmarshal(response.Body.Bytes(), &result); err != nil {
+			t.Fatal(err)
+		}
+		if _, leaked := result.Statuses["hidden"]; leaked || strings.Contains(response.Body.String(), "must-not-leak") {
+			t.Fatal("VPN metadata escaped device scope")
+		}
+		return result.Statuses
+	}
+	if status := read()["visible"]; status["state"] != "connected" || status["address"] != "10.77.0.2" {
+		t.Fatalf("missing VPN status: %v", status)
+	}
+	session.status.Updated = time.Now().Add(-vpn.Lease - time.Second).Unix()
+	if read()["visible"]["state"] != "unknown" {
+		t.Fatal("stale session shown as connected")
+	}
+	session.status.Updated = time.Now().Unix()
+	delete(server.hub.agents, "visible")
+	if read()["visible"]["state"] != "unknown" {
+		t.Fatal("offline agent shown as connected")
+	}
+	delete(server.vpnPilot.sessions, "visible")
+	if read()["visible"]["state"] != "disconnected" {
+		t.Fatal("missing session not shown as off")
+	}
+	server.vpnPilot = nil
+	if len(read()) != 0 {
+		t.Fatal("unavailable VPN returned known status")
+	}
+}
 
 func TestVPNPolicyRequiresAdminAndValidation(t *testing.T) {
 	s := securityServer(t)

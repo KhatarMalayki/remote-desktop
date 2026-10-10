@@ -48,6 +48,18 @@ test('device table keeps all data in six columns with safe new-tab links', () =>
   assert.doesNotMatch(context.buildDeviceTable([{ ...device, online: false }]), /href="#remote=/);
 });
 
+test('VPN badge distinguishes verified, transitional, offline and unavailable status', () => {
+  const { context } = harness();
+  for (const [state, label] of Object.entries({connected: 'VPN ON', disconnected: 'VPN OFF', preparing: 'VPN Menyiapkan', connecting: 'VPN Menghubungkan', running: 'VPN Verifikasi', disconnecting: 'VPN Memutus', error: 'VPN Error', unknown: 'VPN Belum diketahui'})) {
+    const html = context.buildDeviceTable([{id: 'pc', online: true, vpn: {state, address: '10.77.0.2'}}]);
+    assert.ok(html.includes(label), state);
+    assert.equal(html.includes('10.77.0.2'), state === 'connected');
+  }
+  assert.match(context.deviceVPNBadge({online: false, vpn: {state: 'connected'}}), /VPN Belum diketahui/);
+  assert.match(context.deviceVPNBadge({online: true}), /VPN Belum diketahui/);
+  assert.doesNotMatch(context.deviceVPNBadge({online: true, vpn: {state: 'connected', address: '<script>bad</script>'}}), /<script>/);
+});
+
 test('resource meters clamp usage and distinguish missing data', () => {
   const { context } = harness();
   assert.match(context.deviceResourceUsage('RAM', 200, 100), /value="100"/);

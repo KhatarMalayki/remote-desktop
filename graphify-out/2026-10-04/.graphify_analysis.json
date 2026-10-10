@@ -1,0 +1,360 @@
+{
+  "communities": {
+    "0": [
+      "agent_agent",
+      "agent_agent_connect",
+      "agent_agent_handlemessage",
+      "agent_agent_heartbeatloop",
+      "agent_agent_readloop",
+      "agent_agent_register",
+      "agent_agent_run",
+      "agent_agentconfig",
+      "agent_systeminfo",
+      "cmd_agent_main",
+      "cmd_agent_main_envor",
+      "cmd_agent_main_main",
+      "internal_agent_client",
+      "internal_agent_client_generatedeviceid",
+      "internal_agent_client_go_conn",
+      "internal_agent_client_loadconfig",
+      "internal_agent_client_newagent",
+      "internal_agent_sysinfo",
+      "internal_agent_sysinfo_collectsysteminfo",
+      "internal_agent_sysinfo_formatbytes",
+      "internal_agent_sysinfo_getcpumodel",
+      "internal_agent_sysinfo_getcpuusage",
+      "internal_agent_sysinfo_getdiskinfo",
+      "internal_agent_sysinfo_getlocalip",
+      "internal_agent_sysinfo_getmemoryinfo",
+      "internal_agent_sysinfo_parseprocstat",
+      "models_wsmessage",
+      "rawmessage"
+    ],
+    "1": [
+      "fs",
+      "handlerfunc",
+      "internal_server_server",
+      "internal_server_server_generatetoken",
+      "internal_server_server_go_hub",
+      "internal_server_server_hashpassword",
+      "internal_server_server_jsonerror",
+      "internal_server_server_jsonresp",
+      "internal_server_server_new",
+      "internal_server_server_validatetoken",
+      "request",
+      "responsewriter",
+      "server_config",
+      "server_server",
+      "server_server_authmiddleware",
+      "server_server_handleagentws",
+      "server_server_handledevice",
+      "server_server_handledevices",
+      "server_server_handlegroups",
+      "server_server_handlelogin",
+      "server_server_handlelogs",
+      "server_server_handlerelayws",
+      "server_server_handlestats",
+      "server_server_handleviewerws",
+      "server_server_listenandserve",
+      "upgrader"
+    ],
+    "2": [
+      "internal_models_device",
+      "internal_server_db",
+      "internal_server_db_migrate",
+      "internal_server_db_newdb",
+      "internal_server_db_scandevice",
+      "internal_server_db_scandevicerows",
+      "models_device",
+      "models_deviceheartbeat",
+      "rows",
+      "server_db",
+      "server_db_addlog",
+      "server_db_close",
+      "server_db_deletedevice",
+      "server_db_ensureadmin",
+      "server_db_getdevice",
+      "server_db_getgroups",
+      "server_db_getlogs",
+      "server_db_getuser",
+      "server_db_listdevices",
+      "server_db_stats",
+      "server_db_updatedevicemeta",
+      "server_db_updateheartbeat",
+      "server_db_upsertdevice",
+      "server_scanner",
+      "time"
+    ],
+    "3": [
+      "internal_server_hub",
+      "internal_server_hub_go_conn",
+      "internal_server_hub_go_hub",
+      "internal_server_hub_go_server_hub",
+      "internal_server_hub_newhub",
+      "models_signalmessage",
+      "rwmutex",
+      "server_client",
+      "server_client_readpump",
+      "server_client_writepump",
+      "server_hub_broadcaststatus",
+      "server_hub_forwardsignal",
+      "server_hub_isonline",
+      "server_hub_onlinecount",
+      "server_hub_onlineids",
+      "server_hub_registeragent",
+      "server_hub_registerviewer",
+      "server_hub_unregisteragent",
+      "server_hub_unregisterviewer",
+      "server_server_handleagentmessage",
+      "server_server_handleviewermessage"
+    ],
+    "4": [
+      "web_static_app",
+      "web_static_app_closedevicemodal",
+      "web_static_app_deletedevice",
+      "web_static_app_devices",
+      "web_static_app_exportassets",
+      "web_static_app_quickremote",
+      "web_static_app_setremotestatus",
+      "web_static_app_showtoast",
+      "web_static_app_startremote",
+      "web_static_app_stopremote"
+    ],
+    "5": [
+      "web_static_app_api",
+      "web_static_app_dologout",
+      "web_static_app_esc",
+      "web_static_app_loadgroups",
+      "web_static_app_loadstats",
+      "web_static_app_opendevicemodal",
+      "web_static_app_savedevicemeta",
+      "web_static_app_showpage",
+      "web_static_app_updateremotedevicelist"
+    ],
+    "6": [
+      "web_static_app_chart_colors",
+      "web_static_app_chartdefaults",
+      "web_static_app_fmtbytes",
+      "web_static_app_rendercharts",
+      "web_static_app_renderdiskchart",
+      "web_static_app_rendermemorychart",
+      "web_static_app_renderonlineofflinechart",
+      "web_static_app_renderoschart"
+    ],
+    "7": [
+      "internal_server_relay",
+      "internal_server_relay_go_conn",
+      "internal_server_relay_go_server_hub",
+      "internal_server_relay_piperelay",
+      "mutex",
+      "server_hub_handlerelay",
+      "server_relaysession"
+    ],
+    "8": [
+      "web_static_app_filterdevices",
+      "web_static_app_gopage",
+      "web_static_app_loaddevices",
+      "web_static_app_renderassets",
+      "web_static_app_renderpagination",
+      "web_static_app_searchassets",
+      "web_static_app_searchdevices"
+    ],
+    "9": [
+      "web_static_app_builddevicetable",
+      "web_static_app_osicon",
+      "web_static_app_renderdevices",
+      "web_static_app_renderrecentdevices",
+      "web_static_app_timeago",
+      "web_static_app_updateonlinestatus"
+    ],
+    "10": [
+      "web_static_app_checkauth",
+      "web_static_app_connectws",
+      "web_static_app_dologin",
+      "web_static_app_handlesignal",
+      "web_static_app_init"
+    ],
+    "11": [
+      "cmd_server_main",
+      "cmd_server_main_envor",
+      "cmd_server_main_main"
+    ],
+    "12": [
+      "scripts_build_sh__entry",
+      "scripts_build_sh_scripts_build"
+    ],
+    "13": [
+      "pkg_github_com_user_remote_desktop"
+    ],
+    "14": [
+      "scripts_build_ps1_scripts_build"
+    ],
+    "15": [
+      "web"
+    ]
+  },
+  "cohesion": {
+    "0": 0.13227513227513227,
+    "1": 0.20615384615384616,
+    "2": 0.13,
+    "3": 0.14285714285714285,
+    "4": 0.35555555555555557,
+    "5": 0.3055555555555556,
+    "6": 0.39285714285714285,
+    "7": 0.38095238095238093,
+    "8": 0.2857142857142857,
+    "9": 0.4,
+    "10": 0.4,
+    "11": 1.0,
+    "12": 1.0,
+    "13": 1.0,
+    "14": 1.0,
+    "15": 1.0
+  },
+  "gods": [
+    {
+      "id": "server_server",
+      "label": "Server",
+      "degree": 20
+    },
+    {
+      "id": "server_db",
+      "label": "DB",
+      "degree": 19
+    },
+    {
+      "id": "web_static_app_loaddevices",
+      "label": "loadDevices()",
+      "degree": 15
+    },
+    {
+      "id": "internal_server_hub_go_server_hub",
+      "label": "Hub",
+      "degree": 14
+    },
+    {
+      "id": "server_client",
+      "label": "Client",
+      "degree": 12
+    },
+    {
+      "id": "agent_agent",
+      "label": "Agent",
+      "degree": 10
+    },
+    {
+      "id": "internal_server_server_jsonerror",
+      "label": "jsonError()",
+      "degree": 10
+    },
+    {
+      "id": "internal_server_server_jsonresp",
+      "label": "jsonResp()",
+      "degree": 9
+    },
+    {
+      "id": "internal_server_server_new",
+      "label": "New()",
+      "degree": 8
+    },
+    {
+      "id": "web_static_app_api",
+      "label": "api()",
+      "degree": 8
+    }
+  ],
+  "surprises": [
+    {
+      "source": "main()",
+      "target": "New()",
+      "source_files": [
+        "cmd/server/main.go",
+        "internal/server/server.go"
+      ],
+      "confidence": "INFERRED",
+      "relation": "calls",
+      "why": "inferred connection - not explicitly stated in source; connects across different repos/directories; bridges separate communities"
+    },
+    {
+      "source": "main()",
+      "target": "LoadConfig()",
+      "source_files": [
+        "cmd/agent/main.go",
+        "internal/agent/client.go"
+      ],
+      "confidence": "INFERRED",
+      "relation": "calls",
+      "why": "inferred connection - not explicitly stated in source; connects across different repos/directories"
+    },
+    {
+      "source": "main()",
+      "target": "NewAgent()",
+      "source_files": [
+        "cmd/agent/main.go",
+        "internal/agent/client.go"
+      ],
+      "confidence": "INFERRED",
+      "relation": "calls",
+      "why": "inferred connection - not explicitly stated in source; connects across different repos/directories"
+    },
+    {
+      "source": "New()",
+      "target": "NewDB()",
+      "source_files": [
+        "internal/server/server.go",
+        "internal/server/db.go"
+      ],
+      "confidence": "INFERRED",
+      "relation": "calls",
+      "why": "inferred connection - not explicitly stated in source; bridges separate communities"
+    },
+    {
+      "source": "New()",
+      "target": "NewHub()",
+      "source_files": [
+        "internal/server/server.go",
+        "internal/server/hub.go"
+      ],
+      "confidence": "INFERRED",
+      "relation": "calls",
+      "why": "inferred connection - not explicitly stated in source; bridges separate communities"
+    }
+  ],
+  "questions": [
+    {
+      "type": "bridge_node",
+      "question": "Why does `DB` connect `Community 2` to `Community 1`, `Community 3`?",
+      "why": "High betweenness centrality (0.207) - this node is a cross-community bridge."
+    },
+    {
+      "type": "bridge_node",
+      "question": "Why does `Server` connect `Community 1` to `Community 2`, `Community 3`?",
+      "why": "High betweenness centrality (0.162) - this node is a cross-community bridge."
+    },
+    {
+      "type": "bridge_node",
+      "question": "Why does `WSMessage` connect `Community 0` to `Community 2`?",
+      "why": "High betweenness centrality (0.161) - this node is a cross-community bridge."
+    },
+    {
+      "type": "isolated_nodes",
+      "question": "What connects `github.com/user/remote-desktop`, `Hub`, `build.sh script` to the rest of the system?",
+      "why": "4 weakly-connected nodes found - possible documentation gaps or missing edges."
+    },
+    {
+      "type": "low_cohesion",
+      "question": "Should `Community 0` be split into smaller, more focused modules?",
+      "why": "Cohesion score 0.13227513227513227 - nodes in this community are weakly interconnected."
+    },
+    {
+      "type": "low_cohesion",
+      "question": "Should `Community 2` be split into smaller, more focused modules?",
+      "why": "Cohesion score 0.13 - nodes in this community are weakly interconnected."
+    },
+    {
+      "type": "low_cohesion",
+      "question": "Should `Community 3` be split into smaller, more focused modules?",
+      "why": "Cohesion score 0.14285714285714285 - nodes in this community are weakly interconnected."
+    }
+  ]
+}

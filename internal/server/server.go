@@ -26,6 +26,7 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/user/remote-desktop/internal/models"
 	"github.com/user/remote-desktop/internal/versioncmp"
+	"github.com/user/remote-desktop/internal/vpn"
 )
 
 type Config struct {
@@ -354,6 +355,7 @@ func (s *Server) ListenAndServe() error {
 	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/vpn/pilot", s.authMiddleware(s.handleVPN))
+	mux.HandleFunc("/api/vpn/self-service", s.authMiddleware(s.handleVPNSelfPolicy))
 	mux.HandleFunc("/api/endpoint/applications", s.authMiddleware(s.handleTrackedApplications))
 	mux.HandleFunc("/api/endpoint/lock-policy", s.authMiddleware(s.handleLockPolicy))
 	mux.HandleFunc("/api/deployments", s.authMiddleware(s.handleDeployments))
@@ -578,7 +580,26 @@ func (s *Server) handleDevices(w http.ResponseWriter, r *http.Request) {
 			d.Recommendation = deviceRecommendation(d)
 		}
 
+		vpnStatuses := map[string]map[string]string{}
+		if pilot := s.vpnPilot; pilot != nil {
+			pilot.Lock()
+			for _, device := range devices {
+				status := map[string]string{"state": "disconnected"}
+				if session := pilot.sessions[device.ID]; session != nil {
+					status["state"] = session.status.State
+					status["address"] = session.status.Address
+					status["advertise_lan"] = session.status.AdvertiseLAN
+					status["route_lan"] = strings.Join(session.status.Routes, ", ")
+					if status["state"] != "disconnected" && status["state"] != "error" && (!device.Online || time.Since(time.Unix(session.status.Updated, 0)) > vpn.Lease) {
+						status["state"] = "unknown"
+					}
+				}
+				vpnStatuses[device.ID] = status
+			}
+			pilot.Unlock()
+		}
 		jsonResp(w, map[string]interface{}{
+			"vpn_statuses":   vpnStatuses,
 			"devices":        devices,
 			"total":          total,
 			"limit":          limit,
@@ -2070,6 +2091,10 @@ func (s *Server) handleAgentMessage(c *Client, raw []byte) {
 		s.receiveEndpointReport(c.DeviceID, msg.Data)
 	case "vpn_pilot_status":
 		s.receiveVPN(c.DeviceID, msg.Data)
+	case "vpn_self_connect":
+		s.receiveVPNSelfRequest(c.DeviceID, "connect", msg.Data)
+	case "vpn_self_disconnect":
+		s.receiveVPNSelfRequest(c.DeviceID, "disconnect", msg.Data)
 	case "lock_policy_result":
 		s.receiveLockPolicyResult(c.DeviceID, msg.Data)
 	case "rustdesk_result":

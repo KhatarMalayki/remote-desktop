@@ -3,40 +3,57 @@
 package agent
 
 import (
+	"errors"
 	"fmt"
-	"os"
-	"os/exec"
-	"path/filepath"
+	"net"
 	"runtime"
 	"syscall"
 	"time"
 	"unsafe"
 
 	"github.com/lxn/win"
+	"github.com/user/remote-desktop/internal/vpn"
 	"golang.org/x/sys/windows"
 )
 
 const (
 	wmTrayMessage = win.WM_APP + 7
 	cmdDisconnect = 1001
-	cmdExitTray   = 1002
+	cmdConnect    = 1003
+	cmdAdminPanel = 1004
+	wmTrayResult  = win.WM_APP + 8
 )
 
-func initVPNTray() {
-	if os.Getenv("RD_VPN_NO_TRAY") == "true" {
-		return
-	}
-	executable, err := os.Executable()
-	if err != nil {
-		return
-	}
-	script := fmt.Sprintf(`$path = [Console]::In.ReadToEnd(); $name = 'RemoteDeskVPNTray'; if (!(Get-ItemProperty -Path HKCU:\Software\Microsoft\Windows\CurrentVersion\Run -Name $name -ErrorAction SilentlyContinue)) { Set-ItemProperty -Path HKCU:\Software\Microsoft\Windows\CurrentVersion\Run -Name $name -Value ('"'+$path+'" --vpn-tray') }`)
-	_, _ = vpnPowershell(script, executable)
-}
+var trayPanel string
+var trayIcon win.NOTIFYICONDATA
+var trayTaskbarCreated uint32
+var trayRequestPending bool
+var trayResults = make(chan vpn.SelfReply, 1)
 
-func RunVPNTray() error {
+func RunVPNTray(panel string) error {
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
+	user, err := windows.GetCurrentProcessToken().GetTokenUser()
+	if err != nil {
+		return err
+	}
+	if user.User.Sid.IsWellKnown(windows.WinLocalSystemSid) || windows.GetCurrentProcessToken().IsElevated() {
+		return fmt.Errorf("VPN tray must run as an unelevated interactive user")
+	}
+	mutexName, _ := windows.UTF16PtrFromString(`Local\RemoteDeskVPNTray`)
+	mutex, err := windows.CreateMutex(nil, false, mutexName)
+	if mutex != 0 {
+		defer windows.CloseHandle(mutex)
+	}
+	if errors.Is(err, windows.ERROR_ALREADY_EXISTS) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	trayPanel = vpnPanelURL(panel)
+	taskbar, _ := windows.UTF16PtrFromString("TaskbarCreated")
+	trayTaskbarCreated = win.RegisterWindowMessage(taskbar)
 	instance := win.GetModuleHandle(nil)
 	className, _ := windows.UTF16PtrFromString("RemoteDeskVPNTrayWindow")
 	title, _ := windows.UTF16PtrFromString("RemoteDesk VPN Safety")
@@ -54,8 +71,7 @@ func RunVPNTray() error {
 		return fmt.Errorf("create tray window failed")
 	}
 	icon := win.LoadIcon(0, (*uint16)(unsafe.Pointer(uintptr(win.IDI_APPLICATION))))
-	tip, _ := windows.UTF16FromString("RemoteDesk VPN: Disconnect Darurat")
-	data := win.NOTIFYICONDATA{
+	trayIcon = win.NOTIFYICONDATA{
 		CbSize:           uint32(unsafe.Sizeof(win.NOTIFYICONDATA{})),
 		HWnd:             hwnd,
 		UID:              1,
@@ -63,11 +79,8 @@ func RunVPNTray() error {
 		UCallbackMessage: wmTrayMessage,
 		HIcon:            icon,
 	}
-	copy(data.SzTip[:], tip)
-	if !win.Shell_NotifyIcon(win.NIM_ADD, &data) {
-		return fmt.Errorf("add tray icon failed")
-	}
-	defer win.Shell_NotifyIcon(win.NIM_DELETE, &data)
+	refreshVPNTray(true)
+	defer win.Shell_NotifyIcon(win.NIM_DELETE, &trayIcon)
 	win.SetTimer(hwnd, 1, 3000, 0)
 	var msg win.MSG
 	for win.GetMessage(&msg, 0, 0, 0) > 0 {
@@ -78,34 +91,66 @@ func RunVPNTray() error {
 }
 
 func trayWndProc(hwnd win.HWND, msg uint32, wparam uintptr, lparam uintptr) uintptr {
+	if trayTaskbarCreated != 0 && msg == trayTaskbarCreated {
+		refreshVPNTray(true)
+		return 0
+	}
 	switch msg {
+	case wmTrayResult:
+		result := <-trayResults
+		trayRequestPending = false
+		text, _ := windows.UTF16PtrFromString(result.Detail)
+		title, _ := windows.UTF16PtrFromString("RemoteDesk VPN")
+		win.MessageBox(hwnd, text, title, win.MB_OK|win.MB_ICONINFORMATION)
+		refreshVPNTray(false)
+		return 0
+	case win.WM_TIMER:
+		refreshVPNTray(false)
+		return 0
 	case wmTrayMessage:
 		switch lparam {
 		case win.WM_RBUTTONUP, win.WM_LBUTTONUP:
 			menu := win.CreatePopupMenu()
-			running, _ := vpnPlatformRunning()
-			stateText := "VPN: Nonaktif"
-			if running {
-				stateText = "VPN: Aktif (Split Tunnel Pilot)"
-			}
-			disconnectText := "Disconnect VPN Sekarang (Pengaman)"
-			if !running {
-				disconnectText = "VPN Sudah Nonaktif"
-			}
+			running, stateErr := vpnPlatformRunning()
+			stateText := vpnTrayStatus(running, stateErr)
 			appendMenuItem(menu, 0, stateText, true)
 			appendMenuSeparator(menu)
-			appendMenuItem(menu, cmdDisconnect, disconnectText, !running)
-			appendMenuItem(menu, cmdExitTray, "Tutup Tray", false)
+			appendMenuItem(menu, cmdConnect, "Connect VPN (sesuai policy admin)", running || trayRequestPending)
+			appendMenuItem(menu, cmdDisconnect, "Disconnect / Batalkan Koneksi", trayRequestPending)
+			appendMenuItem(menu, cmdAdminPanel, "Panel Admin (opsional)", trayPanel == "")
 			var point win.POINT
 			win.GetCursorPos(&point)
 			win.SetForegroundWindow(hwnd)
 			chosen := win.TrackPopupMenu(menu, win.TPM_RETURNCMD|win.TPM_NONOTIFY, point.X, point.Y, 0, hwnd, nil)
 			win.DestroyMenu(menu)
 			switch chosen {
-			case cmdDisconnect:
-				_ = vpnEmergencyDisconnect()
-			case cmdExitTray:
-				win.DestroyWindow(hwnd)
+			case cmdAdminPanel:
+				operation, _ := windows.UTF16PtrFromString("open")
+				target, _ := windows.UTF16PtrFromString(trayPanel)
+				if err := windows.ShellExecute(windows.Handle(hwnd), operation, target, nil, nil, windows.SW_SHOWNORMAL); err != nil {
+					trayError(hwnd, err)
+				}
+			case cmdConnect, cmdDisconnect:
+				trayRequestPending = true
+				operation := "connect"
+				if chosen == cmdDisconnect {
+					operation = "disconnect"
+				}
+				go func() {
+					var stopErr error
+					if operation == "disconnect" {
+						stopErr = vpnEmergencyDisconnect()
+					}
+					reply, err := requestVPNFromTray(vpnSelfPipe, operation)
+					if err != nil {
+						reply.Detail = err.Error()
+					}
+					if stopErr != nil {
+						reply.Detail += "\nPenghentian lokal belum terkonfirmasi: " + stopErr.Error()
+					}
+					trayResults <- reply
+					win.PostMessage(hwnd, wmTrayResult, 0, 0)
+				}()
 			}
 		}
 		return 0
@@ -115,6 +160,43 @@ func trayWndProc(hwnd win.HWND, msg uint32, wparam uintptr, lparam uintptr) uint
 	default:
 		return win.DefWindowProc(hwnd, msg, wparam, lparam)
 	}
+}
+
+func vpnTrayStatus(running bool, err error) string {
+	if err != nil {
+		return "VPN: Status tidak diketahui"
+	}
+	if !running {
+		return "VPN: Nonaktif"
+	}
+	adapter, err := net.InterfaceByName(vpn.TunnelName)
+	if err == nil {
+		addresses, err := adapter.Addrs()
+		if err == nil {
+			for _, address := range addresses {
+				if network, ok := address.(*net.IPNet); ok && network.IP.To4() != nil {
+					return "VPN: Aktif - " + network.IP.String()
+				}
+			}
+		}
+	}
+	return "VPN: Aktif - IP belum tersedia"
+}
+
+func refreshVPNTray(add bool) {
+	running, err := vpnPlatformRunning()
+	tip, _ := windows.UTF16FromString("RemoteDesk | " + vpnTrayStatus(running, err))
+	clear(trayIcon.SzTip[:])
+	copy(trayIcon.SzTip[:len(trayIcon.SzTip)-1], tip)
+	if add || !win.Shell_NotifyIcon(win.NIM_MODIFY, &trayIcon) {
+		win.Shell_NotifyIcon(win.NIM_ADD, &trayIcon)
+	}
+}
+
+func trayError(hwnd win.HWND, err error) {
+	text, _ := windows.UTF16PtrFromString(err.Error())
+	title, _ := windows.UTF16PtrFromString("RemoteDesk VPN")
+	win.MessageBox(hwnd, text, title, win.MB_OK|win.MB_ICONERROR)
 }
 
 func appendMenuItem(menu win.HMENU, id uint32, text string, disabled bool) {
@@ -143,24 +225,25 @@ func appendMenuSeparator(menu win.HMENU) {
 }
 
 func vpnEmergencyDisconnect() error {
-	manager, err := windows.OpenSCManager(nil, nil, windows.SC_MANAGER_CONNECT)
+	service, err := openVPNService(windows.SERVICE_STOP | windows.SERVICE_QUERY_STATUS)
+	if errors.Is(err, windows.ERROR_SERVICE_DOES_NOT_EXIST) {
+		return nil
+	}
 	if err != nil {
 		return err
 	}
-	defer windows.CloseServiceHandle(manager)
-	name, _ := windows.UTF16PtrFromString(vpnService)
-	handle, err := windows.OpenService(manager, name, windows.SERVICE_STOP|windows.SERVICE_QUERY_STATUS)
-	if err == nil {
-		defer windows.CloseServiceHandle(handle)
-		var status windows.SERVICE_STATUS
-		_ = windows.ControlService(handle, windows.SERVICE_CONTROL_STOP, &status)
+	defer service.Close()
+	handle := service.Handle
+	var status windows.SERVICE_STATUS
+	if err := windows.ControlService(handle, windows.SERVICE_CONTROL_STOP, &status); err != nil && !errors.Is(err, windows.ERROR_SERVICE_NOT_ACTIVE) {
+		return err
 	}
-	leasePath := filepath.Join(vpnDirectory(), "lease.json")
-	_ = os.Remove(leasePath)
-	_ = exec.Command("net.exe", "stop", vpnService, "/y").Run()
 	deadline := time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {
-		if running, _ := vpnPlatformRunning(); !running {
+		if err := windows.QueryServiceStatus(handle, &status); err != nil {
+			return err
+		}
+		if status.CurrentState == windows.SERVICE_STOPPED {
 			return nil
 		}
 		time.Sleep(200 * time.Millisecond)

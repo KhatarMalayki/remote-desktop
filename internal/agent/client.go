@@ -357,6 +357,11 @@ func (a *Agent) handleMessage(raw []byte) {
 	}
 
 	switch msg.Action {
+	case "vpn_self_result":
+		var reply vpn.SelfReply
+		if a.vpnPilot != nil && json.Unmarshal(msg.Data, &reply) == nil {
+			select { case a.vpnPilot.selfReplies <- reply: default: }
+		}
 	case "vpn_pilot":
 		var command vpn.Command
 		if json.Unmarshal(msg.Data, &command) == nil {
@@ -518,6 +523,7 @@ func (a *Agent) handleMessage(raw []byte) {
 func (a *Agent) writeTextMessage(raw []byte) error {
 	a.connWriteMu.Lock()
 	defer a.connWriteMu.Unlock()
+	if a.conn == nil { return fmt.Errorf("agent belum terhubung") }
 	return a.conn.WriteMessage(websocket.TextMessage, raw)
 }
 

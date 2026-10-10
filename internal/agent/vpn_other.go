@@ -12,6 +12,7 @@ func vpnPlatformConnect(vpn.Config,string,string,vpnLease)error{return fmt.Error
 func vpnPlatformDisconnect()error{return nil}
 func vpnPlatformRunning()(bool,error){return false,nil}
 func vpnWriteLease(vpnLease)error{return fmt.Errorf("platform tidak didukung")}
-func initVPNTray(){}
-func RunVPNTray()error{return fmt.Errorf("tray pilot hanya tersedia di Windows")}
+func initVPNTray(string){}
+func (a *Agent) initVPNSelfService(){}
+func RunVPNTray(string)error{return fmt.Errorf("tray pilot hanya tersedia di Windows")}
 func RunVPNWatchdog()error{return fmt.Errorf("watchdog pilot hanya tersedia di Windows")}

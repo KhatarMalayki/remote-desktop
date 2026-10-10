@@ -26,6 +26,43 @@ function harness(response) {
   return {context, elements, calls};
 }
 
+test('self-service policy requires loaded admin state and confirmation', async () => {
+  const {context, elements, calls} = harness({enabled: false, route_lan: ''});
+  await context.openVPNModal('pc');
+  assert.equal(elements.vpnSelfEnabled.checked, false);
+  assert.equal(elements.btnVPNSelfSave.disabled, false);
+  elements.vpnSelfEnabled.checked = true;
+  elements.vpnSelfRoute.value = '192.168.1.0/24';
+  context.appConfirm = async () => false;
+  await context.saveVPNSelfPolicy();
+  assert.equal(calls.filter(call => call.options).length, 0);
+  context.appConfirm = async () => true;
+  await context.saveVPNSelfPolicy();
+  const saved = calls.find(call => call.options);
+  assert.equal(saved.url, '/api/vpn/self-service?device=pc');
+  assert.equal(saved.options.method, 'PUT');
+  assert.deepEqual(JSON.parse(saved.options.body), {enabled:true, route_lan:'192.168.1.0/24'});
+  context.currentUser.role = 'viewer';
+  await context.saveVPNSelfPolicy();
+  assert.equal(calls.filter(call => call.options).length, 1);
+});
+
+test('unavailable policy and device switches disable stale policy writes', async () => {
+  const {context, elements, calls} = harness(null);
+  await context.openVPNModal('pc');
+  assert.equal(elements.btnVPNSelfSave.disabled, true);
+  await context.saveVPNSelfPolicy();
+  assert.equal(calls.filter(call => call.options).length, 0);
+  let finish;
+  context.api = () => new Promise(resolve => { finish = resolve; });
+  const loading = context.loadVPNSelfPolicy();
+  vm.runInContext('vpnSelectedDevice = "other"', context);
+  finish({enabled:true, route_lan:'192.168.1.0/24'});
+  await loading;
+  assert.equal(elements.btnVPNSelfSave.disabled, true);
+  assert.equal(elements.vpnSelfEnabled.checked, false);
+});
+
 test('VPN action opens real dialog and shows readiness without connecting', async () => {
   const {context, elements, calls} = harness({ready: false, detail: 'Hub belum dikonfigurasi', sessions: {}});
   await context.openVPNModal('pc');
@@ -67,4 +104,54 @@ test('preparing and connecting sessions remain cancellable', async () => {
     await context.triggerVPN('disconnect');
     assert.deepEqual(JSON.parse(calls.find(call=>call.options).options.body),{device:'pc',operation:'disconnect'});
   }
+});
+
+test('LAN opt-in requires client, subnet and explicit confirmation', async () => {
+  const {context,elements,calls} = harness({ready:true,sessions:{}});
+  await context.openVPNModal('pc');
+  assert.equal(elements.vpnAdvertiseLAN.checked,false);
+  assert.equal(elements.vpnLANSubnet.disabled,true);
+  elements.vpnAdvertiseLAN.checked=true;
+  context.renderVPNLANControls();
+  assert.equal(elements.vpnLANSubnet.disabled,false);
+  await context.triggerVPN('connect');
+  assert.equal(calls.filter(call=>call.options).length,0);
+  elements.vpnLANSubnet.value='192.168.1.0/24';elements.vpnLANClient.value='other-page-device';
+  let confirmation='';
+  context.appConfirm=async message=>{confirmation=message;return false;};
+  await context.triggerVPN('connect');
+  assert.equal(calls.filter(call=>call.options).length,0);
+  assert.match(confirmation,/192\.168\.1\.0\/24/);
+  assert.match(confirmation,/other-page-device/);
+  context.appConfirm=async()=>true;
+  await context.triggerVPN('connect');
+  assert.deepEqual(JSON.parse(calls.find(call=>call.options).options.body),{device:'pc',operation:'connect',advertise_lan:'192.168.1.0/24',lan_clients:['other-page-device']});
+});
+
+test('client confirms assigned LAN route and active gateway controls stay locked', async () => {
+  const {context,elements,calls}=harness({ready:true,sessions:{gateway:{state:'connected',advertise_lan:'192.168.1.0/24',lan_clients:['pc']}}});
+  await context.openVPNModal('pc');
+  await context.triggerVPN('connect');
+  assert.equal(JSON.parse(calls.find(call=>call.options).options.body).route_lan,'192.168.1.0/24');
+  context.onVPNDevicePickerChange('gateway');
+  assert.equal(elements.vpnAdvertiseLAN.checked,true);
+  assert.equal(elements.vpnAdvertiseLAN.disabled,true);
+  assert.equal(elements.vpnLANSubnet.disabled,true);
+  assert.match(elements.vpnLANStatus.textContent,/Gateway LAN/);
+  context.appConfirm=async()=>false;
+  const before=calls.filter(call=>call.options).length;
+  await context.triggerVPN('disconnect');
+  assert.equal(calls.filter(call=>call.options).length,before);
+});
+
+test('switching device clears LAN opt-in and denied roles cannot open VPN', async () => {
+  const {context,elements,calls}=harness({ready:true,sessions:{}});
+  await context.openVPNModal('pc');
+  elements.vpnAdvertiseLAN.checked=true;elements.vpnLANSubnet.value='192.168.1.0/24';
+  context.onVPNDevicePickerChange('other');
+  assert.equal(elements.vpnAdvertiseLAN.checked,false);
+  assert.equal(elements.vpnLANSubnet.value,'');
+  const before=calls.length;context.currentUser.role='viewer';
+  await context.openVPNModal('pc');
+  assert.equal(calls.slice(before).filter(call=>call.url).length,0);
 });

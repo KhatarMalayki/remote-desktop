@@ -1,0 +1,852 @@
+{
+  "cmd/agent/main.go": {
+    "mtime": 1791280136.7465513,
+    "ast_hash": "7a3197e2ba129dd004ca7da35f793e7b",
+    "semantic_hash": ""
+  },
+  "cmd/server/main.go": {
+    "mtime": 1791280136.7429292,
+    "ast_hash": "8257478b148421f41d5f7e9fd83cb705",
+    "semantic_hash": ""
+  },
+  "go.mod": {
+    "mtime": 1791050248.130931,
+    "ast_hash": "4df94f5db3084576784ba09dbab6a3fa",
+    "semantic_hash": ""
+  },
+  "internal/agent/client.go": {
+    "mtime": 1791065642.4767385,
+    "ast_hash": "c9e87508c7cc032f758ef3f0195ea9f5",
+    "semantic_hash": ""
+  },
+  "internal/agent/sysinfo.go": {
+    "mtime": 1790764926.976259,
+    "ast_hash": "44dbffeb0d2b2a8f8d68ee78b025a478",
+    "semantic_hash": ""
+  },
+  "internal/models/device.go": {
+    "mtime": 1791065399.492097,
+    "ast_hash": "58c4fbfe8e8a63cff87336a290319f21",
+    "semantic_hash": ""
+  },
+  "internal/server/db.go": {
+    "mtime": 1790785326.1478183,
+    "ast_hash": "e1271bf688e93935fd3c2433d322206c",
+    "semantic_hash": ""
+  },
+  "internal/server/hub.go": {
+    "mtime": 1790674944.4048035,
+    "ast_hash": "bbd4fdb6805d5358719c41b870b063a6",
+    "semantic_hash": ""
+  },
+  "internal/server/relay.go": {
+    "mtime": 1790754508.028512,
+    "ast_hash": "37e0a69a0fada66a8232a443fc533f73",
+    "semantic_hash": ""
+  },
+  "internal/server/server.go": {
+    "mtime": 1791260124.887892,
+    "ast_hash": "c2a3ce602ca29a01bf366390d7bc83e3",
+    "semantic_hash": ""
+  },
+  "scripts/build.ps1": {
+    "mtime": 1787541862.9929361,
+    "ast_hash": "1a0228ad98e24d327acef26058ef442f",
+    "semantic_hash": "1a0228ad98e24d327acef26058ef442f"
+  },
+  "scripts/build.sh": {
+    "mtime": 1791043620.3656397,
+    "ast_hash": "1d71cdf972f6b3abd325fe94490b78d5",
+    "semantic_hash": ""
+  },
+  "web.go": {
+    "mtime": 1787542026.7083905,
+    "ast_hash": "8c9cb5d1b967f64d6abc8c1ca0fe3e90",
+    "semantic_hash": "8c9cb5d1b967f64d6abc8c1ca0fe3e90"
+  },
+  "web/static/app.js": {
+    "mtime": 1791464459.9105127,
+    "ast_hash": "3dc1f1e50175fed72b9b9a5ed9529384",
+    "semantic_hash": ""
+  },
+  ".codex/hooks.json": {
+    "mtime": 1788169347.6042333,
+    "ast_hash": "d821f520f13ea7951f1a16b234ea4652",
+    "semantic_hash": ""
+  },
+  "internal/server/db_test.go": {
+    "mtime": 1791260156.395403,
+    "ast_hash": "dca5ddbfaedd7efaa8b5bda12e730364",
+    "semantic_hash": ""
+  },
+  "AGENTS.md": {
+    "mtime": 1788169347.5876145,
+    "ast_hash": "21ceb6533048be51308e69e7b74a35cf",
+    "semantic_hash": ""
+  },
+  "README.md": {
+    "mtime": 1787563363.8268082,
+    "ast_hash": "c2363c215d08f9b27bd2be4416ec01d5",
+    "semantic_hash": ""
+  },
+  "docker-compose.yml": {
+    "mtime": 1787541840.5156348,
+    "ast_hash": "cb29e58a54b9c6d78ac942ba2ce18e67",
+    "semantic_hash": ""
+  },
+  "docs/01-installation.md": {
+    "mtime": 1787558450.872374,
+    "ast_hash": "85ca10a00d95c141a3199de0179eb272",
+    "semantic_hash": ""
+  },
+  "docs/02-user-guide.md": {
+    "mtime": 1790911246.760146,
+    "ast_hash": "aa8243df17598bc992314d39a811fbc5",
+    "semantic_hash": ""
+  },
+  "docs/03-agent-deployment.md": {
+    "mtime": 1791043370.3881776,
+    "ast_hash": "16d6762c8454bf847b46eaf3dcffded1",
+    "semantic_hash": ""
+  },
+  "docs/04-api-reference.md": {
+    "mtime": 1790218422.485784,
+    "ast_hash": "231004ad8da5790d0a62bcbe36189a39",
+    "semantic_hash": ""
+  },
+  "docs/05-architecture.md": {
+    "mtime": 1787558740.6049898,
+    "ast_hash": "37139ac173d0cae9af4e8bf321ab7205",
+    "semantic_hash": ""
+  },
+  "docs/06-troubleshooting.md": {
+    "mtime": 1787558812.5323057,
+    "ast_hash": "0985c88916091a7ed0b60862f26b5140",
+    "semantic_hash": ""
+  },
+  "web/index.html": {
+    "mtime": 1791213803.649419,
+    "ast_hash": "db0b060b9ab4e55f8783338c6dd1ccf5",
+    "semantic_hash": ""
+  },
+  "scripts/update-server.sh": {
+    "mtime": 1789115796.095798,
+    "ast_hash": "9a85afd8e42dda593d34b68e0e93aea8",
+    "semantic_hash": ""
+  },
+  ".github/workflows/docker-publish.yml": {
+    "mtime": 1791262294.0733333,
+    "ast_hash": "f85e7deda5329114e865d87d37981586",
+    "semantic_hash": ""
+  },
+  "docker-compose.synology.yml": {
+    "mtime": 1791052429.3353658,
+    "ast_hash": "34f0e52f0598ca51d8aef895b65caaf1",
+    "semantic_hash": ""
+  },
+  ".github/workflows/release-agent.yml": {
+    "mtime": 1791043370.402185,
+    "ast_hash": "a2af6b05aaf1e75ccc982c33342106cf",
+    "semantic_hash": ""
+  },
+  "internal/server/totp.go": {
+    "mtime": 1790156832.2393155,
+    "ast_hash": "382b8b09b6aeea99bac7f0d3626a48b1",
+    "semantic_hash": ""
+  },
+  "web/static/qrcode.min.js": {
+    "mtime": 1789369146.3596575,
+    "ast_hash": "517b55d3688ce9ef1085a3d9632bcb97",
+    "semantic_hash": ""
+  },
+  "internal/agent/network_scan.go": {
+    "mtime": 1789516356.5085945,
+    "ast_hash": "d9888bd96dcd66481a7363cc0c638506",
+    "semantic_hash": ""
+  },
+  "internal/server/ownership_test.go": {
+    "mtime": 1790926349.2287881,
+    "ast_hash": "5da1f1f5535243ae635a776187f645ce",
+    "semantic_hash": ""
+  },
+  "web/static/ownership.js": {
+    "mtime": 1790237599.2428668,
+    "ast_hash": "d1aa0d86145ce541f5d21cb0b0c67e0f",
+    "semantic_hash": ""
+  },
+  "internal/agent/remote.go": {
+    "mtime": 1791043370.375622,
+    "ast_hash": "e6128408a49d7685716048fab10b2669",
+    "semantic_hash": ""
+  },
+  "internal/agent/remote_input_other.go": {
+    "mtime": 1791043064.1168427,
+    "ast_hash": "7bc12ae839d1026a9dd4323815583529",
+    "semantic_hash": ""
+  },
+  "internal/agent/remote_input_windows.go": {
+    "mtime": 1791193549.4903753,
+    "ast_hash": "188bfe018fabf4edf601b54c67a083f0",
+    "semantic_hash": ""
+  },
+  "internal/agent/remote_test.go": {
+    "mtime": 1789675924.402036,
+    "ast_hash": "62074515e8e2bd57727b8c6232fe4e71",
+    "semantic_hash": ""
+  },
+  "internal/server/relay_test.go": {
+    "mtime": 1790754616.9713056,
+    "ast_hash": "6fe4f9854258049fedb91e39af8ffa5e",
+    "semantic_hash": ""
+  },
+  "internal/agent/remote_input_windows_test.go": {
+    "mtime": 1791193578.3146944,
+    "ast_hash": "d669abdc91714cd2a75cda9c51eb1a37",
+    "semantic_hash": ""
+  },
+  "cmd/agent/system_service_other.go": {
+    "mtime": 1790640507.0516334,
+    "ast_hash": "855b0aa7d05fef1d7fc66ec75c2aee1e",
+    "semantic_hash": ""
+  },
+  "cmd/agent/system_service_windows.go": {
+    "mtime": 1791065399.5213308,
+    "ast_hash": "de5591e8ba829d0269a44db269e0f00f",
+    "semantic_hash": ""
+  },
+  "internal/agent/remote_desktop_other.go": {
+    "mtime": 1791043064.1200833,
+    "ast_hash": "6b19c6e315a5201dfa3a405526e06dcd",
+    "semantic_hash": ""
+  },
+  "internal/agent/client_test.go": {
+    "mtime": 1789910856.640989,
+    "ast_hash": "4f16a9c77584bb62445571530343279e",
+    "semantic_hash": ""
+  },
+  "internal/versioncmp/version.go": {
+    "mtime": 1789913043.4634557,
+    "ast_hash": "662e245fc2f20c44390b7fde031bf793",
+    "semantic_hash": ""
+  },
+  "internal/versioncmp/version_test.go": {
+    "mtime": 1789913043.469462,
+    "ast_hash": "1073dca16d68dfeac80d84d67e3d078c",
+    "semantic_hash": ""
+  },
+  "cmd/agent/single_instance_other.go": {
+    "mtime": 1789916284.3498557,
+    "ast_hash": "29e3420565d3db603c1a570037a84760",
+    "semantic_hash": ""
+  },
+  "cmd/agent/single_instance_windows.go": {
+    "mtime": 1789949416.2835834,
+    "ast_hash": "8877943f12c4b9195da7aab8955b3908",
+    "semantic_hash": ""
+  },
+  "cmd/agent/single_instance_windows_test.go": {
+    "mtime": 1789949416.284615,
+    "ast_hash": "80248ee7b9cfc27b0d1a079646c7de7c",
+    "semantic_hash": ""
+  },
+  "internal/agent/service_update_other.go": {
+    "mtime": 1789950784.624282,
+    "ast_hash": "cfb61c402a745d3e9379889bceda071f",
+    "semantic_hash": ""
+  },
+  "internal/agent/service_update_windows.go": {
+    "mtime": 1789950784.622249,
+    "ast_hash": "4e19bf422ce01403cde6469b57b08447",
+    "semantic_hash": ""
+  },
+  "internal/agent/service_update_windows_test.go": {
+    "mtime": 1789950784.62631,
+    "ast_hash": "57d1db9ae4de8b538d7dc25932809534",
+    "semantic_hash": ""
+  },
+  "internal/agent/rustdesk.go": {
+    "mtime": 1789982843.165898,
+    "ast_hash": "8eae25f066b9fa339a88f17ca192d152",
+    "semantic_hash": ""
+  },
+  "internal/agent/rustdesk_other.go": {
+    "mtime": 1789982783.5001445,
+    "ast_hash": "674e82411afac6e30f928120d1d810fb",
+    "semantic_hash": ""
+  },
+  "internal/agent/rustdesk_test.go": {
+    "mtime": 1789982920.7775471,
+    "ast_hash": "942296577b0e6787f87518da82768bc1",
+    "semantic_hash": ""
+  },
+  "internal/agent/rustdesk_windows.go": {
+    "mtime": 1789982783.4975448,
+    "ast_hash": "a6de9e1d1962ba133b188331e4d89d51",
+    "semantic_hash": ""
+  },
+  "internal/agent/rustdesk_manage_other.go": {
+    "mtime": 1789985736.1770058,
+    "ast_hash": "3fec7b38fe18f3682425b9bf0796f9a7",
+    "semantic_hash": ""
+  },
+  "internal/agent/rustdesk_manage_windows.go": {
+    "mtime": 1790002126.1339412,
+    "ast_hash": "0d55225ce14c475b5aaa95e2f063db07",
+    "semantic_hash": ""
+  },
+  "internal/server/rustdesk_test.go": {
+    "mtime": 1790570402.91728,
+    "ast_hash": "f2b5a03c3c55cec4d39e99fbae8a32d6",
+    "semantic_hash": ""
+  },
+  "internal/agent/rustdesk_config.go": {
+    "mtime": 1790002048.3251357,
+    "ast_hash": "7dcd5d1bef5f6f0840a768ab90f3c3d5",
+    "semantic_hash": ""
+  },
+  "internal/agent/rustdesk_config_test.go": {
+    "mtime": 1790002164.1707768,
+    "ast_hash": "3d22fe9322ac601454cc335b5973c628",
+    "semantic_hash": ""
+  },
+  "internal/server/asset_workflow.go": {
+    "mtime": 1790237599.2484233,
+    "ast_hash": "adb505c2ba853c75b20d451e8b17f585",
+    "semantic_hash": ""
+  },
+  "internal/server/auth_security.go": {
+    "mtime": 1790150618.8807497,
+    "ast_hash": "7db323820987f83302ad14e078985ba3",
+    "semantic_hash": ""
+  },
+  "internal/server/auth_security_test.go": {
+    "mtime": 1790926349.0419557,
+    "ast_hash": "2426861182272a5b3a49d4fcef36e9fc",
+    "semantic_hash": ""
+  },
+  "docs/authentication.md": {
+    "mtime": 1790926349.0680718,
+    "ast_hash": "f7bccd6aeb10dd42c762af4a0cc52427",
+    "semantic_hash": ""
+  },
+  "internal/server/mfa_management.go": {
+    "mtime": 1790150661.2778063,
+    "ast_hash": "090b5804eb86bfdaa8e243d259418e15",
+    "semantic_hash": ""
+  },
+  "internal/server/mfa_management_test.go": {
+    "mtime": 1790156610.675374,
+    "ast_hash": "42d0a0436edc4da44ba6b517c9b58cb7",
+    "semantic_hash": ""
+  },
+  "web/dialogs.test.cjs": {
+    "mtime": 1790216692.5497358,
+    "ast_hash": "e08698230dd7a101aa6d1af4e9f72584",
+    "semantic_hash": ""
+  },
+  "web/static/dialogs.js": {
+    "mtime": 1790216356.2454712,
+    "ast_hash": "571fb667090e4a04a180ba7bb05cc1da",
+    "semantic_hash": ""
+  },
+  "internal/server/holder_permissions_test.go": {
+    "mtime": 1790218389.9927692,
+    "ast_hash": "222deae84d3e3dacecd07b34d5013465",
+    "semantic_hash": ""
+  },
+  "internal/server/match_asset_test.go": {
+    "mtime": 1790582199.3105104,
+    "ast_hash": "d45cd6d65f7d99a4c65d3e04f925a5ab",
+    "semantic_hash": ""
+  },
+  "internal/agent/process_other.go": {
+    "mtime": 1790581944.7001529,
+    "ast_hash": "9d4ca19a2df82193d5d26e232e90f9e9",
+    "semantic_hash": ""
+  },
+  "internal/agent/process_windows.go": {
+    "mtime": 1790610765.5700974,
+    "ast_hash": "0b4aec94c01b7721b13a05b738c51409",
+    "semantic_hash": ""
+  },
+  "internal/agent/process_meta.go": {
+    "mtime": 1790610765.5695128,
+    "ast_hash": "587547979270facfd3aa7bd709e09572",
+    "semantic_hash": ""
+  },
+  "internal/agent/process_usage_other.go": {
+    "mtime": 1790611283.8703654,
+    "ast_hash": "fa56189760d9e1886e0f601014c94a42",
+    "semantic_hash": ""
+  },
+  "internal/agent/process_usage_windows.go": {
+    "mtime": 1790611354.332292,
+    "ast_hash": "1e38e827fc7660a13bae03ec3e075eb8",
+    "semantic_hash": ""
+  },
+  "docs/remote-input-research.md": {
+    "mtime": 1790642132.0072813,
+    "ast_hash": "8f70c7ff62d3da95ef77ee27f70b4788",
+    "semantic_hash": ""
+  },
+  "internal/agent/remote_file.go": {
+    "mtime": 1790751493.4210372,
+    "ast_hash": "8d573939580561afef8aab5271cfd220",
+    "semantic_hash": ""
+  },
+  "internal/agent/remote_file_test.go": {
+    "mtime": 1790651103.498472,
+    "ast_hash": "89d5ae4244a2a2040e61e21f71b773c7",
+    "semantic_hash": ""
+  },
+  "internal/agent/remote_protection_other.go": {
+    "mtime": 1790666683.0111675,
+    "ast_hash": "9052f31411eec8a3a1fe3803bc2cc559",
+    "semantic_hash": ""
+  },
+  "internal/agent/remote_protection_windows.go": {
+    "mtime": 1790666728.5928235,
+    "ast_hash": "27d288a7d2ac977fea1af5c429bfe55d",
+    "semantic_hash": ""
+  },
+  "internal/agent/remote_protection_windows_test.go": {
+    "mtime": 1790666669.6685967,
+    "ast_hash": "df85deae12847ecbb246b0d6fbceecf9",
+    "semantic_hash": ""
+  },
+  "web/remote.test.cjs": {
+    "mtime": 1791213835.324651,
+    "ast_hash": "750ca1e50d0f79c69dcf054098134252",
+    "semantic_hash": ""
+  },
+  "docs/remote-session-controls.md": {
+    "mtime": 1790666776.7244954,
+    "ast_hash": "0b34b620ac9b9d8196b23a0ad09037da",
+    "semantic_hash": ""
+  },
+  "web/terminal.test.cjs": {
+    "mtime": 1790736312.866263,
+    "ast_hash": "61918bef27bbff684b6bcae990e2ce80",
+    "semantic_hash": ""
+  },
+  "internal/agent/deploy.go": {
+    "mtime": 1790751061.4914463,
+    "ast_hash": "2dc8c2b12eeb84edd89919e4a5675786",
+    "semantic_hash": ""
+  },
+  "internal/agent/deploy_test.go": {
+    "mtime": 1790751329.483452,
+    "ast_hash": "305be249159ce69e9fd102f50eaa9bd4",
+    "semantic_hash": ""
+  },
+  "internal/agent/remote_destination_test.go": {
+    "mtime": 1790751329.484011,
+    "ast_hash": "ad6863389bfdd14ac8543513106b8851",
+    "semantic_hash": ""
+  },
+  "internal/server/deploy.go": {
+    "mtime": 1790751988.616345,
+    "ast_hash": "06641c3d5c658566070ea01641000a4c",
+    "semantic_hash": ""
+  },
+  "internal/server/deploy_test.go": {
+    "mtime": 1790751493.4210372,
+    "ast_hash": "cf9ce0c7bd62995478395e60699b4b8a",
+    "semantic_hash": ""
+  },
+  "web/static/deploy.js": {
+    "mtime": 1790751728.9148228,
+    "ast_hash": "a06671896159b98ac3c41893ca93116e",
+    "semantic_hash": ""
+  },
+  "docs/application-deployment.md": {
+    "mtime": 1790751850.2676563,
+    "ast_hash": "3e304f4aef19bf6837813d1c7128d3cd",
+    "semantic_hash": ""
+  },
+  "docs/remote-disconnect-investigation.md": {
+    "mtime": 1790754683.9851663,
+    "ast_hash": "c9aa5c6734a0ad3f9f9a75b99d1f3650",
+    "semantic_hash": ""
+  },
+  ".archify/architecture-remotedesk-20260930-170003/candidate.json": {
+    "mtime": 1790762536.7124016,
+    "ast_hash": "98efcfc1672d75161de8c724c3f925ef",
+    "semantic_hash": ""
+  },
+  ".archify/architecture-remotedesk-20260930-170003/remotedesk.browser-check.json": {
+    "mtime": 1790762644.8810444,
+    "ast_hash": "450ef9738e686fb376797a746778511f",
+    "semantic_hash": ""
+  },
+  ".archify/architecture-remotedesk-20260930-170003/remotedesk.delivery.json": {
+    "mtime": 1790762640.1532981,
+    "ast_hash": "0c61d52dbb6a5e365e9e312f4acbd537",
+    "semantic_hash": ""
+  },
+  ".archify/architecture-remotedesk-20260930-170003/remotedesk.finalize-summary.json": {
+    "mtime": 1790762645.7246344,
+    "ast_hash": "51abed51706aca1647a7b8a46b5fd1d9",
+    "semantic_hash": ""
+  },
+  ".archify/architecture-remotedesk-20260930-170003/remotedesk.finalize.json": {
+    "mtime": 1790762645.61507,
+    "ast_hash": "6a5908d54945adc6fe8bb4a6a83c498e",
+    "semantic_hash": ""
+  },
+  ".archify/architecture-remotedesk-20260930-170003/remotedesk.html": {
+    "mtime": 1790762639.6976457,
+    "ast_hash": "27e969695203163b5c5959def10c363f",
+    "semantic_hash": ""
+  },
+  "internal/agent/endpoint.go": {
+    "mtime": 1790785326.1466942,
+    "ast_hash": "e32a471ffac32e15cb641537cf6cee30",
+    "semantic_hash": ""
+  },
+  "internal/agent/endpoint_other.go": {
+    "mtime": 1790785326.1070433,
+    "ast_hash": "a0ecf9b1b869d2996aeb8883d09dba1e",
+    "semantic_hash": ""
+  },
+  "internal/agent/endpoint_test.go": {
+    "mtime": 1790785545.9563909,
+    "ast_hash": "334d0a3afa7f7b9763c43c904dc8a161",
+    "semantic_hash": ""
+  },
+  "internal/agent/endpoint_windows.go": {
+    "mtime": 1790785523.458826,
+    "ast_hash": "da7d527403c17f4506e74c5bf8a16283",
+    "semantic_hash": ""
+  },
+  "internal/models/endpoint.go": {
+    "mtime": 1790785326.0858858,
+    "ast_hash": "15068abb497f2cb9727c7f8df3f994f2",
+    "semantic_hash": ""
+  },
+  "internal/server/endpoint.go": {
+    "mtime": 1790785326.1204114,
+    "ast_hash": "cf1ab61294e7632991f243cf9734ea52",
+    "semantic_hash": ""
+  },
+  "internal/server/endpoint_test.go": {
+    "mtime": 1790785545.9588294,
+    "ast_hash": "b4fa3263b56c3a7febc5bc233160c480",
+    "semantic_hash": ""
+  },
+  "web/static/endpoint.js": {
+    "mtime": 1790789411.8319523,
+    "ast_hash": "9ac05dfe6e81a1134194fb5aeb3bb05a",
+    "semantic_hash": ""
+  },
+  "web/ui-smoke.cjs": {
+    "mtime": 1791213873.5085573,
+    "ast_hash": "0500bfe9711404c4b4afac52eaa86f5a",
+    "semantic_hash": ""
+  },
+  "output/playwright/assets-desktop.png": {
+    "mtime": 1790859598.0634582,
+    "ast_hash": "80238540d071602805701be6b2635fb0",
+    "semantic_hash": ""
+  },
+  "output/playwright/branch-assets-1440.png": {
+    "mtime": 1790859655.2507534,
+    "ast_hash": "bdf48e0b941c67ff7ad2bb5f5f8c54c0",
+    "semantic_hash": ""
+  },
+  "output/playwright/branch-assets-desktop.png": {
+    "mtime": 1790859597.7483287,
+    "ast_hash": "bdf48e0b941c67ff7ad2bb5f5f8c54c0",
+    "semantic_hash": ""
+  },
+  "output/playwright/dashboard-1440.png": {
+    "mtime": 1790859655.0684505,
+    "ast_hash": "33f756cf860f368757d54a84f08b9a09",
+    "semantic_hash": ""
+  },
+  "output/playwright/dashboard-desktop.png": {
+    "mtime": 1790859597.5680404,
+    "ast_hash": "e5396f2e0cde3cbef60ff20e50976e5a",
+    "semantic_hash": ""
+  },
+  "output/playwright/devices-1440.png": {
+    "mtime": 1790859655.439259,
+    "ast_hash": "293f87b55e779c0f40c3eef5d7682538",
+    "semantic_hash": ""
+  },
+  "output/playwright/devices-desktop.png": {
+    "mtime": 1790859597.9195807,
+    "ast_hash": "20463877de22401009d72f4f658b5b56",
+    "semantic_hash": ""
+  },
+  "output/playwright/login-1440.png": {
+    "mtime": 1791188432.781747,
+    "ast_hash": "cb55ca09b1418d29f28dadeb6221bae8",
+    "semantic_hash": ""
+  },
+  "output/playwright/redesign-login.png": {
+    "mtime": 1790859417.5254369,
+    "ast_hash": "dcbf458de7ae78e6c8af5e7e45b0ef89",
+    "semantic_hash": ""
+  },
+  "output/playwright/remote-desktop.png": {
+    "mtime": 1790859598.1954515,
+    "ast_hash": "89f18e8d77c43cd40dfa24b03314b986",
+    "semantic_hash": ""
+  },
+  "web/devices.test.cjs": {
+    "mtime": 1791065759.3020017,
+    "ast_hash": "d67dfb85584a1a1fa4bee8cfbd883b68",
+    "semantic_hash": ""
+  },
+  "internal/agent/remote_clipboard.go": {
+    "mtime": 1791043064.1206067,
+    "ast_hash": "98074a2d51c7b492fc75d1040761783d",
+    "semantic_hash": ""
+  },
+  "internal/agent/remote_clipboard_test.go": {
+    "mtime": 1791043064.1246557,
+    "ast_hash": "e826a9385b936b1b8ffd57303892b59d",
+    "semantic_hash": ""
+  },
+  "internal/server/password_breach.go": {
+    "mtime": 1790926258.1822603,
+    "ast_hash": "ca1c5efe977d7923373e4cc140f5914c",
+    "semantic_hash": ""
+  },
+  "internal/server/password_breach_test.go": {
+    "mtime": 1790926602.384567,
+    "ast_hash": "c1a6d220b4ec426ec89965a6a32d5885",
+    "semantic_hash": ""
+  },
+  "internal/server/agent_package_mac.go": {
+    "mtime": 1791043370.3846407,
+    "ast_hash": "efe613d68a3c6309fa9095ad7c790f4f",
+    "semantic_hash": ""
+  },
+  "internal/server/agent_package_mac_test.go": {
+    "mtime": 1791043464.8336246,
+    "ast_hash": "59a565d443f7c1796e275be27794a222",
+    "semantic_hash": ""
+  },
+  "web/agent-download.test.cjs": {
+    "mtime": 1790934335.1432943,
+    "ast_hash": "6b22824bb1eef541eaa27aeb36aa5dc0",
+    "semantic_hash": ""
+  },
+  "internal/agent/remote_input_darwin.go": {
+    "mtime": 1791043464.9021344,
+    "ast_hash": "5c78c00ab9599b91d23a8fc301784dc4",
+    "semantic_hash": ""
+  },
+  "internal/agent/remote_mac_keys.go": {
+    "mtime": 1791043064.1262867,
+    "ast_hash": "acb6bfe3b3abcb622c1e93a0fd19192e",
+    "semantic_hash": ""
+  },
+  "internal/agent/remote_mac_keys_test.go": {
+    "mtime": 1791043064.1283107,
+    "ast_hash": "feca7aa77b07a8fe6352dead71883c24",
+    "semantic_hash": ""
+  },
+  "internal/agent/remote_native_darwin.m": {
+    "mtime": 1791043212.8546286,
+    "ast_hash": "ef6e624a02a90a068692d6c8c147ae51",
+    "semantic_hash": ""
+  },
+  ".github/workflows/build-macos-agent.yml": {
+    "mtime": 1791043370.3911996,
+    "ast_hash": "3043b52bb2822ef7b81c9479bd44d6f5",
+    "semantic_hash": ""
+  },
+  "cmd/agent/system_service_stop_windows_test.go": {
+    "mtime": 1791065528.6786501,
+    "ast_hash": "b0d4cd2920ac44d90342e16d9b5d4273",
+    "semantic_hash": ""
+  },
+  "internal/agent/key_rotation_test.go": {
+    "mtime": 1791065642.4705384,
+    "ast_hash": "44433d3486d11ff6874ecab9b69d9d2b",
+    "semantic_hash": ""
+  },
+  "internal/agent/vpn.go": {
+    "mtime": 1791280053.9549222,
+    "ast_hash": "ee7eff9126c6c7e31776d81dcab43f43",
+    "semantic_hash": ""
+  },
+  "internal/agent/vpn_other.go": {
+    "mtime": 1791260176.8688235,
+    "ast_hash": "c6d935eb5d918846e03dfc5ca9236341",
+    "semantic_hash": ""
+  },
+  "internal/agent/vpn_tray_windows.go": {
+    "mtime": 1791049499.5673823,
+    "ast_hash": "c9c1b4bd3652907eef4725b88c5c8ad3",
+    "semantic_hash": ""
+  },
+  "internal/agent/vpn_windows.go": {
+    "mtime": 1791260213.5887752,
+    "ast_hash": "25f4248dfa97dfa917151ce670e77ea6",
+    "semantic_hash": ""
+  },
+  "internal/server/api_keys.go": {
+    "mtime": 1791172184.028628,
+    "ast_hash": "148dda89f68b60f6f705bc62243a298d",
+    "semantic_hash": ""
+  },
+  "internal/server/api_keys_test.go": {
+    "mtime": 1791172184.029227,
+    "ast_hash": "d4aaec99cdc014bc54d7cef617c7aa57",
+    "semantic_hash": ""
+  },
+  "internal/server/vpn.go": {
+    "mtime": 1791464459.9120388,
+    "ast_hash": "5ece82a223071d6b3d58def55aa6e815",
+    "semantic_hash": ""
+  },
+  "internal/server/vpn_test.go": {
+    "mtime": 1791464459.9151528,
+    "ast_hash": "5e2cd6ac9b10dda8a176b5d6cf326c70",
+    "semantic_hash": ""
+  },
+  "internal/vpn/pilot.go": {
+    "mtime": 1791047884.4030845,
+    "ast_hash": "3be4dd42af51ba352533d18b0f6bce32",
+    "semantic_hash": ""
+  },
+  "internal/vpn/pilot_test.go": {
+    "mtime": 1791047884.4030845,
+    "ast_hash": "a4cf286300ca763fe66cced3ffb7ce01",
+    "semantic_hash": ""
+  },
+  "web/key-rotation.test.cjs": {
+    "mtime": 1791172151.6897461,
+    "ast_hash": "63218e0fc8ed312b592e78d334f1af06",
+    "semantic_hash": ""
+  },
+  "web/static/vpn.js": {
+    "mtime": 1791214208.3313038,
+    "ast_hash": "a09cafdfe68244cb29722a82d2cd0651",
+    "semantic_hash": ""
+  },
+  "docs/api-key-rotation.md": {
+    "mtime": 1791171978.25107,
+    "ast_hash": "8025ef61cd0b5987703effc90fe38630",
+    "semantic_hash": ""
+  },
+  "scripts/playwright-opera.ps1": {
+    "mtime": 1791174706.9561608,
+    "ast_hash": "554c8d1e2b93ccaa3c9a033d2c234752",
+    "semantic_hash": ""
+  },
+  "scripts/playwright-opera.test.ps1": {
+    "mtime": 1791174731.376215,
+    "ast_hash": "779f7703631da6ea6f568035011be045",
+    "semantic_hash": ""
+  },
+  ".playwright-mcp/page-2026-10-05T06-42-02-207Z.yml": {
+    "mtime": 1791182522.2135992,
+    "ast_hash": "8789805674cb07d5a0aa33882c049f4e",
+    "semantic_hash": ""
+  },
+  ".playwright-mcp/page-2026-10-05T06-43-44-269Z.yml": {
+    "mtime": 1791182624.2714577,
+    "ast_hash": "7576eeea466c428782fd009013d56367",
+    "semantic_hash": ""
+  },
+  ".playwright-mcp/page-2026-10-05T06-45-31-948Z.yml": {
+    "mtime": 1791182731.9579794,
+    "ast_hash": "503609c5410a80b4a89f61adedfbb2fd",
+    "semantic_hash": ""
+  },
+  ".playwright-mcp/page-2026-10-05T06-54-04-607Z.yml": {
+    "mtime": 1791183244.6098936,
+    "ast_hash": "c46b87a1d009da630408d02b1412c876",
+    "semantic_hash": ""
+  },
+  ".playwright-mcp/page-2026-10-05T06-43-49-855Z.png": {
+    "mtime": 1791182629.8601081,
+    "ast_hash": "c6eeaf71b581b87ff05594ca455f47df",
+    "semantic_hash": ""
+  },
+  ".playwright-mcp/page-2026-10-05T06-45-42-444Z.png": {
+    "mtime": 1791182742.4464352,
+    "ast_hash": "7db9c6df4c7fb59218ce90ea92d416cd",
+    "semantic_hash": ""
+  },
+  ".playwright-mcp/page-2026-10-05T06-49-36-750Z.png": {
+    "mtime": 1791182976.7536807,
+    "ast_hash": "aa7b69b2db7387f2612564894183f533",
+    "semantic_hash": ""
+  },
+  ".playwright-mcp/page-2026-10-05T06-54-13-119Z.png": {
+    "mtime": 1791183253.1264436,
+    "ast_hash": "474683aa6b25d4e721a405024a8f7f73",
+    "semantic_hash": ""
+  },
+  ".playwright-mcp/page-2026-10-05T06-55-01-608Z.png": {
+    "mtime": 1791183301.6123269,
+    "ast_hash": "c6e99c8c0dade55f1ea618d585ad1151",
+    "semantic_hash": ""
+  },
+  ".playwright-mcp/page-2026-10-05T07-30-51-963Z.yml": {
+    "mtime": 1791185451.9682121,
+    "ast_hash": "f8b14cbd6953bf41d3d5594ec3e22880",
+    "semantic_hash": ""
+  },
+  "web/users-ui.test.cjs": {
+    "mtime": 1791186872.3296638,
+    "ast_hash": "666685d56064a6533797c102965f8a12",
+    "semantic_hash": ""
+  },
+  "output/users-modal-desktop.png": {
+    "mtime": 1791185587.7425077,
+    "ast_hash": "67316bbf90787a5adffef2333d403ac6",
+    "semantic_hash": ""
+  },
+  "web/vpn.test.cjs": {
+    "mtime": 1791280136.7480743,
+    "ast_hash": "c190dbeca1844cfe317eb8d6fe5489b0",
+    "semantic_hash": ""
+  },
+  ".playwright-mcp/page-2026-10-05T15-09-32-796Z.yml": {
+    "mtime": 1791212972.8031058,
+    "ast_hash": "f722fd0a52f1a1e32e7f9201339fed0e",
+    "semantic_hash": ""
+  },
+  ".playwright-mcp/page-2026-10-05T15-28-01-406Z.yml": {
+    "mtime": 1791214081.4097197,
+    "ast_hash": "f8b14cbd6953bf41d3d5594ec3e22880",
+    "semantic_hash": ""
+  },
+  "output/playwright/vpn-fixed-desktop.png": {
+    "mtime": 1791214167.3301039,
+    "ast_hash": "aef86990f2170edf06fdca578a4c924b",
+    "semantic_hash": ""
+  },
+  ".playwright-mcp/page-2026-10-06T01-37-58-805Z.yml": {
+    "mtime": 1791250678.8087432,
+    "ast_hash": "f5a957b9b63189c1fa35306e988454cd",
+    "semantic_hash": ""
+  },
+  ".playwright-mcp/page-2026-10-06T02-00-57-786Z.yml": {
+    "mtime": 1791252057.7942145,
+    "ast_hash": "bd59f9aa248ab60555a40700adbc5657",
+    "semantic_hash": ""
+  },
+  ".playwright-mcp/page-2026-10-06T02-13-41-156Z.yml": {
+    "mtime": 1791252821.1617217,
+    "ast_hash": "0d642a15c6926908b05abc968d0f1bff",
+    "semantic_hash": ""
+  },
+  "scripts/extract-wireguard.ps1": {
+    "mtime": 1791262325.1017814,
+    "ast_hash": "64af6d253c42662a898a23e67b144529",
+    "semantic_hash": ""
+  },
+  "web/idle.test.cjs": {
+    "mtime": 1791464372.3557596,
+    "ast_hash": "0eb253b39ba251f3189f2c0611a03768",
+    "semantic_hash": ""
+  }
+}

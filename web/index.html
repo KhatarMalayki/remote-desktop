@@ -1030,7 +1030,7 @@
 <div id="vpnModal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeVPNModal()">
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="vpnModalTitle" aria-describedby="vpnModalHelp" onkeydown="handleVPNDialogKeydown(event)">
     <h3 id="vpnModalTitle">VPN Pilot</h3>
-    <p id="vpnModalHelp" class="users-subtitle">Uji VPN maksimal 15 menit. Hanya subnet pilot; bukan akses seluruh LAN. Membuka panel ini tidak mengaktifkan VPN.</p>
+    <p id="vpnModalHelp" class="users-subtitle">Uji VPN maksimal 15 menit, dua perangkat. LAN hanya dibagikan jika admin mengaktifkan Advertise LAN. Membuka panel tidak mengaktifkan VPN.</p>
     <div class="form-group">
       <label for="vpnDevicePicker">Perangkat target</label>
       <select id="vpnDevicePicker" onchange="onVPNDevicePickerChange(this.value)"></select>
@@ -1046,6 +1046,32 @@
       <p id="vpnClientDetail">VPN belum aktif.</p>
       <div class="users-help-text">IP VPN: <span id="vpnAssignedIP">Belum terhubung</span></div>
     </div>
+    <div class="users-card">
+      <h4 class="users-card-title">Connect mandiri dari tray</h4>
+      <label><input id="vpnSelfEnabled" type="checkbox" disabled> Izinkan pengguna lokal connect VPN pada perangkat ini</label>
+      <div class="form-group">
+        <label for="vpnSelfRoute">Subnet LAN yang boleh diakses (opsional)</label>
+        <input id="vpnSelfRoute" type="text" placeholder="192.168.1.0/24" maxlength="18" autocomplete="off" spellcheck="false" disabled aria-describedby="vpnSelfHelp">
+      </div>
+      <p id="vpnSelfHelp" class="users-help-text">Default ditolak. Izin berlaku untuk semua pengguna lokal perangkat, bukan akun admin dashboard. Anggota VPN pilot dapat saling mengakses; belum ada pembatasan peer/port. Akses LAN hanya jika gateway aktif juga mengizinkan perangkat ini. User tidak dapat advertise LAN atau mengubah policy. Batas tetap 2 perangkat / 15 menit.</p>
+      <p id="vpnSelfStatus" class="users-help-text" role="status">Policy belum dimuat.</p>
+      <button id="btnVPNSelfSave" type="button" class="btn btn-primary" onclick="saveVPNSelfPolicy()" disabled>Simpan Policy</button>
+    </div>
+    <div class="users-card">
+      <h4 class="users-card-title">Gateway LAN (opsional)</h4>
+      <label><input id="vpnAdvertiseLAN" type="checkbox" onchange="renderVPNLANControls()"> Advertise LAN dari perangkat ini</label>
+      <div class="form-group">
+        <label for="vpnLANSubnet">Subnet LAN lokal (CIDR)</label>
+        <input id="vpnLANSubnet" type="text" placeholder="192.168.1.0/24" maxlength="18" autocomplete="off" spellcheck="false" aria-describedby="vpnLANHelp" disabled>
+      </div>
+      <div class="form-group">
+        <label for="vpnLANClient">Perangkat VPN yang diizinkan mengakses LAN</label>
+        <input id="vpnLANClient" type="text" list="vpnLANClients" placeholder="Pilih atau ketik ID device" maxlength="256" autocomplete="off" disabled>
+        <datalist id="vpnLANClients"></datalist>
+      </div>
+      <p id="vpnLANHelp" class="users-help-text">Agent gateway dan client minimal 0.2.69. Masukkan subnet persis interface LAN gateway, IPv4 privat /16–/30. Gateway harus mendukung NetNat; NAT/ICS yang sudah digunakan tidak ditimpa. Hubungkan gateway dahulu, lalu client terpilih. Disconnect dahulu untuk mengubah atau mematikan advertise LAN; client ikut diputus.</p>
+      <p id="vpnLANStatus" class="users-help-text" aria-live="polite">Advertise LAN OFF</p>
+    </div>
     <div class="modal-actions">
       <button type="button" class="btn btn-ghost" onclick="refreshVPNState()">Refresh Status</button>
       <button type="button" id="btnVPNConnect" class="btn btn-primary" onclick="triggerVPN('connect')" disabled>Connect VPN Pilot</button>
@@ -1056,10 +1082,10 @@
 </div>
 <script src="/static/dialogs.js?v=20260924"></script>
 <script src="/static/ownership.js?v=20260924"></script>
-<script src="/static/app.js?v=20261008-priority-fixes"></script>
+<script src="/static/app.js?v=20261010-lan"></script>
 <script src="/static/deploy.js?v=20260930"></script>
 <script src="/static/endpoint.js?v=0.2.58"></script>
-<script src="/static/vpn.js?v=20261008-priority-fixes"></script>
+<script src="/static/vpn.js?v=20261010-self-service"></script>
 <div id="fileManagerModal" class="modal-overlay" style="display:none">
  <div class="modal" style="max-width:1000px">
   <h3>Transfer file</h3>
