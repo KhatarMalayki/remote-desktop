@@ -136,6 +136,23 @@ body { line-height: 1.5; }
 .users-modal-heading h3 { margin:0; padding:0; border:0; }
 .users-subtitle { font-size:12px; color:var(--fg2); margin:0 0 14px 0; line-height:1.5; }
 .users-card { background:var(--bg3); padding:14px 16px; border-radius:var(--radius); border:1px solid var(--border); margin-bottom:16px; }
+.vpn-master-layout { display:grid; grid-template-columns:minmax(0,1.2fr) minmax(320px,1fr); gap:20px; align-items:start; }
+.vpn-master-layout > * { min-width:0; }
+.vpn-master-layout h3 { margin:0 0 12px; font-size:16px; overflow-wrap:anywhere; }
+.vpn-master-notice { border-left:3px solid var(--accent); }
+.vpn-master-notice p { margin:6px 0; }
+.vpn-master-notice small { color:var(--fg2); }
+.vpn-master-list .toolbar { margin:12px 0; flex-wrap:wrap; }
+.vpn-master-list .search-input { min-width:0; flex:1 1 180px; }
+.vpn-master-table { overflow:auto; margin:12px 0; border:1px solid var(--border); border-radius:8px; }
+.vpn-master-table .device-table { min-width:440px; width:100%; margin:0; }
+.vpn-master-table td { white-space:normal; overflow-wrap:anywhere; }
+.vpn-master-table td small { display:block; color:var(--fg2); margin-top:5px; }
+.vpn-master-table td .btn { margin:2px; }
+.vpn-master-selected { background:rgba(79,140,255,.08); }
+.vpn-master-actions { display:flex; gap:8px; flex-wrap:wrap; }
+.vpn-master-table:focus-visible, #vpnMasterSelectedName:focus-visible { outline:2px solid var(--accent); outline-offset:3px; }
+@media (max-width:1100px) { .vpn-master-layout { grid-template-columns:minmax(0,1fr); } }
 .users-card-title { font-size:13px; font-weight:600; margin:0 0 10px 0; }
 .users-form-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
 .users-form-grid .form-group { min-width:0; margin-bottom:0; }

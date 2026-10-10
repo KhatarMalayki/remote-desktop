@@ -22,13 +22,20 @@ No scheduled task or new autorun entry is installed.
 
 ## Admin policy
 
-In the device VPN dialog, enable **Connect mandiri dari tray**, optionally enter an
+In **Administrasi > Master VPN**, find the device and select **Kelola**.
+Enable **Connect mandiri dari tray**, optionally enter an
 approved private LAN subnet, then save. This authorizes all interactive local users
 on that device. The client cannot select another device, publish LAN, or supply routes.
 LAN access additionally requires the active gateway's existing device whitelist.
 Saving policy stops an active self-service session; disabling it prevents reconnect.
 The server checks policy again before provisioning/renewing the lease. Failures to
 read policy deny access. Cleanup failures remain visible and retry through the watchdog.
+
+Gateway/subnet settings are also in Master VPN. Select the gateway, fill its subnet
+and permitted client, then explicitly activate it. These remain session-scoped,
+not persistent gateway policies. The device's **Koneksi VPN** dialog contains only
+status, Connect/Disconnect, and a shortcut to Master VPN; opening it cannot apply
+an unsaved gateway configuration from the master page.
 
 This is device-level self-service on the existing pilot, not NetBird feature parity:
 the two-device/15-minute limits remain; approved VPN members can communicate with

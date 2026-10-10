@@ -7,7 +7,7 @@ const source = fs.readFileSync(require('node:path').join(__dirname,'static/app.j
 test('polling only refreshes visible page and leaves active remote untouched', async () => {
   const calls=[];
   const context=vm.createContext({document:{hidden:false},currentPage:'remote',remoteWS:{},
-    loadStats:()=>calls.push('stats'),loadDevices:()=>calls.push('devices'),
+    loadStats:()=>calls.push('stats'),loadDevices:()=>calls.push('devices'),loadVPNMaster:()=>calls.push('vpn'),
     loadBranchAssets:async()=>{calls.push('assets');},renderAssets:()=>calls.push('render')});
   vm.runInContext(source.slice(source.indexOf('function refreshVisiblePage()'),source.indexOf('// ==================== API')),context);
   context.refreshVisiblePage();
@@ -21,6 +21,8 @@ test('polling only refreshes visible page and leaves active remote untouched', a
   assert.deepEqual(calls,['devices']);calls.length=0;
   context.currentPage='assets';context.refreshVisiblePage();await Promise.resolve();
   assert.deepEqual(calls,['assets','render']);
+  calls.length=0;context.currentPage='vpn';context.refreshVisiblePage();
+  assert.deepEqual(calls,['vpn']);
 });
 
 test('device metadata save includes dedicated identity fields', async () => {

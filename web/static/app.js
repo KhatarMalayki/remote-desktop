@@ -160,6 +160,8 @@ function updateUserUI() {
   var navBranches = document.getElementById('navBranches');
   if (navBranches) navBranches.style.display = currentUser.role === 'admin' ? 'flex' : 'none';
   var navReconf = document.getElementById('navReconfigure');
+  const navVPN = document.getElementById('navVPNMaster');
+  if (navVPN) navVPN.style.display = currentUser.role === 'admin' ? 'flex' : 'none';
   if (navReconf) navReconf.style.display = currentUser.role === 'admin' ? 'flex' : 'none';
   var navSec = document.getElementById('navSecurityLogs');
   if (navSec) navSec.style.display = currentUser.role === 'admin' ? 'flex' : 'none';
@@ -209,6 +211,7 @@ function refreshVisiblePage() {
   if (document.hidden) return;
   if (currentPage === 'dashboard') { loadStats(); loadDevices(); }
   else if (currentPage === 'devices') loadDevices();
+  else if (currentPage === 'vpn') loadVPNMaster();
   else if (currentPage === 'branch-assets') loadBranchAssets();
   else if (currentPage === 'assets') loadBranchAssets().then(renderAssets);
   else if (currentPage === 'remote' && !remoteWS) loadDevices();
@@ -256,6 +259,7 @@ function updateOnlineStatus(id, online) {
 // ==================== PAGES ====================
 
 function showPage(page) {
+  if (page === 'vpn' && (!currentUser || currentUser.role !== 'admin')) { showToast('Master VPN hanya untuk admin'); return; }
   currentPage = page;
   document.querySelectorAll('.page').forEach(function(p) { p.classList.remove('active'); });
   var el = document.getElementById('page-' + page);
@@ -268,6 +272,8 @@ function showPage(page) {
   if (page === 'assets') { loadDevices(); }
   if (page === 'branch-assets') { loadBranchAssets(); }
   if (page === 'remote') { updateRemoteDeviceList(); }
+  syncVPNPolling();
+  if (page === 'vpn') return loadVPNMaster();
 }
 
 var lastStats = null;
